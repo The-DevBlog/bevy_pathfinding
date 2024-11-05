@@ -10,9 +10,9 @@ mod resources;
 use components::*;
 use resources::*;
 
-const MAP_SIZE: f32 = 800.0;
-const MAP_GRID_SIZE: u32 = 60;
-const MAP_CELL_SIZE: f32 = MAP_SIZE / MAP_GRID_SIZE as f32;
+// const MAP_SIZE: f32 = 800.0;
+// const MAP_GRID_SIZE: u32 = 60;
+// const MAP_CELL_SIZE: f32 = MAP_SIZE / MAP_GRID_SIZE as f32;
 const COLOR_PATH_FINDING: Srgba = YELLOW;
 const COLOR_PATH: Srgba = LIGHT_STEEL_BLUE;
 const COLOR_OCCUPIED_CELL: Srgba = RED;
@@ -22,8 +22,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Grid>()
-            .init_resource::<TargetCell>()
+        app.init_resource::<TargetCell>()
             .init_resource::<SetGridOccupantsOnce>()
             .init_resource::<DelayedRunTimer>()
             .add_systems(
@@ -43,15 +42,21 @@ impl Plugin for BevyRtsPathFindingPlugin {
 
 // runs once at Update
 fn set_grid_occupants(
-    mut grid: ResMut<Grid>,
+    mut grid_q: Query<&mut Grid>,
     rapier_context: Res<RapierContext>,
     mut track: ResMut<SetGridOccupantsOnce>,
     time: Res<Time>,
     mut timer: ResMut<DelayedRunTimer>,
 ) {
+    let mut grid = match grid_q.get_single_mut() {
+        Ok(grid) => grid,
+        Err(_e) => return,
+    };
+
     // Wait until the delay timer finishes, then run the system
     if !track.0 && timer.0.tick(time.delta()).finished() {
-        let half_size = MAP_CELL_SIZE / 2.0;
+        let half_size_x = grid.cell_width / 2.0;
+        let half_size_z = grid.cell_height / 2.0;
 
         let mut occupied_cells = Vec::new();
 
@@ -60,7 +65,7 @@ fn set_grid_occupants(
             for (column_idx, cell) in cell_row.iter_mut().enumerate() {
                 // Define the cell's bounding box as a Rapier cuboid (half extents of the cell)
                 let cell_center = Vec3::new(cell.position.x, 0.0, cell.position.y);
-                let cell_shape = Collider::cuboid(half_size, 1.0, half_size);
+                let cell_shape = Collider::cuboid(half_size_x, 1.0, half_size_z);
 
                 if let Some(_) = rapier_context.intersection_with_shape(
                     cell_center,
@@ -80,11 +85,17 @@ fn set_grid_occupants(
 }
 
 fn update_grid_occupants(
-    mut grid: ResMut<Grid>,
+    mut grid_q: Query<&mut Grid>,
     rapier_context: Res<RapierContext>,
     collider_q: Query<&Transform, With<Collider>>,
 ) {
-    let half_size = MAP_CELL_SIZE / 2.0;
+    let mut grid = match grid_q.get_single_mut() {
+        Ok(grid) => grid,
+        Err(_e) => return,
+    };
+
+    let half_size_x = grid.cell_width / 2.0;
+    let half_size_z = grid.cell_height / 2.0;
 
     // Create a new vector to hold indices of cells that are still occupied
     let mut still_occupied_cells = Vec::new();
@@ -96,7 +107,7 @@ fn update_grid_occupants(
     for (row, column) in occupied_cells_snapshot.iter() {
         let cell = grid.cells[*row][*column];
         let cell_center = Vec3::new(cell.position.x, 0.0, cell.position.y);
-        let cell_shape = Collider::cuboid(half_size, 1.0, half_size);
+        let cell_shape = Collider::cuboid(half_size_x, 1.0, half_size_z);
 
         // If cell is no longer occupied, mark it as unoccupied
         if rapier_context
@@ -120,8 +131,8 @@ fn update_grid_occupants(
         let collider_position = transform.translation;
 
         // Calculate the grid cell row and column based on collider's position
-        let normalized_x = (collider_position.x + MAP_SIZE / 2.0) / MAP_CELL_SIZE;
-        let normalized_y = (collider_position.z + MAP_SIZE / 2.0) / MAP_CELL_SIZE;
+        let normalized_x = (collider_position.x + grid.width / 2.0) / grid.cell_width;
+        let normalized_y = (collider_position.z + grid.height / 2.0) / grid.cell_height;
         let row = normalized_y.floor() as usize;
         let column = normalized_x.floor() as usize;
 
@@ -130,7 +141,7 @@ fn update_grid_occupants(
             // Access the cell and check if it needs to be marked as occupied
             let cell = &grid.cells[row][column];
             let cell_center = Vec3::new(cell.position.x, 0.0, cell.position.y);
-            let cell_shape = Collider::cuboid(half_size, 1.0, half_size);
+            let cell_shape = Collider::cuboid(half_size_x, 1.0, half_size_z);
 
             if let Some(_) = rapier_context.intersection_with_shape(
                 cell_center,
@@ -155,14 +166,19 @@ fn draw_grid(
     mut gizmos: Gizmos,
     mut unit_q: Query<(&Transform, &Selected), With<Selected>>,
     target_cell: Res<TargetCell>,
-    grid: Res<Grid>,
+    grid_q: Query<&Grid>,
 ) {
+    let grid = match grid_q.get_single() {
+        Ok(grid) => grid,
+        Err(_e) => return,
+    };
+
     // draw grid
     gizmos.grid(
         Vec3::ZERO,
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(MAP_GRID_SIZE, MAP_GRID_SIZE),
-        Vec2::new(MAP_CELL_SIZE, MAP_CELL_SIZE),
+        UVec2::new(grid.width as u32, grid.height as u32),
+        Vec2::new(grid.cell_width, grid.cell_height),
         COLOR_GRID,
     );
 
@@ -173,7 +189,7 @@ fn draw_grid(
         }
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
-            let (start_row, start_column) = get_unit_cell_row_and_column(&unit_trans);
+            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_trans);
 
             // Compute the path, ensuring only non-occupied cells are included
             if let Some(path) = find_path(&grid, (start_row, start_column), (goal_row, goal_column))
@@ -184,7 +200,7 @@ fn draw_grid(
                     let cell = grid.cells[row as usize][column as usize];
                     let position = Vec3::new(cell.position.x, 0.1, cell.position.y);
                     let rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-                    let size = Vec2::splat(MAP_CELL_SIZE);
+                    let size = Vec2::splat(grid.cell_width);
                     let color = COLOR_PATH;
 
                     gizmos.rect(position, rotation, size, color);
@@ -198,7 +214,7 @@ fn draw_grid(
         let cell = grid.cells[*row][*column];
         let position = Vec3::new(cell.position.x, 0.1, cell.position.y);
         let rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-        let size = Vec2::splat(MAP_CELL_SIZE);
+        let size = Vec2::splat(grid.cell_width);
         gizmos.rect(position, rotation, size, COLOR_OCCUPIED_CELL);
     }
 }
@@ -262,20 +278,24 @@ fn move_units_along_path(
 }
 
 fn set_destination_path(
-    grid: Res<Grid>,
+    grid_q: Query<&Grid>,
     mut unit_q: Query<(&Transform, &Selected, &mut Destination), With<Selected>>,
     target_cell: Res<TargetCell>,
     input: Res<ButtonInput<MouseButton>>,
 ) {
+    let grid = match grid_q.get_single() {
+        Ok(grid) => grid,
+        Err(_e) => return,
+    };
+
     for (transform, selected, mut destination) in unit_q.iter_mut() {
-        // println!("MADE IT");
         if !selected.0 {
             continue;
         }
 
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
-            let (start_row, start_column) = get_unit_cell_row_and_column(&transform);
+            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &transform);
 
             // Compute the path, ensuring only non-occupied cells are included
             if let Some(path) = find_path(&grid, (start_row, start_column), (goal_row, goal_column))
@@ -298,11 +318,17 @@ fn set_destination_path(
 }
 
 fn set_target_cell(
+    grid_q: Query<&Grid>,
     mut target_cell: ResMut<TargetCell>,
     cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     map_base_q: Query<&GlobalTransform, With<MapBase>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
+    let grid = match grid_q.get_single() {
+        Ok(grid) => grid,
+        Err(_e) => return,
+    };
+
     let map_base = match map_base_q.get_single() {
         Ok(value) => value,
         Err(_) => return,
@@ -320,16 +346,17 @@ fn set_target_cell(
     let coords = get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
 
     // Adjust mouse coordinates to the grid's coordinate system
-    let grid_origin = -MAP_SIZE / 2.0;
-    let adjusted_x = coords.x - grid_origin; // Shift origin to (0, 0)
-    let adjusted_z = coords.z - grid_origin;
+    let grid_origin_x = -grid.width / 2.0;
+    let grid_origin_z = -grid.height / 2.0;
+    let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
+    let adjusted_z = coords.z - grid_origin_z;
 
     // Calculate the column and row indices
-    let column = (adjusted_x / MAP_CELL_SIZE).floor() as u32;
-    let row = (adjusted_z / MAP_CELL_SIZE).floor() as u32;
+    let column = (adjusted_x / grid.cell_width).floor() as u32;
+    let row = (adjusted_z / grid.cell_height).floor() as u32;
 
     // Check if indices are within the grid bounds
-    if column < MAP_GRID_SIZE && row < MAP_GRID_SIZE {
+    if column < grid.width as u32 && row < grid.height as u32 {
         // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
         target_cell.row = Some(row);
         target_cell.column = Some(column);
@@ -367,9 +394,9 @@ pub fn successors(grid: &Grid, row: u32, column: u32) -> Vec<((u32, u32), usize)
         let new_col = column as i32 + d_col;
 
         if new_row >= 0
-            && new_row < MAP_GRID_SIZE as i32
+            && new_row < grid.width as i32
             && new_col >= 0
-            && new_col < MAP_GRID_SIZE as i32
+            && new_col < grid.height as i32
         {
             let neighbor_cell = grid.cells[new_row as usize][new_col as usize];
 
@@ -389,15 +416,16 @@ pub fn heuristic(row: u32, column: u32, goal_row: u32, goal_column: u32) -> usiz
     (dx + dy) as usize // Manhattan distance
 }
 
-pub fn get_unit_cell_row_and_column(transform: &Transform) -> (u32, u32) {
+pub fn get_unit_cell_row_and_column(grid: &Grid, transform: &Transform) -> (u32, u32) {
     // Get the unit's current cell
     let unit_pos = transform.translation;
-    let grid_origin = -MAP_SIZE / 2.0;
-    let adjusted_x = unit_pos.x - grid_origin;
-    let adjusted_z = unit_pos.z - grid_origin;
+    let grid_origin_x = -grid.width / 2.0;
+    let grid_origin_y = -grid.height / 2.0;
+    let adjusted_x = unit_pos.x - grid_origin_x;
+    let adjusted_z = unit_pos.z - grid_origin_y;
 
-    let column = (adjusted_x / MAP_CELL_SIZE).floor() as u32;
-    let row = (adjusted_z / MAP_CELL_SIZE).floor() as u32;
+    let column = (adjusted_x / grid.cell_width).floor() as u32;
+    let row = (adjusted_z / grid.cell_height).floor() as u32;
 
     (row, column)
 }
