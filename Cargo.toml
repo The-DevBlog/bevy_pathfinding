@@ -1,0 +1,9 @@
+[package]
+name = "bevy_rts_pathfinding"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.14.2"
+bevy_rapier3d = "0.27.0"
+pathfinding = "4.11.0"
