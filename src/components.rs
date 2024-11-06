@@ -1,12 +1,10 @@
 use bevy::prelude::*;
 
-use crate::*;
-
 #[derive(Component)]
 pub struct MapBase;
 
 #[derive(Component)]
-pub struct Selected(pub bool);
+pub struct Selected;
 
 #[derive(Component)]
 pub struct GameCamera;

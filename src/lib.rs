@@ -177,16 +177,16 @@ fn draw_grid(
     gizmos.grid(
         Vec3::ZERO,
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(grid.width as u32, grid.height as u32),
+        UVec2::new(grid.columns as u32, grid.rows as u32),
         Vec2::new(grid.cell_width, grid.cell_height),
         COLOR_GRID,
     );
 
     // highlight unit paths
     for (unit_trans, selected) in unit_q.iter_mut() {
-        if !selected.0 {
-            continue;
-        }
+        // if !selected.0 {
+        //     continue;
+        // }
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
             let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_trans);
@@ -288,14 +288,14 @@ fn set_destination_path(
         Err(_e) => return,
     };
 
-    for (transform, selected, mut destination) in unit_q.iter_mut() {
-        if !selected.0 {
-            continue;
-        }
+    for (unit_transform, selected, mut destination) in unit_q.iter_mut() {
+        // if !selected.0 {
+        //     continue;
+        // }
 
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
-            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &transform);
+            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_transform);
 
             // Compute the path, ensuring only non-occupied cells are included
             if let Some(path) = find_path(&grid, (start_row, start_column), (goal_row, goal_column))
@@ -322,8 +322,13 @@ fn set_target_cell(
     mut target_cell: ResMut<TargetCell>,
     cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     map_base_q: Query<&GlobalTransform, With<MapBase>>,
+    selected_q: Query<&Selected>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
+    if selected_q.is_empty() {
+        return;
+    }
+
     let grid = match grid_q.get_single() {
         Ok(grid) => grid,
         Err(_e) => return,
@@ -361,6 +366,7 @@ fn set_target_cell(
         target_cell.row = Some(row);
         target_cell.column = Some(column);
     } else {
+        println!("setting to none");
         target_cell.row = None;
         target_cell.column = None;
     }
@@ -398,11 +404,13 @@ pub fn successors(grid: &Grid, row: u32, column: u32) -> Vec<((u32, u32), usize)
             && new_col >= 0
             && new_col < grid.height as i32
         {
-            let neighbor_cell = grid.cells[new_row as usize][new_col as usize];
-
-            // Only add the neighbor if it is not occupied
-            if !neighbor_cell.occupied {
-                neighbors.push(((new_row as u32, new_col as u32), 1)); // Cost is 1 per move
+            if let Some(row_cells) = grid.cells.get(new_row as usize) {
+                if let Some(neighbor_cell) = row_cells.get(new_col as usize) {
+                    // Only add the neighbor if it is not occupied
+                    if !neighbor_cell.occupied {
+                        neighbors.push(((new_row as u32, new_col as u32), 1)); // Cost is 1 per move
+                    }
+                }
             }
         }
     }
