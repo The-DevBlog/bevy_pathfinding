@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{color::palettes::css::*, prelude::*};
 
 #[derive(Component)]
 pub struct MapBase;
@@ -31,6 +31,25 @@ pub struct Grid {
     pub height: f32,
     pub cell_width: f32,
     pub cell_height: f32,
+}
+
+#[derive(Component, Debug)]
+pub struct GridColors {
+    pub path_finding: Srgba,
+    pub path: Srgba,
+    pub occupied: Srgba,
+    pub grid: Srgba,
+}
+
+impl Default for GridColors {
+    fn default() -> Self {
+        Self {
+            path_finding: YELLOW,
+            path: LIGHT_STEEL_BLUE,
+            occupied: RED,
+            grid: GRAY,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

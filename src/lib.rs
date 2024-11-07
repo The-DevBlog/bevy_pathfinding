@@ -10,9 +10,6 @@ mod resources;
 use components::*;
 use resources::*;
 
-// const MAP_SIZE: f32 = 800.0;
-// const MAP_GRID_SIZE: u32 = 60;
-// const MAP_CELL_SIZE: f32 = MAP_SIZE / MAP_GRID_SIZE as f32;
 const COLOR_PATH_FINDING: Srgba = YELLOW;
 const COLOR_PATH: Srgba = LIGHT_STEEL_BLUE;
 const COLOR_OCCUPIED_CELL: Srgba = RED;
@@ -164,14 +161,25 @@ fn update_grid_occupants(
 
 fn draw_grid(
     mut gizmos: Gizmos,
-    mut unit_q: Query<(&Transform, &Selected), With<Selected>>,
+    mut unit_q: Query<&Transform, With<Selected>>,
     target_cell: Res<TargetCell>,
     grid_q: Query<&Grid>,
+    grid_colors_q: Query<&GridColors>,
 ) {
     let grid = match grid_q.get_single() {
         Ok(grid) => grid,
         Err(_e) => return,
     };
+
+    let mut color_grid = COLOR_GRID;
+    let mut color_path = COLOR_PATH;
+    let mut color_occupied_cell = COLOR_OCCUPIED_CELL;
+
+    if let Ok(colors) = grid_colors_q.get_single() {
+        color_grid = colors.grid;
+        color_path = colors.path;
+        color_occupied_cell = colors.occupied;
+    }
 
     // draw grid
     gizmos.grid(
@@ -179,17 +187,14 @@ fn draw_grid(
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
         UVec2::new(grid.columns as u32, grid.rows as u32),
         Vec2::new(grid.cell_width, grid.cell_height),
-        COLOR_GRID,
+        color_grid,
     );
 
     // highlight unit paths
-    for (unit_trans, selected) in unit_q.iter_mut() {
-        // if !selected.0 {
-        //     continue;
-        // }
+    for unit_transform in unit_q.iter_mut() {
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
-            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_trans);
+            let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_transform);
 
             // Compute the path, ensuring only non-occupied cells are included
             if let Some(path) = find_path(&grid, (start_row, start_column), (goal_row, goal_column))
@@ -201,7 +206,7 @@ fn draw_grid(
                     let position = Vec3::new(cell.position.x, 0.1, cell.position.y);
                     let rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     let size = Vec2::splat(grid.cell_width);
-                    let color = COLOR_PATH;
+                    let color = color_path;
 
                     gizmos.rect(position, rotation, size, color);
                 }
@@ -215,7 +220,7 @@ fn draw_grid(
         let position = Vec3::new(cell.position.x, 0.1, cell.position.y);
         let rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
         let size = Vec2::splat(grid.cell_width);
-        gizmos.rect(position, rotation, size, COLOR_OCCUPIED_CELL);
+        gizmos.rect(position, rotation, size, color_occupied_cell);
     }
 }
 
@@ -223,9 +228,9 @@ fn draw_line_to_destination(
     unit_q: Query<(&Destination, &Transform), With<Unit>>,
     mut gizmos: Gizmos,
 ) {
-    for (destination, unit_trans) in unit_q.iter() {
+    for (destination, unit_transform) in unit_q.iter() {
         if let Some(_) = destination.endpoint {
-            let mut current = unit_trans.translation;
+            let mut current = unit_transform.translation;
 
             for cell in destination.waypoints.iter() {
                 let next = Vec3::new(cell.position.x, 0.1, cell.position.y);
@@ -245,7 +250,7 @@ fn move_units_along_path(
         &mut ExternalImpulse,
     )>,
 ) {
-    for (mut unit_trans, mut destination, speed, mut ext_impulse) in unit_q.iter_mut() {
+    for (mut unit_transform, mut destination, speed, mut ext_impulse) in unit_q.iter_mut() {
         // Check if we've reached the end of the path
         if destination.waypoints.len() == 0 {
             destination.endpoint = None;
@@ -257,12 +262,12 @@ fn move_units_along_path(
         let cell = &destination.waypoints[0];
         let target_pos = Vec3::new(
             cell.position.x,
-            unit_trans.translation.y, // Keep current y to avoid vertical movement
+            unit_transform.translation.y, // Keep current y to avoid vertical movement
             cell.position.y,
         );
 
         // Calculate the direction and distance to the target position
-        let direction = target_pos - unit_trans.translation;
+        let direction = target_pos - unit_transform.translation;
         let distance_sq = direction.length_squared();
 
         let threshold = 5.0;
@@ -271,7 +276,7 @@ fn move_units_along_path(
         } else {
             // Move towards the waypoint
             let direction_normalized = Vec3::new(direction.x, 0.0, direction.z).normalize();
-            rotate_towards(&mut unit_trans, direction_normalized);
+            rotate_towards(&mut unit_transform, direction_normalized);
             ext_impulse.impulse += direction_normalized * speed.0 * time.delta_seconds();
         }
     }
@@ -279,7 +284,7 @@ fn move_units_along_path(
 
 fn set_destination_path(
     grid_q: Query<&Grid>,
-    mut unit_q: Query<(&Transform, &Selected, &mut Destination), With<Selected>>,
+    mut unit_q: Query<(&Transform, &mut Destination), With<Selected>>,
     target_cell: Res<TargetCell>,
     input: Res<ButtonInput<MouseButton>>,
 ) {
@@ -288,11 +293,7 @@ fn set_destination_path(
         Err(_e) => return,
     };
 
-    for (unit_transform, selected, mut destination) in unit_q.iter_mut() {
-        // if !selected.0 {
-        //     continue;
-        // }
-
+    for (unit_transform, mut destination) in unit_q.iter_mut() {
         if let (Some(goal_row), Some(goal_column)) = (target_cell.row, target_cell.column) {
             // Get the unit's current cell
             let (start_row, start_column) = get_unit_cell_row_and_column(&grid, &unit_transform);
@@ -445,13 +446,13 @@ pub fn rotate_towards(trans: &mut Transform, direction: Vec3) {
 
 pub fn get_world_coords(
     map_base_trans: &GlobalTransform,
-    cam_trans: &GlobalTransform,
+    cam_transform: &GlobalTransform,
     cam: &Camera,
     cursor_pos: Vec2,
 ) -> Vec3 {
     let plane_origin = map_base_trans.translation();
     let plane = InfinitePlane3d::new(map_base_trans.up());
-    let ray = cam.viewport_to_world(cam_trans, cursor_pos).unwrap();
+    let ray = cam.viewport_to_world(cam_transform, cursor_pos).unwrap();
     let distance = ray.intersect_plane(plane_origin, plane).unwrap();
     return ray.get_point(distance);
 }
