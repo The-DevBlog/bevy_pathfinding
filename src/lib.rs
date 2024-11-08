@@ -367,7 +367,6 @@ fn set_target_cell(
         target_cell.row = Some(row);
         target_cell.column = Some(column);
     } else {
-        println!("setting to none");
         target_cell.row = None;
         target_cell.column = None;
     }
@@ -376,14 +375,19 @@ fn set_target_cell(
 pub fn find_path(grid: &Grid, start: (u32, u32), goal: (u32, u32)) -> Option<Vec<(u32, u32)>> {
     pathfinding::prelude::astar(
         &start,
-        |&(row, column)| successors(&grid, row, column),
+        |&(row, column)| successors(&grid, row, column, start),
         |&(row, column)| heuristic(row, column, goal.0, goal.1),
         |&pos| pos == goal,
     )
     .map(|(path, _cost)| path)
 }
 
-pub fn successors(grid: &Grid, row: u32, column: u32) -> Vec<((u32, u32), usize)> {
+pub fn successors(
+    grid: &Grid,
+    row: u32,
+    column: u32,
+    start: (u32, u32),
+) -> Vec<((u32, u32), usize)> {
     let mut neighbors = Vec::new();
     let directions = [
         (-1, 0),  // Up
@@ -407,8 +411,8 @@ pub fn successors(grid: &Grid, row: u32, column: u32) -> Vec<((u32, u32), usize)
         {
             if let Some(row_cells) = grid.cells.get(new_row as usize) {
                 if let Some(neighbor_cell) = row_cells.get(new_col as usize) {
-                    // Only add the neighbor if it is not occupied
-                    if !neighbor_cell.occupied {
+                    // Treat the start cell as unoccupied
+                    if !neighbor_cell.occupied || (new_row as u32, new_col as u32) == start {
                         neighbors.push(((new_row as u32, new_col as u32), 1)); // Cost is 1 per move
                     }
                 }
@@ -426,7 +430,6 @@ pub fn heuristic(row: u32, column: u32, goal_row: u32, goal_column: u32) -> usiz
 }
 
 pub fn get_unit_cell_row_and_column(grid: &Grid, transform: &Transform) -> (u32, u32) {
-    // Get the unit's current cell
     let unit_pos = transform.translation;
     let grid_origin_x = -grid.width / 2.0;
     let grid_origin_y = -grid.height / 2.0;
