@@ -58,7 +58,7 @@ pub struct GridCell {
     pub position: Vec3,
     pub cost: f32,
     pub flow_vector: Vec3,
-    pub is_obstacle: bool,
+    pub occupied: bool,
 }
 
 #[derive(Resource)]
@@ -93,7 +93,7 @@ impl Grid {
                     position: Vec3::ZERO,
                     cost: f32::INFINITY,
                     flow_vector: Vec3::ZERO,
-                    is_obstacle: false,
+                    occupied: false,
                 };
                 cells_width
             ];
@@ -117,7 +117,7 @@ impl Grid {
 
                 // Randomly set some cells as obstacles
                 if rng.gen_bool(0.1) {
-                    grid[x][z].is_obstacle = true;
+                    grid[x][z].occupied = true;
                 }
             }
         }
@@ -155,7 +155,7 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
 
                 let neighbor = &mut grid.cells[nx][nz];
 
-                if neighbor.is_obstacle {
+                if neighbor.occupied {
                     continue;
                 }
 
@@ -173,7 +173,7 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
 fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
     for x in 0..grid.cells_width {
         for z in 0..grid.cells_depth {
-            if grid.cells[x][z].is_obstacle {
+            if grid.cells[x][z].occupied {
                 continue;
             }
 
@@ -213,7 +213,7 @@ fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
         for z in 0..grid.cells_depth {
             let cell = &grid.cells[x][z];
 
-            if cell.is_obstacle || cell.flow_vector == Vec3::ZERO {
+            if cell.occupied || cell.flow_vector == Vec3::ZERO {
                 // Draw an 'X' for each occupied cell
                 let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
                 let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
