@@ -1,6 +1,7 @@
 use bevy::{
     color::palettes::{css::*, tailwind::CYAN_100},
     prelude::*,
+    window::PrimaryWindow,
 };
 use bevy_rapier3d::{
     plugin::RapierContext,
@@ -316,6 +317,55 @@ fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
         Vec2::new(CELL_SIZE, CELL_SIZE),
         COLOR_GRID,
     );
+}
+
+fn set_target_cell(
+    grid: Res<Grid>,
+    mut target_cell: ResMut<TargetCell>,
+    cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    map_base_q: Query<&GlobalTransform, With<MapBase>>,
+    // selected_q: Query<&Selected>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+) {
+    // if selected_q.is_empty() {
+    //     return;
+    // }
+
+    let map_base = match map_base_q.get_single() {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let cam = match cam_q.get_single() {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+
+    let Some(viewport_cursor) = window_q.single().cursor_position() else {
+        return;
+    };
+
+    let coords = get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
+
+    // Adjust mouse coordinates to the grid's coordinate system
+    let grid_origin_x = -grid.width / 2.0;
+    let grid_origin_z = -grid.height / 2.0;
+    let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
+    let adjusted_z = coords.z - grid_origin_z;
+
+    // Calculate the column and row indices
+    let column = (adjusted_x / grid.cell_width).floor() as u32;
+    let row = (adjusted_z / grid.cell_height).floor() as u32;
+
+    // Check if indices are within the grid bounds
+    if column < grid.width as u32 && row < grid.height as u32 {
+        // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
+        target_cell.row = Some(row);
+        target_cell.column = Some(column);
+    } else {
+        target_cell.row = None;
+        target_cell.column = None;
+    }
 }
 
 // GAME LOGIC
