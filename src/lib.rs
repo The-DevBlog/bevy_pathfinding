@@ -3,12 +3,8 @@ use bevy::{
     prelude::*,
     window::PrimaryWindow,
 };
-use bevy_rapier3d::{
-    plugin::RapierContext,
-    prelude::{Collider, QueryFilter},
-};
-use rand::Rng;
-use std::{collections::VecDeque, time::Duration};
+use bevy_rapier3d::{plugin::RapierContext, prelude::*};
+use std::collections::VecDeque;
 
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
@@ -29,19 +25,30 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<InitializeGrid>().add_systems(
-            Update,
-            (
-                detect_colliders,
-                calculate_flow_field,
-                calculate_flow_vectors,
-                draw_flow_field,
-                draw_grid,
+        app.init_resource::<InitializeGrid>()
+            .add_systems(
+                Update,
+                (
+                    set_target_cell,
+                    tick_grid_init_timer,
+                    calculate_flow_field,
+                    calculate_flow_vectors,
+                    draw_flow_field,
+                    draw_grid,
+                ),
             )
-                .chain(),
-        );
+            .observe(detect_colliders);
     }
 }
+
+#[derive(Event)]
+struct DetectCollidersEv;
+
+#[derive(Component)]
+pub struct MapBase;
+
+#[derive(Component)]
+pub struct GameCamera;
 
 #[derive(Resource)]
 struct InitializeGrid {
@@ -60,15 +67,15 @@ impl Default for InitializeGrid {
 
 #[derive(Resource)]
 pub struct TargetCell {
-    x: usize,
-    z: usize,
+    row: usize,
+    column: usize,
 }
 
 impl TargetCell {
     pub fn new(cells_width: usize, cells_depth: usize) -> Self {
         let target = TargetCell {
-            x: cells_width - 1,
-            z: cells_depth - 1,
+            row: cells_width - 1,
+            column: cells_depth - 1,
         };
 
         target
@@ -86,9 +93,11 @@ pub struct GridCell {
 #[derive(Resource)]
 pub struct Grid {
     pub cells: Vec<Vec<GridCell>>,
-    pub cells_width: usize,
-    pub cells_depth: usize,
+    pub cell_rows: usize,
+    pub cell_columns: usize,
     pub colors: GridColors,
+    pub width: f32,
+    pub depth: f32,
 }
 
 pub struct GridColors {
@@ -108,7 +117,7 @@ impl Default for GridColors {
 }
 
 impl Grid {
-    pub fn new(cells_width: usize, cells_depth: usize) -> Self {
+    pub fn new(cell_rows: usize, cell_columns: usize, width: f32, depth: f32) -> Self {
         let mut grid = vec![
             vec![
                 GridCell {
@@ -117,19 +126,19 @@ impl Grid {
                     flow_vector: Vec3::ZERO,
                     occupied: false,
                 };
-                cells_width
+                cell_rows
             ];
-            cells_depth
+            cell_columns
         ];
 
         // Calculate the offset to center the grid at (0, 0, 0)
-        let grid_width = cells_width as f32 * CELL_SIZE;
-        let grid_depth = cells_depth as f32 * CELL_SIZE;
+        let grid_width = cell_rows as f32 * CELL_SIZE;
+        let grid_depth = cell_columns as f32 * CELL_SIZE;
         let half_grid_width = grid_width / 2.0;
         let half_grid_depth = grid_depth / 2.0;
 
-        for x in 0..cells_width {
-            for z in 0..cells_depth {
+        for x in 0..cell_rows {
+            for z in 0..cell_columns {
                 let world_x = x as f32 * CELL_SIZE - half_grid_width + CELL_SIZE / 2.0;
                 let world_z = z as f32 * CELL_SIZE - half_grid_depth + CELL_SIZE / 2.0;
 
@@ -137,15 +146,29 @@ impl Grid {
             }
         }
 
-        let target = TargetCell::new(cells_width, cells_depth);
-        grid[target.x][target.z].cost = 0.0;
+        let target = TargetCell::new(cell_rows, cell_columns);
+        grid[target.row][target.column].cost = 0.0;
 
         Grid {
             cells: grid,
             colors: GridColors::default(),
-            cells_width: cells_width,
-            cells_depth: cells_depth,
+            cell_rows,
+            cell_columns,
+            width,
+            depth,
         }
+    }
+}
+
+fn tick_grid_init_timer(
+    mut cmds: Commands,
+    mut grid_init: ResMut<InitializeGrid>,
+    time: Res<Time>,
+) {
+    if grid_init.delay.just_finished() {
+        cmds.trigger(DetectCollidersEv);
+    } else {
+        grid_init.delay.tick(time.delta());
     }
 }
 
@@ -158,10 +181,10 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
     }
 
     // Set the cost of the target cell to zero
-    grid.cells[target.x][target.z].cost = 0.0;
+    grid.cells[target.row][target.column].cost = 0.0;
 
     let mut queue = VecDeque::new();
-    queue.push_back((target.x, target.z));
+    queue.push_back((target.row, target.column));
 
     while let Some((x, z)) = queue.pop_front() {
         let current_cost = grid.cells[x][z].cost;
@@ -170,10 +193,7 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
             let nx = x as isize + dx;
             let nz = z as isize + dz;
 
-            if nx >= 0
-                && nx < grid.cells_width as isize
-                && nz >= 0
-                && nz < grid.cells_depth as isize
+            if nx >= 0 && nx < grid.cell_rows as isize && nz >= 0 && nz < grid.cell_columns as isize
             {
                 let nx = nx as usize;
                 let nz = nz as usize;
@@ -196,8 +216,8 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
 }
 
 fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
-    for x in 0..grid.cells_width {
-        for z in 0..grid.cells_depth {
+    for x in 0..grid.cell_rows {
+        for z in 0..grid.cell_columns {
             if grid.cells[x][z].occupied {
                 continue;
             }
@@ -210,9 +230,9 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
                 let nz = z as isize + dz;
 
                 if nx >= 0
-                    && nx < grid.cells_width as isize
+                    && nx < grid.cell_rows as isize
                     && nz >= 0
-                    && nz < grid.cells_depth as isize
+                    && nz < grid.cell_columns as isize
                 {
                     let nx = nx as usize;
                     let nz = nz as usize;
@@ -232,45 +252,32 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
 }
 
 fn detect_colliders(
+    _trigger: Trigger<DetectCollidersEv>,
     mut grid: ResMut<Grid>,
     rapier_context: Res<RapierContext>,
     mut grid_init: ResMut<InitializeGrid>,
-    time: Res<Time>,
 ) {
-    grid_init.delay.tick(time.delta());
     if grid_init.done && grid_init.delay.finished() {
         return;
     }
 
-    for x in 0..grid.cells_width {
-        for z in 0..grid.cells_depth {
+    for x in 0..grid.cell_rows {
+        for z in 0..grid.cell_columns {
             let cell = &mut grid.cells[x][z];
             cell.occupied = false; // Reset obstacle status
 
-            // Define the position and shape of the cell as a cuboid collider
-            let cell_pos = cell.position;
-            let cell_rot = Quat::IDENTITY; // No rotation
             let cell_shape = Collider::cuboid(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
-
-            // Use Rapier's `intersections_with_shape` method
-            let mut found = false;
-
             rapier_context.intersections_with_shape(
-                cell_pos,
-                cell_rot,
+                cell.position,
+                Quat::IDENTITY, // no rotation
                 &cell_shape,
                 QueryFilter::default().exclude_sensors(),
-                |collider_entity| {
+                |_collider_entity| {
                     // A collider is found overlapping the cell
                     cell.occupied = true;
-                    found = true;
                     false // Return false to stop after finding one collider
                 },
             );
-
-            if found {
-                continue; // Move to the next cell
-            }
         }
     }
 
@@ -280,8 +287,8 @@ fn detect_colliders(
 fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
     let arrow_len = CELL_SIZE * 0.75 / 2.0;
 
-    for x in 0..grid.cells_width {
-        for z in 0..grid.cells_depth {
+    for x in 0..grid.cell_rows {
+        for z in 0..grid.cell_columns {
             let cell = &grid.cells[x][z];
 
             if cell.occupied || cell.flow_vector == Vec3::ZERO {
@@ -313,7 +320,7 @@ fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
     gizmos.grid(
         Vec3::ZERO,
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(grid.cells_width as u32, grid.cells_depth as u32),
+        UVec2::new(grid.cell_rows as u32, grid.cell_columns as u32),
         Vec2::new(CELL_SIZE, CELL_SIZE),
         COLOR_GRID,
     );
@@ -321,15 +328,16 @@ fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
 
 fn set_target_cell(
     grid: Res<Grid>,
+    mut cmds: Commands,
     mut target_cell: ResMut<TargetCell>,
     cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     map_base_q: Query<&GlobalTransform, With<MapBase>>,
-    // selected_q: Query<&Selected>,
+    input: Res<ButtonInput<MouseButton>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
-    // if selected_q.is_empty() {
-    //     return;
-    // }
+    if !input.just_released(MouseButton::Left) {
+        return;
+    }
 
     let map_base = match map_base_q.get_single() {
         Ok(value) => value,
@@ -349,40 +357,34 @@ fn set_target_cell(
 
     // Adjust mouse coordinates to the grid's coordinate system
     let grid_origin_x = -grid.width / 2.0;
-    let grid_origin_z = -grid.height / 2.0;
+    let grid_origin_z = -grid.depth / 2.0;
     let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
     let adjusted_z = coords.z - grid_origin_z;
 
     // Calculate the column and row indices
-    let column = (adjusted_x / grid.cell_width).floor() as u32;
-    let row = (adjusted_z / grid.cell_height).floor() as u32;
+    let cell_width = grid.width / grid.cell_rows as f32;
+    let cell_depth = grid.depth / grid.cell_columns as f32;
+    let row = (adjusted_x / cell_width).floor() as u32;
+    let column = (adjusted_z / cell_depth).floor() as u32;
 
     // Check if indices are within the grid bounds
-    if column < grid.width as u32 && row < grid.height as u32 {
+    if row < grid.width as u32 && column < grid.depth as u32 {
         // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
-        target_cell.row = Some(row);
-        target_cell.column = Some(column);
-    } else {
-        target_cell.row = None;
-        target_cell.column = None;
+        target_cell.row = row as usize;
+        target_cell.column = column as usize;
+        cmds.trigger(DetectCollidersEv);
     }
 }
 
-// GAME LOGIC
-// #[derive(Component)]
-// struct Agent;
-
-// fn spawn_agents(mut commands: Commands) {
-//     let agent = ();
-//     for _ in 0..10 {
-//         commands
-//             .spawn()
-//             .insert(Agent)
-//             .insert(Transform::from_translation(Vec3::new(
-//                 0.0,
-//                 GRID_HEIGHT as f32 * CELL_SIZE / 2.0,
-//                 0.0,
-//             )))
-//             .insert(GlobalTransform::default());
-//     }
-// }
+pub fn get_world_coords(
+    map_base_trans: &GlobalTransform,
+    cam_transform: &GlobalTransform,
+    cam: &Camera,
+    cursor_pos: Vec2,
+) -> Vec3 {
+    let plane_origin = map_base_trans.translation();
+    let plane = InfinitePlane3d::new(map_base_trans.up());
+    let ray = cam.viewport_to_world(cam_transform, cursor_pos).unwrap();
+    let distance = ray.intersect_plane(plane_origin, plane).unwrap();
+    return ray.get_point(distance);
+}
