@@ -36,22 +36,23 @@ impl Plugin for BevyRtsPathFindingPlugin {
                 calculate_flow_vectors,
                 draw_flow_field,
                 draw_grid,
-            ),
+            )
+                .chain(),
         );
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 struct InitializeGrid {
     pub done: bool,
-    pub delay: Duration,
+    pub delay: Timer,
 }
 
 impl Default for InitializeGrid {
     fn default() -> Self {
         Self {
             done: false,
-            delay: Duration::from_secs(0.15),
+            delay: Timer::from_seconds(0.05, TimerMode::Once),
         }
     }
 }
@@ -120,8 +121,6 @@ impl Grid {
             cells_depth
         ];
 
-        // let mut rng = rand::thread_rng();
-
         // Calculate the offset to center the grid at (0, 0, 0)
         let grid_width = cells_width as f32 * CELL_SIZE;
         let grid_depth = cells_depth as f32 * CELL_SIZE;
@@ -134,11 +133,6 @@ impl Grid {
                 let world_z = z as f32 * CELL_SIZE - half_grid_depth + CELL_SIZE / 2.0;
 
                 grid[x][z].position = Vec3::new(world_x, 0.0, world_z);
-
-                // Randomly set some cells as obstacles
-                // if rng.gen_bool(0.1) {
-                //     grid[x][z].occupied = true;
-                // }
             }
         }
 
@@ -155,13 +149,23 @@ impl Grid {
 }
 
 fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
+    // Reset costs
+    for row in grid.cells.iter_mut() {
+        for cell in row.iter_mut() {
+            cell.cost = f32::INFINITY;
+        }
+    }
+
+    // Set the cost of the target cell to zero
+    grid.cells[target.x][target.z].cost = 0.0;
+
     let mut queue = VecDeque::new();
     queue.push_back((target.x, target.z));
 
     while let Some((x, z)) = queue.pop_front() {
         let current_cost = grid.cells[x][z].cost;
 
-        for (dx, dz) in &NEIGHBOR_OFFSETS {
+        for &(dx, dz) in &NEIGHBOR_OFFSETS {
             let nx = x as isize + dx;
             let nz = z as isize + dz;
 
@@ -230,8 +234,10 @@ fn detect_colliders(
     mut grid: ResMut<Grid>,
     rapier_context: Res<RapierContext>,
     mut grid_init: ResMut<InitializeGrid>,
+    time: Res<Time>,
 ) {
-    if grid_init.0 {
+    grid_init.delay.tick(time.delta());
+    if grid_init.done && grid_init.delay.finished() {
         return;
     }
 
@@ -254,7 +260,6 @@ fn detect_colliders(
                 &cell_shape,
                 QueryFilter::default().exclude_sensors(),
                 |collider_entity| {
-                    println!("Found Object");
                     // A collider is found overlapping the cell
                     cell.occupied = true;
                     found = true;
@@ -268,7 +273,7 @@ fn detect_colliders(
         }
     }
 
-    grid_init.0 = true;
+    grid_init.done = true;
 }
 
 fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
