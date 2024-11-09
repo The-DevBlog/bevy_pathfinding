@@ -149,6 +149,19 @@ fn set_target_and_generate_flow_field(
     }
 }
 
+pub fn get_unit_cell_row_and_column(grid: &Grid, transform: &Transform) -> (u32, u32) {
+    let unit_pos = transform.translation;
+    let grid_origin_x = -grid.width / 2.0;
+    let grid_origin_y = -grid.height / 2.0;
+    let adjusted_x = unit_pos.x - grid_origin_x;
+    let adjusted_z = unit_pos.z - grid_origin_y;
+
+    let column = (adjusted_x / grid.cell_width).floor() as u32;
+    let row = (adjusted_z / grid.cell_height).floor() as u32;
+
+    (row, column)
+}
+
 pub fn rotate_towards(trans: &mut Transform, direction: Vec3) {
     let target_yaw = direction.x.atan2(direction.z);
     trans.rotation = Quat::from_rotation_y(target_yaw);
