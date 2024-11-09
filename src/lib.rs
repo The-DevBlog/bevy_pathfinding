@@ -2,9 +2,12 @@ use bevy::{
     color::palettes::{css::*, tailwind::CYAN_100},
     prelude::*,
 };
-use bevy_rapier3d::prelude::Collider;
+use bevy_rapier3d::{
+    plugin::RapierContext,
+    prelude::{Collider, QueryFilter},
+};
 use rand::Rng;
-use std::collections::VecDeque;
+use std::{collections::VecDeque, time::Duration};
 
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
@@ -25,15 +28,31 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<InitializeGrid>().add_systems(
             Update,
             (
+                detect_colliders,
                 calculate_flow_field,
                 calculate_flow_vectors,
                 draw_flow_field,
                 draw_grid,
             ),
         );
+    }
+}
+
+#[derive(Resource, Default)]
+struct InitializeGrid {
+    pub done: bool,
+    pub delay: Duration,
+}
+
+impl Default for InitializeGrid {
+    fn default() -> Self {
+        Self {
+            done: false,
+            delay: Duration::from_secs(0.15),
+        }
     }
 }
 
@@ -101,7 +120,7 @@ impl Grid {
             cells_depth
         ];
 
-        let mut rng = rand::thread_rng();
+        // let mut rng = rand::thread_rng();
 
         // Calculate the offset to center the grid at (0, 0, 0)
         let grid_width = cells_width as f32 * CELL_SIZE;
@@ -117,9 +136,9 @@ impl Grid {
                 grid[x][z].position = Vec3::new(world_x, 0.0, world_z);
 
                 // Randomly set some cells as obstacles
-                if rng.gen_bool(0.1) {
-                    grid[x][z].occupied = true;
-                }
+                // if rng.gen_bool(0.1) {
+                //     grid[x][z].occupied = true;
+                // }
             }
         }
 
@@ -207,35 +226,49 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
     }
 }
 
-fn detect_colliders(mut grid: ResMut<Grid>, colliders: Query<(&Transform, &Collider)>) {
+fn detect_colliders(
+    mut grid: ResMut<Grid>,
+    rapier_context: Res<RapierContext>,
+    mut grid_init: ResMut<InitializeGrid>,
+) {
+    if grid_init.0 {
+        return;
+    }
+
     for x in 0..grid.cells_width {
         for z in 0..grid.cells_depth {
             let cell = &mut grid.cells[x][z];
             cell.occupied = false; // Reset obstacle status
 
-            let cell_min =
-                cell.position - Vec3::new(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
-            let cell_max =
-                cell.position + Vec3::new(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+            // Define the position and shape of the cell as a cuboid collider
+            let cell_pos = cell.position;
+            let cell_rot = Quat::IDENTITY; // No rotation
+            let cell_shape = Collider::cuboid(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
 
-            for (collider_transform, collider) in colliders.iter() {
-                // Compute the collider's AABB in world space
-                let collider_aabb = collider.compute_aabb(&collider_transform.compute_matrix());
+            // Use Rapier's `intersections_with_shape` method
+            let mut found = false;
 
-                // Check for overlap
-                if aabb_overlap(cell_min, cell_max, collider_aabb.mins, collider_aabb.maxs) {
+            rapier_context.intersections_with_shape(
+                cell_pos,
+                cell_rot,
+                &cell_shape,
+                QueryFilter::default().exclude_sensors(),
+                |collider_entity| {
+                    println!("Found Object");
+                    // A collider is found overlapping the cell
                     cell.occupied = true;
-                    break; // No need to check other colliders for this cell
-                }
+                    found = true;
+                    false // Return false to stop after finding one collider
+                },
+            );
+
+            if found {
+                continue; // Move to the next cell
             }
         }
     }
-}
 
-fn aabb_overlap(min1: Vec3, max1: Vec3, min2: Vec3, max2: Vec3) -> bool {
-    (min1.x <= max2.x && max1.x >= min2.x)
-        && (min1.y <= max2.y && max1.y >= min2.y)
-        && (min1.z <= max2.z && max1.z >= min2.z)
+    grid_init.0 = true;
 }
 
 fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
