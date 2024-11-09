@@ -1,168 +1,212 @@
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::ExternalImpulse;
-use components::*;
+use bevy::{color::palettes::tailwind::CYAN_100, prelude::*};
+use rand::Rng;
+use std::collections::VecDeque;
 
-mod components;
+pub const GRID_WIDTH: f32 = GRID_CELLS_X as f32 * CELL_SIZE as f32;
+pub const GRID_DEPTH: f32 = GRID_CELLS_Z as f32 * CELL_SIZE as f32;
+const GRID_CELLS_X: usize = 40;
+const GRID_CELLS_Z: usize = 40;
+const CELL_SIZE: f32 = 10.0;
+const NEIGHBOR_OFFSETS: [(isize, isize); 8] = [
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+    (1, 1),
+    (-1, 1),
+    (1, -1),
+    (-1, -1),
+];
 
 pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
-    fn build(&self, app: &mut App) {}
-}
-
-#[derive(Resource, Debug, Clone)]
-pub struct FlowField {
-    pub cost_field: Vec<Vec<usize>>,        // Movement cost for each cell
-    pub integration_field: Vec<Vec<usize>>, // Cumulative cost to reach each cell from the target
-    pub direction_field: Vec<Vec<Vec2>>,    // Direction vector for each cell
-    pub target_cell: (u32, u32),            // Target cell position for the flow field
-}
-
-impl FlowField {
-    pub fn new(grid_width: usize, grid_height: usize, target_cell: (u32, u32)) -> Self {
-        FlowField {
-            cost_field: vec![vec![1; grid_width]; grid_height],
-            integration_field: vec![vec![usize::MAX; grid_width]; grid_height],
-            direction_field: vec![vec![Vec2::ZERO; grid_width]; grid_height],
-            target_cell,
-        }
+    fn build(&self, app: &mut App) {
+        app.init_resource::<Grid>()
+            .init_resource::<TargetCell>()
+            .add_systems(
+                Update,
+                (
+                    calculate_flow_field,
+                    calculate_flow_vectors,
+                    draw_flow_field,
+                ),
+            );
     }
 }
 
-fn build_cost_field(flow_field: &mut FlowField, grid: &Grid) {
-    for (row, cells) in grid.cells.iter().enumerate() {
-        for (col, cell) in cells.iter().enumerate() {
-            flow_field.cost_field[row][col] = if cell.occupied { usize::MAX } else { 1 };
-        }
+#[derive(Resource)]
+struct TargetCell {
+    x: usize,
+    z: usize,
+}
+
+impl Default for TargetCell {
+    fn default() -> Self {
+        let target = TargetCell {
+            x: GRID_CELLS_X - 1,
+            z: GRID_CELLS_Z - 1,
+        };
+
+        target
     }
 }
 
-use std::collections::VecDeque;
+#[derive(Clone)]
+struct GridCell {
+    position: Vec3,
+    cost: f32,
+    flow_vector: Vec3,
+    is_obstacle: bool,
+}
 
-fn build_integration_field(flow_field: &mut FlowField) {
+#[derive(Resource)]
+struct Grid {
+    cells: Vec<Vec<GridCell>>,
+}
+
+impl Default for Grid {
+    fn default() -> Self {
+        let mut grid = vec![
+            vec![
+                GridCell {
+                    position: Vec3::ZERO,
+                    cost: f32::INFINITY,
+                    flow_vector: Vec3::ZERO,
+                    is_obstacle: false,
+                };
+                GRID_CELLS_Z
+            ];
+            GRID_CELLS_X
+        ];
+
+        // for x in 0..GRID_WIDTH {
+        //     for z in 0..GRID_DEPTH {
+        //         grid[x][z].position = Vec3::new(x as f32 * CELL_SIZE, 0.0, z as f32 * CELL_SIZE);
+        //     }
+        // }
+
+        let mut rng = rand::thread_rng();
+        for x in 0..GRID_CELLS_X {
+            for z in 0..GRID_CELLS_Z {
+                grid[x][z].position = Vec3::new(x as f32 * CELL_SIZE, 0.0, z as f32 * CELL_SIZE);
+
+                // Randomly set some cells as obstacles
+                if rng.gen_bool(0.1) {
+                    // 10% chance to be an obstacle
+                    grid[x][z].is_obstacle = true;
+                }
+            }
+        }
+
+        let target = TargetCell::default();
+        grid[target.x][target.z].cost = 0.0;
+
+        Grid { cells: grid }
+    }
+}
+
+fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
     let mut queue = VecDeque::new();
-    let (target_row, target_col) = flow_field.target_cell;
+    queue.push_back((target.x, target.z));
 
-    // Set the target cell's integration cost to zero
-    flow_field.integration_field[target_row as usize][target_col as usize] = 0;
-    queue.push_back((target_row, target_col));
+    while let Some((x, z)) = queue.pop_front() {
+        let current_cost = grid.cells[x][z].cost;
 
-    while let Some((row, col)) = queue.pop_front() {
-        let current_cost = flow_field.integration_field[row as usize][col as usize];
+        for (dx, dz) in &NEIGHBOR_OFFSETS {
+            let nx = x as isize + dx;
+            let nz = z as isize + dz;
 
-        for (d_row, d_col) in [(-1, 0), (1, 0), (0, -1), (0, 1)].iter() {
-            let new_row = row as i32 + d_row;
-            let new_col = col as i32 + d_col;
+            if nx >= 0 && nx < GRID_CELLS_X as isize && nz >= 0 && nz < GRID_CELLS_Z as isize {
+                let nx = nx as usize;
+                let nz = nz as usize;
 
-            if new_row >= 0
-                && new_row < flow_field.integration_field.len() as i32
-                && new_col >= 0
-                && new_col < flow_field.integration_field[0].len() as i32
-            {
-                let new_pos = (new_row as usize, new_col as usize);
-                let cost = flow_field.cost_field[new_pos.0][new_pos.1];
+                let neighbor = &mut grid.cells[nx][nz];
 
-                if cost != usize::MAX {
-                    let new_cost = current_cost + cost;
-                    if new_cost < flow_field.integration_field[new_pos.0][new_pos.1] {
-                        flow_field.integration_field[new_pos.0][new_pos.1] = new_cost;
-                        queue.push_back((new_row as u32, new_col as u32));
-                    }
+                if neighbor.is_obstacle {
+                    continue;
+                }
+
+                let new_cost = current_cost + 1.0; // Assuming uniform cost
+
+                if new_cost < neighbor.cost {
+                    neighbor.cost = new_cost;
+                    queue.push_back((nx, nz));
                 }
             }
         }
     }
 }
 
-fn build_direction_field(flow_field: &mut FlowField) {
-    let directions = [
-        (-1, 0, Vec2::new(0.0, -1.0)),
-        (1, 0, Vec2::new(0.0, 1.0)),
-        (0, -1, Vec2::new(-1.0, 0.0)),
-        (0, 1, Vec2::new(1.0, 0.0)),
-    ];
+fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
+    for x in 0..GRID_CELLS_X {
+        for z in 0..GRID_CELLS_Z {
+            if grid.cells[x][z].is_obstacle {
+                continue;
+            }
 
-    for row in 0..flow_field.integration_field.len() {
-        for col in 0..flow_field.integration_field[0].len() {
-            let mut best_direction = Vec2::ZERO;
-            let mut lowest_cost = usize::MAX;
+            let mut min_cost = grid.cells[x][z].cost;
+            let mut min_direction = Vec3::ZERO;
 
-            for (d_row, d_col, direction) in directions.iter() {
-                let new_row = row as i32 + d_row;
-                let new_col = col as i32 + d_col;
+            for (dx, dz) in &NEIGHBOR_OFFSETS {
+                let nx = x as isize + dx;
+                let nz = z as isize + dz;
 
-                if new_row >= 0
-                    && new_row < flow_field.integration_field.len() as i32
-                    && new_col >= 0
-                    && new_col < flow_field.integration_field[0].len() as i32
-                {
-                    let cost = flow_field.integration_field[new_row as usize][new_col as usize];
-                    if cost < lowest_cost {
-                        lowest_cost = cost;
-                        best_direction = *direction;
+                if nx >= 0 && nx < GRID_CELLS_X as isize && nz >= 0 && nz < GRID_CELLS_Z as isize {
+                    let nx = nx as usize;
+                    let nz = nz as usize;
+
+                    let neighbor = &grid.cells[nx][nz];
+
+                    if neighbor.cost < min_cost {
+                        min_cost = neighbor.cost;
+                        min_direction = (neighbor.position - grid.cells[x][z].position).normalize();
                     }
                 }
             }
 
-            flow_field.direction_field[row][col] = best_direction;
+            grid.cells[x][z].flow_vector = min_direction;
         }
     }
 }
 
-fn move_units_along_flow_field(
-    time: Res<Time>,
-    flow_field: Res<FlowField>,
-    mut unit_q: Query<(&mut Transform, &Speed, &mut ExternalImpulse)>,
-    grid_q: Query<&Grid>,
-) {
-    let grid = grid_q.single();
+fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
+    for x in 0..GRID_CELLS_X {
+        for z in 0..GRID_CELLS_Z {
+            let cell = &grid.cells[x][z];
 
-    for (mut transform, speed, mut ext_impulse) in unit_q.iter_mut() {
-        let (row, col) = get_unit_cell_row_and_column(&grid, &transform);
+            if cell.is_obstacle || cell.flow_vector == Vec3::ZERO {
+                continue;
+            }
 
-        // Ensure we're within bounds
-        if row < flow_field.direction_field.len() && col < flow_field.direction_field[0].len() {
-            let direction = flow_field.direction_field[row][col];
-            let movement =
-                Vec3::new(direction.x, 0.0, direction.y) * speed.0 * time.delta_seconds();
-
-            ext_impulse.impulse += movement;
-            rotate_towards(&mut transform, movement.normalize_or_zero());
+            gizmos.line(
+                cell.position,
+                cell.position + cell.flow_vector * 4.0,
+                CYAN_100,
+            );
         }
     }
 }
 
-fn set_target_and_generate_flow_field(
-    mut commands: Commands,
-    grid_q: Query<&Grid>,
-    target_cell: Res<TargetCell>,
-) {
-    let grid = grid_q.single();
-
-    if let (Some(row), Some(col)) = (target_cell.row, target_cell.column) {
-        let mut flow_field = FlowField::new(grid.width as usize, grid.height as usize, (row, col));
-        build_cost_field(&mut flow_field, &grid);
-        build_integration_field(&mut flow_field);
-        build_direction_field(&mut flow_field);
-
-        commands.insert_resource(flow_field);
-    }
+fn draw_grid(mut gizmos: Gizmos) {
+    gizmos.grid()
 }
 
-pub fn get_unit_cell_row_and_column(grid: &Grid, transform: &Transform) -> (u32, u32) {
-    let unit_pos = transform.translation;
-    let grid_origin_x = -grid.width / 2.0;
-    let grid_origin_y = -grid.height / 2.0;
-    let adjusted_x = unit_pos.x - grid_origin_x;
-    let adjusted_z = unit_pos.z - grid_origin_y;
+// GAME LOGIC
+// #[derive(Component)]
+// struct Agent;
 
-    let column = (adjusted_x / grid.cell_width).floor() as u32;
-    let row = (adjusted_z / grid.cell_height).floor() as u32;
-
-    (row, column)
-}
-
-pub fn rotate_towards(trans: &mut Transform, direction: Vec3) {
-    let target_yaw = direction.x.atan2(direction.z);
-    trans.rotation = Quat::from_rotation_y(target_yaw);
-}
+// fn spawn_agents(mut commands: Commands) {
+//     let agent = ();
+//     for _ in 0..10 {
+//         commands
+//             .spawn()
+//             .insert(Agent)
+//             .insert(Transform::from_translation(Vec3::new(
+//                 0.0,
+//                 GRID_HEIGHT as f32 * CELL_SIZE / 2.0,
+//                 0.0,
+//             )))
+//             .insert(GlobalTransform::default());
+//     }
+// }
