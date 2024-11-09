@@ -2,6 +2,7 @@ use bevy::{
     color::palettes::{css::*, tailwind::CYAN_100},
     prelude::*,
 };
+use bevy_rapier3d::prelude::Collider;
 use rand::Rng;
 use std::collections::VecDeque;
 
@@ -204,6 +205,37 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
             grid.cells[x][z].flow_vector = min_direction;
         }
     }
+}
+
+fn detect_colliders(mut grid: ResMut<Grid>, colliders: Query<(&Transform, &Collider)>) {
+    for x in 0..grid.cells_width {
+        for z in 0..grid.cells_depth {
+            let cell = &mut grid.cells[x][z];
+            cell.occupied = false; // Reset obstacle status
+
+            let cell_min =
+                cell.position - Vec3::new(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+            let cell_max =
+                cell.position + Vec3::new(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+
+            for (collider_transform, collider) in colliders.iter() {
+                // Compute the collider's AABB in world space
+                let collider_aabb = collider.compute_aabb(&collider_transform.compute_matrix());
+
+                // Check for overlap
+                if aabb_overlap(cell_min, cell_max, collider_aabb.mins, collider_aabb.maxs) {
+                    cell.occupied = true;
+                    break; // No need to check other colliders for this cell
+                }
+            }
+        }
+    }
+}
+
+fn aabb_overlap(min1: Vec3, max1: Vec3, min2: Vec3, max2: Vec3) -> bool {
+    (min1.x <= max2.x && max1.x >= min2.x)
+        && (min1.y <= max2.y && max1.y >= min2.y)
+        && (min1.z <= max2.z && max1.z >= min2.z)
 }
 
 fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
