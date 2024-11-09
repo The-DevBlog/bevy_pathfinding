@@ -1,14 +1,13 @@
 use bevy::{
-    color::palettes::{css::GRAY, tailwind::CYAN_100},
+    color::palettes::{css::*, tailwind::CYAN_100},
     prelude::*,
 };
 use rand::Rng;
 use std::collections::VecDeque;
 
-pub const GRID_WIDTH: f32 = GRID_CELLS_X as f32 * CELL_SIZE as f32;
-pub const GRID_DEPTH: f32 = GRID_CELLS_Z as f32 * CELL_SIZE as f32;
-const GRID_CELLS_X: usize = 40;
-const GRID_CELLS_Z: usize = 40;
+const COLOR_GRID: Srgba = GRAY;
+const COLOR_ARROWS: Srgba = CYAN_100;
+const COLOR_OCCUPIED_CELL: Srgba = RED;
 const CELL_SIZE: f32 = 10.0;
 const NEIGHBOR_OFFSETS: [(isize, isize); 8] = [
     (1, 0),
@@ -25,30 +24,29 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Grid>()
-            .init_resource::<TargetCell>()
-            .add_systems(
-                Update,
-                (
-                    calculate_flow_field,
-                    calculate_flow_vectors,
-                    draw_flow_field,
-                ),
-            );
+        app.add_systems(
+            Update,
+            (
+                calculate_flow_field,
+                calculate_flow_vectors,
+                draw_flow_field,
+                draw_grid,
+            ),
+        );
     }
 }
 
 #[derive(Resource)]
-struct TargetCell {
+pub struct TargetCell {
     x: usize,
     z: usize,
 }
 
-impl Default for TargetCell {
-    fn default() -> Self {
+impl TargetCell {
+    pub fn new(cells_width: usize, cells_depth: usize) -> Self {
         let target = TargetCell {
-            x: GRID_CELLS_X - 1,
-            z: GRID_CELLS_Z - 1,
+            x: cells_width - 1,
+            z: cells_depth - 1,
         };
 
         target
@@ -56,20 +54,39 @@ impl Default for TargetCell {
 }
 
 #[derive(Clone)]
-struct GridCell {
-    position: Vec3,
-    cost: f32,
-    flow_vector: Vec3,
-    is_obstacle: bool,
+pub struct GridCell {
+    pub position: Vec3,
+    pub cost: f32,
+    pub flow_vector: Vec3,
+    pub is_obstacle: bool,
 }
 
 #[derive(Resource)]
-struct Grid {
-    cells: Vec<Vec<GridCell>>,
+pub struct Grid {
+    pub cells: Vec<Vec<GridCell>>,
+    pub cells_width: usize,
+    pub cells_depth: usize,
+    pub colors: GridColors,
 }
 
-impl Default for Grid {
+pub struct GridColors {
+    pub grid: Srgba,
+    pub arrows: Srgba,
+    pub occupied_cells: Srgba,
+}
+
+impl Default for GridColors {
     fn default() -> Self {
+        Self {
+            grid: COLOR_GRID,
+            arrows: COLOR_ARROWS,
+            occupied_cells: COLOR_OCCUPIED_CELL,
+        }
+    }
+}
+
+impl Grid {
+    pub fn new(cells_width: usize, cells_depth: usize) -> Self {
         let mut grid = vec![
             vec![
                 GridCell {
@@ -78,34 +95,42 @@ impl Default for Grid {
                     flow_vector: Vec3::ZERO,
                     is_obstacle: false,
                 };
-                GRID_CELLS_Z
+                cells_width
             ];
-            GRID_CELLS_X
+            cells_depth
         ];
 
-        // for x in 0..GRID_WIDTH {
-        //     for z in 0..GRID_DEPTH {
-        //         grid[x][z].position = Vec3::new(x as f32 * CELL_SIZE, 0.0, z as f32 * CELL_SIZE);
-        //     }
-        // }
-
         let mut rng = rand::thread_rng();
-        for x in 0..GRID_CELLS_X {
-            for z in 0..GRID_CELLS_Z {
-                grid[x][z].position = Vec3::new(x as f32 * CELL_SIZE, 0.0, z as f32 * CELL_SIZE);
+
+        // Calculate the offset to center the grid at (0, 0, 0)
+        let grid_width = cells_width as f32 * CELL_SIZE;
+        let grid_depth = cells_depth as f32 * CELL_SIZE;
+        let half_grid_width = grid_width / 2.0;
+        let half_grid_depth = grid_depth / 2.0;
+
+        for x in 0..cells_width {
+            for z in 0..cells_depth {
+                let world_x = x as f32 * CELL_SIZE - half_grid_width + CELL_SIZE / 2.0;
+                let world_z = z as f32 * CELL_SIZE - half_grid_depth + CELL_SIZE / 2.0;
+
+                grid[x][z].position = Vec3::new(world_x, 0.0, world_z);
 
                 // Randomly set some cells as obstacles
                 if rng.gen_bool(0.1) {
-                    // 10% chance to be an obstacle
                     grid[x][z].is_obstacle = true;
                 }
             }
         }
 
-        let target = TargetCell::default();
+        let target = TargetCell::new(cells_width, cells_depth);
         grid[target.x][target.z].cost = 0.0;
 
-        Grid { cells: grid }
+        Grid {
+            cells: grid,
+            colors: GridColors::default(),
+            cells_width: cells_width,
+            cells_depth: cells_depth,
+        }
     }
 }
 
@@ -120,7 +145,11 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
             let nx = x as isize + dx;
             let nz = z as isize + dz;
 
-            if nx >= 0 && nx < GRID_CELLS_X as isize && nz >= 0 && nz < GRID_CELLS_Z as isize {
+            if nx >= 0
+                && nx < grid.cells_width as isize
+                && nz >= 0
+                && nz < grid.cells_depth as isize
+            {
                 let nx = nx as usize;
                 let nz = nz as usize;
 
@@ -142,8 +171,8 @@ fn calculate_flow_field(mut grid: ResMut<Grid>, target: Res<TargetCell>) {
 }
 
 fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
-    for x in 0..GRID_CELLS_X {
-        for z in 0..GRID_CELLS_Z {
+    for x in 0..grid.cells_width {
+        for z in 0..grid.cells_depth {
             if grid.cells[x][z].is_obstacle {
                 continue;
             }
@@ -155,7 +184,11 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
                 let nx = x as isize + dx;
                 let nz = z as isize + dz;
 
-                if nx >= 0 && nx < GRID_CELLS_X as isize && nz >= 0 && nz < GRID_CELLS_Z as isize {
+                if nx >= 0
+                    && nx < grid.cells_width as isize
+                    && nz >= 0
+                    && nz < grid.cells_depth as isize
+                {
                     let nx = nx as usize;
                     let nz = nz as usize;
 
@@ -174,30 +207,44 @@ fn calculate_flow_vectors(mut grid: ResMut<Grid>) {
 }
 
 fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
-    for x in 0..GRID_CELLS_X {
-        for z in 0..GRID_CELLS_Z {
+    let arrow_len = CELL_SIZE * 0.75 / 2.0;
+
+    for x in 0..grid.cells_width {
+        for z in 0..grid.cells_depth {
             let cell = &grid.cells[x][z];
 
             if cell.is_obstacle || cell.flow_vector == Vec3::ZERO {
+                // Draw an 'X' for each occupied cell
+                let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
+                let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
+                let bottom_left = cell.position + Vec3::new(-arrow_len, 0.0, arrow_len);
+                let bottom_right = cell.position + Vec3::new(arrow_len, 0.0, arrow_len);
+
+                gizmos.line(top_left, bottom_right, RED);
+                gizmos.line(top_right, bottom_left, RED);
+
                 continue;
             }
 
-            gizmos.line(
-                cell.position,
-                cell.position + cell.flow_vector * 4.0,
-                CYAN_100,
-            );
+            // Normalize the flow vector
+            let flow_direction = cell.flow_vector.normalize();
+
+            // Calculate start and end points
+            let start = cell.position - flow_direction * arrow_len;
+            let end = cell.position + flow_direction * arrow_len;
+
+            gizmos.arrow(start, end, COLOR_ARROWS);
         }
     }
 }
 
-fn draw_grid(mut gizmos: Gizmos) {
+fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
     gizmos.grid(
         Vec3::ZERO,
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(GRID_CELLS_X as u32, GRID_CELLS_Z as u32),
+        UVec2::new(grid.cells_width as u32, grid.cells_depth as u32),
         Vec2::new(CELL_SIZE, CELL_SIZE),
-        GRAY,
+        COLOR_GRID,
     );
 }
 
