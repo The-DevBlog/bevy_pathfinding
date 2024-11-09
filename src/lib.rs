@@ -1,4 +1,7 @@
-use bevy::{color::palettes::tailwind::CYAN_100, prelude::*};
+use bevy::{
+    color::palettes::{css::GRAY, tailwind::CYAN_100},
+    prelude::*,
+};
 use rand::Rng;
 use std::collections::VecDeque;
 
@@ -189,7 +192,13 @@ fn draw_flow_field(grid: Res<Grid>, mut gizmos: Gizmos) {
 }
 
 fn draw_grid(mut gizmos: Gizmos) {
-    gizmos.grid()
+    gizmos.grid(
+        Vec3::ZERO,
+        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        UVec2::new(GRID_CELLS_X as u32, GRID_CELLS_Z as u32),
+        Vec2::new(CELL_SIZE, CELL_SIZE),
+        GRAY,
+    );
 }
 
 // GAME LOGIC
