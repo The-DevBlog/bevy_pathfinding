@@ -148,3 +148,8 @@ fn set_target_and_generate_flow_field(
         commands.insert_resource(flow_field);
     }
 }
+
+pub fn rotate_towards(trans: &mut Transform, direction: Vec3) {
+    let target_yaw = direction.x.atan2(direction.z);
+    trans.rotation = Quat::from_rotation_y(target_yaw);
+}
