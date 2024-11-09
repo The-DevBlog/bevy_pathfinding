@@ -230,6 +230,7 @@ fn draw_line_to_destination(
 ) {
     for (destination, unit_transform) in unit_q.iter() {
         if let Some(_) = destination.endpoint {
+            println!("Drawing line");
             let mut current = unit_transform.translation;
 
             for cell in destination.waypoints.iter() {
@@ -311,6 +312,10 @@ fn set_destination_path(
 
                 // If a left mouse click is detected, assign the computed path
                 if input.just_pressed(MouseButton::Left) {
+                    let destination_cell =
+                        grid.cells[goal_row as usize][goal_column as usize].position;
+                    destination.endpoint =
+                        Some(Vec3::new(destination_cell.x, 0.0, destination_cell.y));
                     destination.waypoints = waypoints;
                 }
             }
