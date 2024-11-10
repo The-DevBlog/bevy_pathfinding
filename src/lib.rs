@@ -37,7 +37,6 @@ impl Plugin for BevyRtsPathFindingPlugin {
             .add_systems(
                 Update,
                 (
-                    set_target_cell,
                     tick_grid_init_timer,
                     calculate_flow_field,
                     calculate_flow_vectors,
@@ -45,7 +44,8 @@ impl Plugin for BevyRtsPathFindingPlugin {
                     draw_grid,
                 ),
             )
-            .observe(detect_colliders);
+            .observe(detect_colliders)
+            .observe(set_target_cell);
     }
 }
 
@@ -216,18 +216,14 @@ fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
 }
 
 fn set_target_cell(
+    _trigger: Trigger<SetTargetCellEv>,
     grid: Res<Grid>,
     mut cmds: Commands,
     mut target_cell: ResMut<TargetCell>,
     cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     map_base_q: Query<&GlobalTransform, With<MapBase>>,
-    input: Res<ButtonInput<MouseButton>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
-    if !input.just_released(MouseButton::Left) {
-        return;
-    }
-
     let map_base = match map_base_q.get_single() {
         Ok(value) => value,
         Err(_) => return,
