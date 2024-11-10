@@ -11,7 +11,7 @@ pub mod components;
 pub mod debug_plugin;
 pub mod events;
 pub mod resources;
-mod utils;
+pub mod utils;
 
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
@@ -67,23 +67,12 @@ fn set_target_cell(
     };
 
     let coords = utils::get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
-
-    // Adjust mouse coordinates to the grid's coordinate system
-    let grid_origin_x = -grid.width / 2.0;
-    let grid_origin_z = -grid.depth / 2.0;
-    let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
-    let adjusted_z = coords.z - grid_origin_z;
-
-    // Calculate the column and row indices
-    let cell_width = grid.width / grid.rows as f32;
-    let cell_depth = grid.depth / grid.columns as f32;
-    let row = (adjusted_x / cell_width).floor() as u32;
-    let column = (adjusted_z / cell_depth).floor() as u32;
+    let cell = utils::get_cell(&grid, &coords);
 
     // Check if indices are within the grid bounds
-    if row < grid.width as u32 && column < grid.depth as u32 {
+    if cell.0 < grid.width as u32 && cell.1 < grid.depth as u32 {
         // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
-        target_cell.0 = Some((row as usize, column as usize));
+        target_cell.0 = Some((cell.0 as usize, cell.1 as usize));
         cmds.trigger(SetFlowFieldEv);
     }
 }
