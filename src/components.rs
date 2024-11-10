@@ -9,15 +9,20 @@ pub struct MapBase;
 pub struct GameCamera;
 
 #[derive(Component)]
+pub struct Selected;
+
+#[derive(Component)]
 pub struct FlowField {
-    pub cells: Vec<Vec<GridCell>>,
+    pub cells: Vec<Vec<Cell>>,
+    pub destination: (usize, usize),
+    pub entities: Vec<u32>,
 }
 
 impl FlowField {
-    pub fn new(rows: usize, columns: usize) -> Self {
+    pub fn new(rows: usize, columns: usize, target_row: usize, target_column: usize) -> Self {
         let mut grid = vec![
             vec![
-                GridCell {
+                Cell {
                     position: Vec3::ZERO,
                     cost: f32::INFINITY,
                     flow_vector: Vec3::ZERO,
@@ -43,15 +48,18 @@ impl FlowField {
             }
         }
 
-        let target = TargetCell::new(rows, columns);
-        grid[target.row][target.column].cost = 0.0;
+        grid[target_row][target_column].cost = 0.0;
 
-        FlowField { cells: grid }
+        FlowField {
+            cells: grid,
+            destination: (target_row, target_column),
+            entities: Vec::new(),
+        }
     }
 }
 
 #[derive(Clone)]
-pub struct GridCell {
+pub struct Cell {
     pub position: Vec3,
     pub cost: f32,
     pub flow_vector: Vec3,

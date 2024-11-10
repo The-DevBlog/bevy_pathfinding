@@ -55,18 +55,10 @@ impl Default for InitializeGrid {
 }
 
 #[derive(Resource)]
-pub struct TargetCell {
-    pub row: usize,
-    pub column: usize,
-}
+pub struct TargetCell(pub Option<(usize, usize)>);
 
-impl TargetCell {
-    pub fn new(cells_width: usize, cells_depth: usize) -> Self {
-        let target = TargetCell {
-            row: cells_width - 1,
-            column: cells_depth - 1,
-        };
-
-        target
+impl Default for TargetCell {
+    fn default() -> Self {
+        TargetCell(None)
     }
 }

@@ -34,193 +34,14 @@ pub struct BevyRtsPathFindingPlugin;
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<InitializeGrid>()
-            .add_systems(Update, (tick_grid_init_timer, draw_flow_field, draw_grid))
-            .observe(detect_colliders)
+            .init_resource::<TargetCell>()
+            .add_systems(Update, (remove_flowfield, draw_flowfield, draw_grid))
             .observe(set_target_cell)
-            .observe(calculate_flow_field)
-            .observe(calculate_flow_vectors);
+            .observe(set_flow_field)
+            .observe(detect_colliders)
+            .observe(calculate_flowfield)
+            .observe(calculate_flowfield_vectors);
     }
-}
-
-fn tick_grid_init_timer(
-    mut cmds: Commands,
-    mut grid_init: ResMut<InitializeGrid>,
-    time: Res<Time>,
-) {
-    if grid_init.delay.just_finished() {
-        cmds.trigger(DetectCollidersEv);
-    } else {
-        grid_init.delay.tick(time.delta());
-    }
-}
-
-fn calculate_flow_field(
-    _trigger: Trigger<DetectCollidersEv>,
-    mut flowfield_q: Query<&mut FlowField>,
-    grid: Res<Grid>,
-    target: Res<TargetCell>,
-) {
-    for mut flowfield in flowfield_q.iter_mut() {
-        // Reset costs
-        for row in flowfield.cells.iter_mut() {
-            for cell in row.iter_mut() {
-                cell.cost = f32::INFINITY;
-            }
-        }
-
-        // Set the cost of the target cell to zero
-        flowfield.cells[target.row][target.column].cost = 0.0;
-
-        let mut queue = VecDeque::new();
-        queue.push_back((target.row, target.column));
-
-        while let Some((x, z)) = queue.pop_front() {
-            let current_cost = flowfield.cells[x][z].cost;
-
-            for &(dx, dz) in &NEIGHBOR_OFFSETS {
-                let nx = x as isize + dx;
-                let nz = z as isize + dz;
-
-                if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
-                    let nx = nx as usize;
-                    let nz = nz as usize;
-
-                    let neighbor = &mut flowfield.cells[nx][nz];
-
-                    if neighbor.occupied {
-                        continue;
-                    }
-
-                    let new_cost = current_cost + 1.0; // Assuming uniform cost
-
-                    if new_cost < neighbor.cost {
-                        neighbor.cost = new_cost;
-                        queue.push_back((nx, nz));
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn calculate_flow_vectors(
-    _trigger: Trigger<DetectCollidersEv>,
-    mut flowfield_q: Query<&mut FlowField>,
-    grid: Res<Grid>,
-) {
-    for mut flowfield in flowfield_q.iter_mut() {
-        for x in 0..grid.rows {
-            for z in 0..grid.columns {
-                if flowfield.cells[x][z].occupied {
-                    continue;
-                }
-
-                let mut min_cost = flowfield.cells[x][z].cost;
-                let mut min_direction = Vec3::ZERO;
-
-                for (dx, dz) in &NEIGHBOR_OFFSETS {
-                    let nx = x as isize + dx;
-                    let nz = z as isize + dz;
-
-                    if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
-                        let nx = nx as usize;
-                        let nz = nz as usize;
-
-                        let neighbor = &flowfield.cells[nx][nz];
-
-                        if neighbor.cost < min_cost {
-                            min_cost = neighbor.cost;
-                            min_direction =
-                                (neighbor.position - flowfield.cells[x][z].position).normalize();
-                        }
-                    }
-                }
-
-                flowfield.cells[x][z].flow_vector = min_direction;
-            }
-        }
-    }
-}
-
-fn detect_colliders(
-    _trigger: Trigger<DetectCollidersEv>,
-    mut flowfield_q: Query<&mut FlowField>,
-    rapier_context: Res<RapierContext>,
-    mut grid_init: ResMut<InitializeGrid>,
-    grid: Res<Grid>,
-) {
-    if grid_init.done && grid_init.delay.finished() {
-        return;
-    }
-
-    for mut flowfield in flowfield_q.iter_mut() {
-        for x in 0..grid.rows {
-            for z in 0..grid.columns {
-                let cell = &mut flowfield.cells[x][z];
-                cell.occupied = false; // Reset obstacle status
-
-                let cell_shape =
-                    Collider::cuboid(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
-                rapier_context.intersections_with_shape(
-                    cell.position,
-                    Quat::IDENTITY, // no rotation
-                    &cell_shape,
-                    QueryFilter::default().exclude_sensors(),
-                    |_collider_entity| {
-                        // A collider is found overlapping the cell
-                        cell.occupied = true;
-                        false // Return false to stop after finding one collider
-                    },
-                );
-            }
-        }
-    }
-
-    grid_init.done = true;
-}
-
-fn draw_flow_field(flowfield_q: Query<&FlowField>, grid: Res<Grid>, mut gizmos: Gizmos) {
-    let arrow_len = CELL_SIZE * 0.75 / 2.0;
-
-    for flowfield in flowfield_q.iter() {
-        for x in 0..grid.rows {
-            for z in 0..grid.columns {
-                let cell = &flowfield.cells[x][z];
-
-                if cell.occupied || cell.flow_vector == Vec3::ZERO {
-                    // Draw an 'X' for each occupied cell
-                    let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
-                    let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
-                    let bottom_left = cell.position + Vec3::new(-arrow_len, 0.0, arrow_len);
-                    let bottom_right = cell.position + Vec3::new(arrow_len, 0.0, arrow_len);
-
-                    gizmos.line(top_left, bottom_right, RED);
-                    gizmos.line(top_right, bottom_left, RED);
-
-                    continue;
-                }
-
-                // Normalize the flow vector
-                let flow_direction = cell.flow_vector.normalize();
-
-                // Calculate start and end points
-                let start = cell.position - flow_direction * arrow_len;
-                let end = cell.position + flow_direction * arrow_len;
-
-                gizmos.arrow(start, end, COLOR_ARROWS);
-            }
-        }
-    }
-}
-
-fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
-    gizmos.grid(
-        Vec3::ZERO,
-        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(grid.rows as u32, grid.columns as u32),
-        Vec2::new(CELL_SIZE, CELL_SIZE),
-        COLOR_GRID,
-    );
 }
 
 fn set_target_cell(
@@ -263,9 +84,234 @@ fn set_target_cell(
     // Check if indices are within the grid bounds
     if row < grid.width as u32 && column < grid.depth as u32 {
         // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
-        target_cell.row = row as usize;
-        target_cell.column = column as usize;
-        cmds.trigger(DetectCollidersEv);
+        target_cell.0 = Some((row as usize, column as usize));
+        cmds.trigger(SetFlowFieldEv);
+    }
+}
+
+fn set_flow_field(
+    _trigger: Trigger<SetFlowFieldEv>,
+    mut cmds: Commands,
+    mut unit_q: Query<Entity, With<Selected>>,
+    mut flowfield_q: Query<&mut FlowField>,
+    target_cell: Res<TargetCell>,
+    grid: Res<Grid>,
+) {
+    if target_cell.0.is_none() {
+        return;
+    }
+
+    let target_cell = target_cell.0.unwrap();
+    let mut new_flowfield = FlowField::new(grid.rows, grid.columns, target_cell.0, target_cell.1);
+
+    for unit_entity in unit_q.iter_mut() {
+        // remove units index that may be currently subscribed to existing flowfield
+        for mut flowfield in flowfield_q.iter_mut() {
+            flowfield.entities.retain(|&e| e != unit_entity.index());
+        }
+
+        new_flowfield.entities.push(unit_entity.index());
+    }
+
+    cmds.spawn(new_flowfield);
+    cmds.trigger(DetectCollidersEv);
+}
+
+fn detect_colliders(
+    _trigger: Trigger<DetectCollidersEv>,
+    mut cmds: Commands,
+    mut flowfield_q: Query<&mut FlowField>,
+    rapier_context: Res<RapierContext>,
+    grid: Res<Grid>,
+) {
+    for mut flowfield in flowfield_q.iter_mut() {
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                let cell = &mut flowfield.cells[x][z];
+                cell.occupied = false; // Reset obstacle status
+
+                let cell_shape =
+                    Collider::cuboid(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+                rapier_context.intersections_with_shape(
+                    cell.position,
+                    Quat::IDENTITY, // no rotation
+                    &cell_shape,
+                    QueryFilter::default().exclude_sensors(),
+                    |_collider_entity| {
+                        println!("Found obstacle!");
+                        // A collider is found overlapping the cell
+                        cell.occupied = true;
+                        false // Return false to stop after finding one collider
+                    },
+                );
+            }
+        }
+    }
+
+    cmds.trigger(CalculateFlowFieldEv);
+}
+
+fn calculate_flowfield(
+    _trigger: Trigger<CalculateFlowFieldEv>,
+    mut flowfield_q: Query<&mut FlowField>,
+    mut cmds: Commands,
+    grid: Res<Grid>,
+) {
+    for mut flowfield in flowfield_q.iter_mut() {
+        // Reset costs
+        for row in flowfield.cells.iter_mut() {
+            for cell in row.iter_mut() {
+                cell.cost = f32::INFINITY;
+            }
+        }
+
+        // Set the cost of the target cell to zero
+        // TODO: is this required since I set the target cell to zero in the ::new() function?
+        let target_cell = flowfield.destination.clone();
+        flowfield.cells[target_cell.0][target_cell.1].cost = 0.0;
+
+        let mut queue = VecDeque::new();
+        queue.push_back((flowfield.destination.0, flowfield.destination.1));
+
+        while let Some((x, z)) = queue.pop_front() {
+            let current_cost = flowfield.cells[x][z].cost;
+
+            for &(dx, dz) in &NEIGHBOR_OFFSETS {
+                let nx = x as isize + dx;
+                let nz = z as isize + dz;
+
+                if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
+                    let nx = nx as usize;
+                    let nz = nz as usize;
+
+                    let neighbor = &mut flowfield.cells[nx][nz];
+
+                    if neighbor.occupied {
+                        continue;
+                    }
+
+                    let new_cost = current_cost + 1.0; // Assuming uniform cost
+
+                    if new_cost < neighbor.cost {
+                        neighbor.cost = new_cost;
+                        queue.push_back((nx, nz));
+                    }
+                }
+            }
+        }
+    }
+
+    cmds.trigger(CalculateFlowVectorsEv);
+}
+
+fn calculate_flowfield_vectors(
+    _trigger: Trigger<CalculateFlowVectorsEv>,
+    mut flowfield_q: Query<&mut FlowField>,
+    grid: Res<Grid>,
+) {
+    for mut flowfield in flowfield_q.iter_mut() {
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                if flowfield.cells[x][z].occupied {
+                    continue;
+                }
+
+                let mut min_cost = flowfield.cells[x][z].cost;
+                let mut min_direction = Vec3::ZERO;
+
+                for (dx, dz) in &NEIGHBOR_OFFSETS {
+                    let nx = x as isize + dx;
+                    let nz = z as isize + dz;
+
+                    if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
+                        let nx = nx as usize;
+                        let nz = nz as usize;
+
+                        let neighbor = &flowfield.cells[nx][nz];
+
+                        if neighbor.cost < min_cost {
+                            min_cost = neighbor.cost;
+                            min_direction =
+                                (neighbor.position - flowfield.cells[x][z].position).normalize();
+                        }
+                    }
+                }
+
+                flowfield.cells[x][z].flow_vector = min_direction;
+            }
+        }
+    }
+}
+
+// TODO: This is VERY expensive. Make optional
+fn draw_flowfield(
+    flowfield_q: Query<&FlowField>,
+    selected_q: Query<Entity, With<Selected>>,
+    grid: Res<Grid>,
+    mut gizmos: Gizmos,
+) {
+    if selected_q.is_empty() {
+        return;
+    }
+
+    let mut selected_entity_ids = Vec::new();
+    for selected_entity in selected_q.iter() {
+        selected_entity_ids.push(selected_entity.index());
+    }
+
+    let arrow_len = CELL_SIZE * 0.75 / 2.0;
+    for flowfield in flowfield_q.iter() {
+        if !selected_entity_ids
+            .iter()
+            .any(|item| flowfield.entities.contains(item))
+        {
+            continue;
+        }
+
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                let cell = &flowfield.cells[x][z];
+
+                if cell.occupied || cell.flow_vector == Vec3::ZERO {
+                    // Draw an 'X' for each occupied cell
+                    let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
+                    let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
+                    let bottom_left = cell.position + Vec3::new(-arrow_len, 0.0, arrow_len);
+                    let bottom_right = cell.position + Vec3::new(arrow_len, 0.0, arrow_len);
+
+                    gizmos.line(top_left, bottom_right, RED);
+                    gizmos.line(top_right, bottom_left, RED);
+
+                    continue;
+                }
+
+                let flow_direction = cell.flow_vector.normalize();
+
+                let start = cell.position - flow_direction * arrow_len;
+                let end = cell.position + flow_direction * arrow_len;
+
+                gizmos.arrow(start, end, COLOR_ARROWS);
+            }
+        }
+    }
+}
+
+fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
+    gizmos.grid(
+        Vec3::ZERO,
+        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        UVec2::new(grid.rows as u32, grid.columns as u32),
+        Vec2::new(CELL_SIZE, CELL_SIZE),
+        COLOR_GRID,
+    );
+}
+
+// remove any flow field that has no entities attached
+fn remove_flowfield(mut cmds: Commands, flowfield_q: Query<(Entity, &FlowField)>) {
+    for (flowfield_entity, flowfield) in flowfield_q.iter() {
+        if flowfield.entities.len() == 0 {
+            cmds.entity(flowfield_entity).despawn();
+        }
     }
 }
 
