@@ -6,6 +6,14 @@ use bevy::{
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use std::collections::VecDeque;
 
+pub mod components;
+pub mod events;
+pub mod resources;
+
+use components::*;
+use events::*;
+use resources::*;
+
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
 const COLOR_OCCUPIED_CELL: Srgba = RED;
@@ -38,125 +46,6 @@ impl Plugin for BevyRtsPathFindingPlugin {
                 ),
             )
             .observe(detect_colliders);
-    }
-}
-
-#[derive(Event)]
-struct DetectCollidersEv;
-
-#[derive(Component)]
-pub struct MapBase;
-
-#[derive(Component)]
-pub struct GameCamera;
-
-#[derive(Resource)]
-struct InitializeGrid {
-    pub done: bool,
-    pub delay: Timer,
-}
-
-impl Default for InitializeGrid {
-    fn default() -> Self {
-        Self {
-            done: false,
-            delay: Timer::from_seconds(0.05, TimerMode::Once),
-        }
-    }
-}
-
-#[derive(Resource)]
-pub struct TargetCell {
-    row: usize,
-    column: usize,
-}
-
-impl TargetCell {
-    pub fn new(cells_width: usize, cells_depth: usize) -> Self {
-        let target = TargetCell {
-            row: cells_width - 1,
-            column: cells_depth - 1,
-        };
-
-        target
-    }
-}
-
-#[derive(Clone)]
-pub struct GridCell {
-    pub position: Vec3,
-    pub cost: f32,
-    pub flow_vector: Vec3,
-    pub occupied: bool,
-}
-
-#[derive(Resource)]
-pub struct Grid {
-    pub cells: Vec<Vec<GridCell>>,
-    pub cell_rows: usize,
-    pub cell_columns: usize,
-    pub colors: GridColors,
-    pub width: f32,
-    pub depth: f32,
-}
-
-pub struct GridColors {
-    pub grid: Srgba,
-    pub arrows: Srgba,
-    pub occupied_cells: Srgba,
-}
-
-impl Default for GridColors {
-    fn default() -> Self {
-        Self {
-            grid: COLOR_GRID,
-            arrows: COLOR_ARROWS,
-            occupied_cells: COLOR_OCCUPIED_CELL,
-        }
-    }
-}
-
-impl Grid {
-    pub fn new(cell_rows: usize, cell_columns: usize, width: f32, depth: f32) -> Self {
-        let mut grid = vec![
-            vec![
-                GridCell {
-                    position: Vec3::ZERO,
-                    cost: f32::INFINITY,
-                    flow_vector: Vec3::ZERO,
-                    occupied: false,
-                };
-                cell_rows
-            ];
-            cell_columns
-        ];
-
-        // Calculate the offset to center the grid at (0, 0, 0)
-        let grid_width = cell_rows as f32 * CELL_SIZE;
-        let grid_depth = cell_columns as f32 * CELL_SIZE;
-        let half_grid_width = grid_width / 2.0;
-        let half_grid_depth = grid_depth / 2.0;
-
-        for x in 0..cell_rows {
-            for z in 0..cell_columns {
-                let world_x = x as f32 * CELL_SIZE - half_grid_width + CELL_SIZE / 2.0;
-                let world_z = z as f32 * CELL_SIZE - half_grid_depth + CELL_SIZE / 2.0;
-
-                grid[x][z].position = Vec3::new(world_x, 0.0, world_z);
-            }
-        }
-
-        let target = TargetCell::new(cell_rows, cell_columns);
-        grid[target.row][target.column].cost = 0.0;
-
-        Grid {
-            cells: grid,
-            colors: GridColors::default(),
-            cell_rows,
-            cell_columns,
-            width,
-            depth,
-        }
     }
 }
 
