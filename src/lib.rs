@@ -1,12 +1,13 @@
-use crate::components::*;
-use crate::events::*;
-use crate::resources::*;
 use bevy::color::palettes::{css::*, tailwind::*};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use std::collections::HashSet;
 use std::collections::VecDeque;
+
+use crate::components::*;
+use crate::events::*;
+use crate::resources::*;
 
 pub mod components;
 pub mod debug;
