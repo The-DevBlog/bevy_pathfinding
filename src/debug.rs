@@ -1,5 +1,7 @@
 use crate::*;
 
+const ARROW_LENGTH: f32 = CELL_SIZE * 0.75 / 2.0;
+
 pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
@@ -8,7 +10,6 @@ impl Plugin for DebugPlugin {
     }
 }
 
-// TODO: This is VERY expensive. Make optional
 fn draw_flowfield(
     flowfield_q: Query<&FlowField>,
     selected_q: Query<Entity, With<Selected>>,
@@ -24,7 +25,6 @@ fn draw_flowfield(
         selected_entity_ids.push(selected_entity);
     }
 
-    let arrow_len = CELL_SIZE * 0.75 / 2.0;
     for flowfield in flowfield_q.iter() {
         if !selected_entity_ids
             .iter()
@@ -36,24 +36,22 @@ fn draw_flowfield(
         for x in 0..grid.rows {
             for z in 0..grid.columns {
                 let cell = &flowfield.cells[x][z];
-
                 if cell.occupied || cell.flow_vector == Vec3::ZERO {
                     // Draw an 'X' for each occupied cell
-                    let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
-                    let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
-                    let bottom_left = cell.position + Vec3::new(-arrow_len, 0.0, arrow_len);
-                    let bottom_right = cell.position + Vec3::new(arrow_len, 0.0, arrow_len);
+                    let top_left = cell.position + Vec3::new(-ARROW_LENGTH, 0.0, -ARROW_LENGTH);
+                    let top_right = cell.position + Vec3::new(ARROW_LENGTH, 0.0, -ARROW_LENGTH);
+                    let bottom_left = cell.position + Vec3::new(-ARROW_LENGTH, 0.0, ARROW_LENGTH);
+                    let bottom_right = cell.position + Vec3::new(ARROW_LENGTH, 0.0, ARROW_LENGTH);
 
                     gizmos.line(top_left, bottom_right, RED);
                     gizmos.line(top_right, bottom_left, RED);
-
                     continue;
                 }
 
                 let flow_direction = cell.flow_vector.normalize();
 
-                let start = cell.position - flow_direction * arrow_len;
-                let end = cell.position + flow_direction * arrow_len;
+                let start = cell.position - flow_direction * ARROW_LENGTH;
+                let end = cell.position + flow_direction * ARROW_LENGTH;
 
                 gizmos.arrow(start, end, COLOR_ARROWS);
             }

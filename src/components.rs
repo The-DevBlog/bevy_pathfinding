@@ -58,7 +58,7 @@ impl FlowField {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Cell {
     pub position: Vec3,
     pub cost: f32,

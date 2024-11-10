@@ -40,21 +40,6 @@ impl Default for GridColors {
 }
 
 #[derive(Resource)]
-pub struct InitializeGrid {
-    pub done: bool,
-    pub delay: Timer,
-}
-
-impl Default for InitializeGrid {
-    fn default() -> Self {
-        Self {
-            done: false,
-            delay: Timer::from_seconds(0.05, TimerMode::Once),
-        }
-    }
-}
-
-#[derive(Resource)]
 pub struct TargetCell(pub Option<(usize, usize)>);
 
 impl Default for TargetCell {

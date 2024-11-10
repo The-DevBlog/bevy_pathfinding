@@ -5,10 +5,11 @@ use bevy::color::palettes::{css::*, tailwind::*};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
+use std::collections::HashSet;
 use std::collections::VecDeque;
 
 pub mod components;
-pub mod debug_plugin;
+pub mod debug;
 pub mod events;
 pub mod resources;
 pub mod utils;
@@ -32,8 +33,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<InitializeGrid>()
-            .init_resource::<TargetCell>()
+        app.init_resource::<TargetCell>()
             .add_systems(Update, remove_flowfield)
             .observe(set_target_cell)
             .observe(set_flow_field)
@@ -43,6 +43,7 @@ impl Plugin for BevyRtsPathFindingPlugin {
     }
 }
 
+// Phase 1
 fn set_target_cell(
     _trigger: Trigger<SetTargetCellEv>,
     mut cmds: Commands,
@@ -77,6 +78,7 @@ fn set_target_cell(
     }
 }
 
+// Phase 2
 fn set_flow_field(
     _trigger: Trigger<SetFlowFieldEv>,
     mut cmds: Commands,
@@ -105,32 +107,49 @@ fn set_flow_field(
     cmds.trigger(DetectCollidersEv);
 }
 
+// Phase 3
 fn detect_colliders(
     _trigger: Trigger<DetectCollidersEv>,
     mut cmds: Commands,
     mut flowfield_q: Query<&mut FlowField>,
     rapier_context: Res<RapierContext>,
     grid: Res<Grid>,
+    selected_q: Query<Entity, With<Selected>>, // Add this query
 ) {
+    // Collect the set of selected unit entities
+    let selected_entities: HashSet<Entity> = selected_q.iter().collect();
+
     for mut flowfield in flowfield_q.iter_mut() {
         for x in 0..grid.rows {
             for z in 0..grid.columns {
                 let cell = &mut flowfield.cells[x][z];
                 cell.occupied = false; // Reset obstacle status
 
-                let cell_shape =
-                    Collider::cuboid(CELL_SIZE / 2.0, CELL_SIZE / 2.0, CELL_SIZE / 2.0);
+                let cell_size = CELL_SIZE / 2.0;
+                let cell_shape = Collider::cuboid(cell_size, cell_size, cell_size);
+                let mut cell_occupied = false;
+
+                // Capture selected_entities by reference for use in the closure
+                let selected_entities = &selected_entities;
+
                 rapier_context.intersections_with_shape(
                     cell.position,
-                    Quat::IDENTITY, // no rotation
+                    Quat::IDENTITY, // No rotation
                     &cell_shape,
                     QueryFilter::default().exclude_sensors(),
-                    |_collider_entity| {
-                        // A collider is found overlapping the cell
-                        cell.occupied = true;
-                        false // Return false to stop after finding one collider
+                    |collider_entity| {
+                        if !selected_entities.contains(&collider_entity) {
+                            // Collider is overlapping the cell and is not a selected unit
+                            cell_occupied = true;
+                            false
+                        } else {
+                            // Collider is a selected unit, ignore it
+                            true
+                        }
                     },
                 );
+
+                cell.occupied = cell_occupied;
             }
         }
     }
@@ -138,6 +157,7 @@ fn detect_colliders(
     cmds.trigger(CalculateFlowFieldEv);
 }
 
+// Phase 4
 fn calculate_flowfield(
     _trigger: Trigger<CalculateFlowFieldEv>,
     mut flowfield_q: Query<&mut FlowField>,
@@ -190,6 +210,7 @@ fn calculate_flowfield(
     cmds.trigger(CalculateFlowVectorsEv);
 }
 
+// Phase 5
 fn calculate_flowfield_vectors(
     _trigger: Trigger<CalculateFlowVectorsEv>,
     mut flowfield_q: Query<&mut FlowField>,
@@ -229,45 +250,6 @@ fn calculate_flowfield_vectors(
         }
     }
 }
-
-// fn calculate_flowfield_vectors(
-//     _trigger: Trigger<CalculateFlowVectorsEv>,
-//     mut flowfield_q: Query<&mut FlowField>,
-//     grid: Res<Grid>,
-// ) {
-//     for mut flowfield in flowfield_q.iter_mut() {
-//         for x in 0..grid.rows {
-//             for z in 0..grid.columns {
-//                 if flowfield.cells[x][z].occupied {
-//                     continue;
-//                 }
-
-//                 let mut min_cost = flowfield.cells[x][z].cost;
-//                 let mut min_direction = Vec3::ZERO;
-
-//                 for (dx, dz) in &NEIGHBOR_OFFSETS {
-//                     let nx = x as isize + dx;
-//                     let nz = z as isize + dz;
-
-//                     if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
-//                         let nx = nx as usize;
-//                         let nz = nz as usize;
-
-//                         let neighbor = &flowfield.cells[nx][nz];
-
-//                         if neighbor.cost < min_cost {
-//                             min_cost = neighbor.cost;
-//                             min_direction =
-//                                 (neighbor.position - flowfield.cells[x][z].position).normalize();
-//                         }
-//                     }
-//                 }
-
-//                 flowfield.cells[x][z].flow_vector = min_direction;
-//             }
-//         }
-//     }
-// }
 
 // remove any flow field that has no entities attached
 fn remove_flowfield(mut cmds: Commands, flowfield_q: Query<(Entity, &FlowField)>) {
