@@ -15,7 +15,7 @@ pub struct Selected;
 pub struct FlowField {
     pub cells: Vec<Vec<Cell>>,
     pub destination: (usize, usize),
-    pub entities: Vec<u32>,
+    pub entities: Vec<Entity>,
 }
 
 impl FlowField {

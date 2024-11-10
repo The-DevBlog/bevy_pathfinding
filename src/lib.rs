@@ -95,10 +95,10 @@ fn set_flow_field(
     for unit_entity in unit_q.iter_mut() {
         // remove units index that may be currently subscribed to existing flowfield
         for mut flowfield in flowfield_q.iter_mut() {
-            flowfield.entities.retain(|&e| e != unit_entity.index());
+            flowfield.entities.retain(|&e| e != unit_entity);
         }
 
-        new_flowfield.entities.push(unit_entity.index());
+        new_flowfield.entities.push(unit_entity);
     }
 
     cmds.spawn(new_flowfield);
@@ -202,10 +202,11 @@ fn calculate_flowfield_vectors(
                     continue;
                 }
 
-                let mut min_cost = flowfield.cells[x][z].cost;
+                // Initialize min_cost to infinity
+                let mut min_cost = f32::INFINITY;
                 let mut min_direction = Vec3::ZERO;
 
-                for (dx, dz) in &NEIGHBOR_OFFSETS {
+                for &(dx, dz) in &NEIGHBOR_OFFSETS {
                     let nx = x as isize + dx;
                     let nz = z as isize + dz;
 
@@ -228,6 +229,45 @@ fn calculate_flowfield_vectors(
         }
     }
 }
+
+// fn calculate_flowfield_vectors(
+//     _trigger: Trigger<CalculateFlowVectorsEv>,
+//     mut flowfield_q: Query<&mut FlowField>,
+//     grid: Res<Grid>,
+// ) {
+//     for mut flowfield in flowfield_q.iter_mut() {
+//         for x in 0..grid.rows {
+//             for z in 0..grid.columns {
+//                 if flowfield.cells[x][z].occupied {
+//                     continue;
+//                 }
+
+//                 let mut min_cost = flowfield.cells[x][z].cost;
+//                 let mut min_direction = Vec3::ZERO;
+
+//                 for (dx, dz) in &NEIGHBOR_OFFSETS {
+//                     let nx = x as isize + dx;
+//                     let nz = z as isize + dz;
+
+//                     if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
+//                         let nx = nx as usize;
+//                         let nz = nz as usize;
+
+//                         let neighbor = &flowfield.cells[nx][nz];
+
+//                         if neighbor.cost < min_cost {
+//                             min_cost = neighbor.cost;
+//                             min_direction =
+//                                 (neighbor.position - flowfield.cells[x][z].position).normalize();
+//                         }
+//                     }
+//                 }
+
+//                 flowfield.cells[x][z].flow_vector = min_direction;
+//             }
+//         }
+//     }
+// }
 
 // remove any flow field that has no entities attached
 fn remove_flowfield(mut cmds: Commands, flowfield_q: Query<(Entity, &FlowField)>) {

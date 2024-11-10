@@ -21,7 +21,7 @@ fn draw_flowfield(
 
     let mut selected_entity_ids = Vec::new();
     for selected_entity in selected_q.iter() {
-        selected_entity_ids.push(selected_entity.index());
+        selected_entity_ids.push(selected_entity);
     }
 
     let arrow_len = CELL_SIZE * 0.75 / 2.0;
