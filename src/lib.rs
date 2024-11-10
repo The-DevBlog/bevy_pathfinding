@@ -1,18 +1,17 @@
-use bevy::{
-    color::palettes::{css::*, tailwind::CYAN_100},
-    prelude::*,
-    window::PrimaryWindow,
-};
+use crate::components::*;
+use crate::events::*;
+use crate::resources::*;
+use bevy::color::palettes::{css::*, tailwind::*};
+use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use std::collections::VecDeque;
 
 pub mod components;
+pub mod debug_plugin;
 pub mod events;
 pub mod resources;
-
-use components::*;
-use events::*;
-use resources::*;
+mod utils;
 
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
@@ -35,7 +34,7 @@ impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<InitializeGrid>()
             .init_resource::<TargetCell>()
-            .add_systems(Update, (remove_flowfield, draw_flowfield, draw_grid))
+            .add_systems(Update, remove_flowfield)
             .observe(set_target_cell)
             .observe(set_flow_field)
             .observe(detect_colliders)
@@ -67,7 +66,7 @@ fn set_target_cell(
         return;
     };
 
-    let coords = get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
+    let coords = utils::get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
 
     // Adjust mouse coordinates to the grid's coordinate system
     let grid_origin_x = -grid.width / 2.0;
@@ -138,7 +137,6 @@ fn detect_colliders(
                     &cell_shape,
                     QueryFilter::default().exclude_sensors(),
                     |_collider_entity| {
-                        println!("Found obstacle!");
                         // A collider is found overlapping the cell
                         cell.occupied = true;
                         false // Return false to stop after finding one collider
@@ -166,7 +164,6 @@ fn calculate_flowfield(
         }
 
         // Set the cost of the target cell to zero
-        // TODO: is this required since I set the target cell to zero in the ::new() function?
         let target_cell = flowfield.destination.clone();
         flowfield.cells[target_cell.0][target_cell.1].cost = 0.0;
 
@@ -243,69 +240,6 @@ fn calculate_flowfield_vectors(
     }
 }
 
-// TODO: This is VERY expensive. Make optional
-fn draw_flowfield(
-    flowfield_q: Query<&FlowField>,
-    selected_q: Query<Entity, With<Selected>>,
-    grid: Res<Grid>,
-    mut gizmos: Gizmos,
-) {
-    if selected_q.is_empty() {
-        return;
-    }
-
-    let mut selected_entity_ids = Vec::new();
-    for selected_entity in selected_q.iter() {
-        selected_entity_ids.push(selected_entity.index());
-    }
-
-    let arrow_len = CELL_SIZE * 0.75 / 2.0;
-    for flowfield in flowfield_q.iter() {
-        if !selected_entity_ids
-            .iter()
-            .any(|item| flowfield.entities.contains(item))
-        {
-            continue;
-        }
-
-        for x in 0..grid.rows {
-            for z in 0..grid.columns {
-                let cell = &flowfield.cells[x][z];
-
-                if cell.occupied || cell.flow_vector == Vec3::ZERO {
-                    // Draw an 'X' for each occupied cell
-                    let top_left = cell.position + Vec3::new(-arrow_len, 0.0, -arrow_len);
-                    let top_right = cell.position + Vec3::new(arrow_len, 0.0, -arrow_len);
-                    let bottom_left = cell.position + Vec3::new(-arrow_len, 0.0, arrow_len);
-                    let bottom_right = cell.position + Vec3::new(arrow_len, 0.0, arrow_len);
-
-                    gizmos.line(top_left, bottom_right, RED);
-                    gizmos.line(top_right, bottom_left, RED);
-
-                    continue;
-                }
-
-                let flow_direction = cell.flow_vector.normalize();
-
-                let start = cell.position - flow_direction * arrow_len;
-                let end = cell.position + flow_direction * arrow_len;
-
-                gizmos.arrow(start, end, COLOR_ARROWS);
-            }
-        }
-    }
-}
-
-fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
-    gizmos.grid(
-        Vec3::ZERO,
-        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-        UVec2::new(grid.rows as u32, grid.columns as u32),
-        Vec2::new(CELL_SIZE, CELL_SIZE),
-        COLOR_GRID,
-    );
-}
-
 // remove any flow field that has no entities attached
 fn remove_flowfield(mut cmds: Commands, flowfield_q: Query<(Entity, &FlowField)>) {
     for (flowfield_entity, flowfield) in flowfield_q.iter() {
@@ -313,17 +247,4 @@ fn remove_flowfield(mut cmds: Commands, flowfield_q: Query<(Entity, &FlowField)>
             cmds.entity(flowfield_entity).despawn();
         }
     }
-}
-
-pub fn get_world_coords(
-    map_base_trans: &GlobalTransform,
-    cam_transform: &GlobalTransform,
-    cam: &Camera,
-    cursor_pos: Vec2,
-) -> Vec3 {
-    let plane_origin = map_base_trans.translation();
-    let plane = InfinitePlane3d::new(map_base_trans.up());
-    let ray = cam.viewport_to_world(cam_transform, cursor_pos).unwrap();
-    let distance = ray.intersect_plane(plane_origin, plane).unwrap();
-    return ray.get_point(distance);
 }
