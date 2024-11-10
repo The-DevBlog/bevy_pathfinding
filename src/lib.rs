@@ -34,18 +34,11 @@ pub struct BevyRtsPathFindingPlugin;
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<InitializeGrid>()
-            .add_systems(
-                Update,
-                (
-                    tick_grid_init_timer,
-                    calculate_flow_field,
-                    calculate_flow_vectors,
-                    draw_flow_field,
-                    draw_grid,
-                ),
-            )
+            .add_systems(Update, (tick_grid_init_timer, draw_flow_field, draw_grid))
             .observe(detect_colliders)
-            .observe(set_target_cell);
+            .observe(set_target_cell)
+            .observe(calculate_flow_field)
+            .observe(calculate_flow_vectors);
     }
 }
 
@@ -62,6 +55,7 @@ fn tick_grid_init_timer(
 }
 
 fn calculate_flow_field(
+    _trigger: Trigger<DetectCollidersEv>,
     mut flowfield_q: Query<&mut FlowField>,
     grid: Res<Grid>,
     target: Res<TargetCell>,
@@ -109,7 +103,11 @@ fn calculate_flow_field(
     }
 }
 
-fn calculate_flow_vectors(mut flowfield_q: Query<&mut FlowField>, grid: Res<Grid>) {
+fn calculate_flow_vectors(
+    _trigger: Trigger<DetectCollidersEv>,
+    mut flowfield_q: Query<&mut FlowField>,
+    grid: Res<Grid>,
+) {
     for mut flowfield in flowfield_q.iter_mut() {
         for x in 0..grid.rows {
             for z in 0..grid.columns {
@@ -215,16 +213,14 @@ fn draw_flow_field(flowfield_q: Query<&FlowField>, grid: Res<Grid>, mut gizmos: 
     }
 }
 
-fn draw_grid(mut gizmos: Gizmos, flowfield_q: Query<&FlowField>, grid: Res<Grid>) {
-    for flowfield in flowfield_q.iter() {
-        gizmos.grid(
-            Vec3::ZERO,
-            Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-            UVec2::new(grid.rows as u32, grid.columns as u32),
-            Vec2::new(CELL_SIZE, CELL_SIZE),
-            COLOR_GRID,
-        );
-    }
+fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
+    gizmos.grid(
+        Vec3::ZERO,
+        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        UVec2::new(grid.rows as u32, grid.columns as u32),
+        Vec2::new(CELL_SIZE, CELL_SIZE),
+        COLOR_GRID,
+    );
 }
 
 fn set_target_cell(
