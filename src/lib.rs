@@ -61,37 +61,37 @@ fn tick_grid_init_timer(
     }
 }
 
-fn calculate_flow_field(mut grid_q: Query<&mut Grid>, target: Res<TargetCell>) {
-    for mut grid in grid_q.iter_mut() {
+fn calculate_flow_field(
+    mut flowfield_q: Query<&mut FlowField>,
+    grid: Res<Grid>,
+    target: Res<TargetCell>,
+) {
+    for mut flowfield in flowfield_q.iter_mut() {
         // Reset costs
-        for row in grid.cells.iter_mut() {
+        for row in flowfield.cells.iter_mut() {
             for cell in row.iter_mut() {
                 cell.cost = f32::INFINITY;
             }
         }
 
         // Set the cost of the target cell to zero
-        grid.cells[target.row][target.column].cost = 0.0;
+        flowfield.cells[target.row][target.column].cost = 0.0;
 
         let mut queue = VecDeque::new();
         queue.push_back((target.row, target.column));
 
         while let Some((x, z)) = queue.pop_front() {
-            let current_cost = grid.cells[x][z].cost;
+            let current_cost = flowfield.cells[x][z].cost;
 
             for &(dx, dz) in &NEIGHBOR_OFFSETS {
                 let nx = x as isize + dx;
                 let nz = z as isize + dz;
 
-                if nx >= 0
-                    && nx < grid.cell_rows as isize
-                    && nz >= 0
-                    && nz < grid.cell_columns as isize
-                {
+                if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
                     let nx = nx as usize;
                     let nz = nz as usize;
 
-                    let neighbor = &mut grid.cells[nx][nz];
+                    let neighbor = &mut flowfield.cells[nx][nz];
 
                     if neighbor.occupied {
                         continue;
@@ -109,40 +109,36 @@ fn calculate_flow_field(mut grid_q: Query<&mut Grid>, target: Res<TargetCell>) {
     }
 }
 
-fn calculate_flow_vectors(mut grid_q: Query<&mut Grid>) {
-    for mut grid in grid_q.iter_mut() {
-        for x in 0..grid.cell_rows {
-            for z in 0..grid.cell_columns {
-                if grid.cells[x][z].occupied {
+fn calculate_flow_vectors(mut flowfield_q: Query<&mut FlowField>, grid: Res<Grid>) {
+    for mut flowfield in flowfield_q.iter_mut() {
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                if flowfield.cells[x][z].occupied {
                     continue;
                 }
 
-                let mut min_cost = grid.cells[x][z].cost;
+                let mut min_cost = flowfield.cells[x][z].cost;
                 let mut min_direction = Vec3::ZERO;
 
                 for (dx, dz) in &NEIGHBOR_OFFSETS {
                     let nx = x as isize + dx;
                     let nz = z as isize + dz;
 
-                    if nx >= 0
-                        && nx < grid.cell_rows as isize
-                        && nz >= 0
-                        && nz < grid.cell_columns as isize
-                    {
+                    if nx >= 0 && nx < grid.rows as isize && nz >= 0 && nz < grid.columns as isize {
                         let nx = nx as usize;
                         let nz = nz as usize;
 
-                        let neighbor = &grid.cells[nx][nz];
+                        let neighbor = &flowfield.cells[nx][nz];
 
                         if neighbor.cost < min_cost {
                             min_cost = neighbor.cost;
                             min_direction =
-                                (neighbor.position - grid.cells[x][z].position).normalize();
+                                (neighbor.position - flowfield.cells[x][z].position).normalize();
                         }
                     }
                 }
 
-                grid.cells[x][z].flow_vector = min_direction;
+                flowfield.cells[x][z].flow_vector = min_direction;
             }
         }
     }
@@ -150,18 +146,19 @@ fn calculate_flow_vectors(mut grid_q: Query<&mut Grid>) {
 
 fn detect_colliders(
     _trigger: Trigger<DetectCollidersEv>,
-    mut grid_q: Query<&mut Grid>,
+    mut flowfield_q: Query<&mut FlowField>,
     rapier_context: Res<RapierContext>,
     mut grid_init: ResMut<InitializeGrid>,
+    grid: Res<Grid>,
 ) {
     if grid_init.done && grid_init.delay.finished() {
         return;
     }
 
-    for mut grid in grid_q.iter_mut() {
-        for x in 0..grid.cell_rows {
-            for z in 0..grid.cell_columns {
-                let cell = &mut grid.cells[x][z];
+    for mut flowfield in flowfield_q.iter_mut() {
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                let cell = &mut flowfield.cells[x][z];
                 cell.occupied = false; // Reset obstacle status
 
                 let cell_shape =
@@ -184,13 +181,13 @@ fn detect_colliders(
     grid_init.done = true;
 }
 
-fn draw_flow_field(grid_q: Query<&Grid>, mut gizmos: Gizmos) {
+fn draw_flow_field(flowfield_q: Query<&FlowField>, grid: Res<Grid>, mut gizmos: Gizmos) {
     let arrow_len = CELL_SIZE * 0.75 / 2.0;
 
-    for grid in grid_q.iter() {
-        for x in 0..grid.cell_rows {
-            for z in 0..grid.cell_columns {
-                let cell = &grid.cells[x][z];
+    for flowfield in flowfield_q.iter() {
+        for x in 0..grid.rows {
+            for z in 0..grid.columns {
+                let cell = &flowfield.cells[x][z];
 
                 if cell.occupied || cell.flow_vector == Vec3::ZERO {
                     // Draw an 'X' for each occupied cell
@@ -218,12 +215,12 @@ fn draw_flow_field(grid_q: Query<&Grid>, mut gizmos: Gizmos) {
     }
 }
 
-fn draw_grid(mut gizmos: Gizmos, grid_q: Query<&Grid>) {
-    for grid in grid_q.iter() {
+fn draw_grid(mut gizmos: Gizmos, flowfield_q: Query<&FlowField>, grid: Res<Grid>) {
+    for flowfield in flowfield_q.iter() {
         gizmos.grid(
             Vec3::ZERO,
             Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-            UVec2::new(grid.cell_rows as u32, grid.cell_columns as u32),
+            UVec2::new(grid.rows as u32, grid.columns as u32),
             Vec2::new(CELL_SIZE, CELL_SIZE),
             COLOR_GRID,
         );
@@ -232,12 +229,12 @@ fn draw_grid(mut gizmos: Gizmos, grid_q: Query<&Grid>) {
 
 fn set_target_cell(
     _trigger: Trigger<SetTargetCellEv>,
-    grid_q: Query<&Grid>,
     mut cmds: Commands,
     mut target_cell: ResMut<TargetCell>,
     cam_q: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     map_base_q: Query<&GlobalTransform, With<MapBase>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    grid: Res<Grid>,
 ) {
     let map_base = match map_base_q.get_single() {
         Ok(value) => value,
@@ -255,27 +252,24 @@ fn set_target_cell(
 
     let coords = get_world_coords(map_base, &cam.1, &cam.0, viewport_cursor);
 
-    // TODO: this doesnt need to loop every time I just need to store the general grid info in a resource
-    for grid in grid_q.iter() {
-        // Adjust mouse coordinates to the grid's coordinate system
-        let grid_origin_x = -grid.width / 2.0;
-        let grid_origin_z = -grid.depth / 2.0;
-        let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
-        let adjusted_z = coords.z - grid_origin_z;
+    // Adjust mouse coordinates to the grid's coordinate system
+    let grid_origin_x = -grid.width / 2.0;
+    let grid_origin_z = -grid.depth / 2.0;
+    let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
+    let adjusted_z = coords.z - grid_origin_z;
 
-        // Calculate the column and row indices
-        let cell_width = grid.width / grid.cell_rows as f32;
-        let cell_depth = grid.depth / grid.cell_columns as f32;
-        let row = (adjusted_x / cell_width).floor() as u32;
-        let column = (adjusted_z / cell_depth).floor() as u32;
+    // Calculate the column and row indices
+    let cell_width = grid.width / grid.rows as f32;
+    let cell_depth = grid.depth / grid.columns as f32;
+    let row = (adjusted_x / cell_width).floor() as u32;
+    let column = (adjusted_z / cell_depth).floor() as u32;
 
-        // Check if indices are within the grid bounds
-        if row < grid.width as u32 && column < grid.depth as u32 {
-            // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
-            target_cell.row = row as usize;
-            target_cell.column = column as usize;
-            cmds.trigger(DetectCollidersEv);
-        }
+    // Check if indices are within the grid bounds
+    if row < grid.width as u32 && column < grid.depth as u32 {
+        // println!("Mouse is over cell at row {}, column {}, position {:?}", cell.row, cell.column, cell.position);
+        target_cell.row = row as usize;
+        target_cell.column = column as usize;
+        cmds.trigger(DetectCollidersEv);
     }
 }
 
