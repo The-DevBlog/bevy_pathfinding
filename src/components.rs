@@ -14,7 +14,7 @@ pub struct Destination;
 #[derive(Component)]
 pub struct Selected;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct FlowField {
     pub cells: Vec<Vec<Cell>>,
     pub destination: (usize, usize),
