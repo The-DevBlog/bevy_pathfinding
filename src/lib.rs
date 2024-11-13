@@ -54,6 +54,10 @@ fn set_target_cell(
     window_q: Query<&Window, With<PrimaryWindow>>,
     grid: Res<Grid>,
 ) {
+    println!("");
+    println!("");
+    println!("");
+    println!("PHASE 1: Setting target cell");
     let map_base = match map_base_q.get_single() {
         Ok(value) => value,
         Err(_) => return,
@@ -77,6 +81,7 @@ fn set_target_cell(
         target_cell.0 = Some((cell.0 as usize, cell.1 as usize));
         cmds.trigger(SetFlowFieldEv);
     }
+    println!("PHASE 1: Target cell set");
 }
 
 // Phase 2
@@ -88,6 +93,8 @@ fn set_flow_field(
     target_cell: Res<TargetCell>,
     grid: Res<Grid>,
 ) {
+    println!("PHASE 2: Setting flow field");
+
     if target_cell.0.is_none() {
         return;
     }
@@ -106,6 +113,7 @@ fn set_flow_field(
 
     cmds.spawn(new_flowfield);
     cmds.trigger(DetectCollidersEv);
+    println!("PHASE 2: Flow field set");
 }
 
 // Phase 3
@@ -115,9 +123,10 @@ fn detect_colliders(
     mut flowfield_q: Query<&mut FlowField>,
     rapier_context: Res<RapierContext>,
     grid: Res<Grid>,
-    selected_q: Query<Entity, With<Selected>>, // Add this query
+    selected_q: Query<Entity, With<Selected>>,
 ) {
-    // Collect the set of selected unit entities
+    println!("PHASE 3: Detect Colliders");
+
     let selected_entities: HashSet<Entity> = selected_q.iter().collect();
 
     for mut flowfield in flowfield_q.iter_mut() {
@@ -155,6 +164,7 @@ fn detect_colliders(
         }
     }
 
+    println!("PHASE 3: Detect Colliders Done");
     cmds.trigger(CalculateFlowFieldEv);
 }
 
@@ -166,6 +176,8 @@ fn calculate_flowfield(
     grid: Res<Grid>,
 ) {
     for mut flowfield in flowfield_q.iter_mut() {
+        println!("PHASE 4: Calcing flowfield");
+
         // Reset costs
         for row in flowfield.cells.iter_mut() {
             for cell in row.iter_mut() {
@@ -208,6 +220,7 @@ fn calculate_flowfield(
         }
     }
 
+    println!("PHASE 4: Done calcing flowfield");
     cmds.trigger(CalculateFlowVectorsEv);
 }
 
@@ -218,6 +231,7 @@ fn calculate_flowfield_vectors(
     grid: Res<Grid>,
 ) {
     for mut flowfield in flowfield_q.iter_mut() {
+        println!("PHASE 5: calcing flowfield vectors");
         for x in 0..grid.rows {
             for z in 0..grid.columns {
                 if flowfield.cells[x][z].occupied {
@@ -250,6 +264,8 @@ fn calculate_flowfield_vectors(
             }
         }
     }
+
+    println!("PHASE 5: done flowfield vectors");
 }
 
 // remove any flow field that has no entities attached

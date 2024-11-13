@@ -9,6 +9,9 @@ pub struct MapBase;
 pub struct GameCamera;
 
 #[derive(Component)]
+pub struct Destination;
+
+#[derive(Component)]
 pub struct Selected;
 
 #[derive(Component)]
