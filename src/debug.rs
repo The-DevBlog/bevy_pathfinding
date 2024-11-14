@@ -2,9 +2,9 @@ use crate::*;
 
 const ARROW_LENGTH: f32 = CELL_SIZE * 0.75 / 2.0;
 
-pub struct DebugPlugin;
+pub struct BevyRtsPathFindingDebugPlugin;
 
-impl Plugin for DebugPlugin {
+impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (draw_flowfield, draw_grid));
     }
