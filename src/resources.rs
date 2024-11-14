@@ -1,19 +1,49 @@
 use bevy::prelude::*;
 
-#[derive(Resource, Default)]
-pub struct SetGridOccupantsOnce(pub bool);
+use crate::*;
 
 #[derive(Resource)]
-pub struct DelayedRunTimer(pub Timer);
+pub struct Grid {
+    pub rows: usize,
+    pub columns: usize,
+    pub width: f32,
+    pub depth: f32,
+    pub colors: GridColors,
+}
 
-impl Default for DelayedRunTimer {
-    fn default() -> Self {
-        Self(Timer::from_seconds(0.5, TimerMode::Once)) // 0.5 seconds delay
+impl Grid {
+    pub fn new(rows: usize, columns: usize, width: f32, depth: f32) -> Self {
+        Self {
+            rows,
+            columns,
+            width,
+            depth,
+            colors: GridColors::default(),
+        }
     }
 }
 
-#[derive(Resource, Default)]
-pub struct TargetCell {
-    pub row: Option<u32>,
-    pub column: Option<u32>,
+pub struct GridColors {
+    pub grid: Srgba,
+    pub arrows: Srgba,
+    pub occupied_cells: Srgba,
+}
+
+impl Default for GridColors {
+    fn default() -> Self {
+        Self {
+            grid: COLOR_GRID,
+            arrows: COLOR_ARROWS,
+            occupied_cells: COLOR_OCCUPIED_CELL,
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct TargetCell(pub Option<(usize, usize)>);
+
+impl Default for TargetCell {
+    fn default() -> Self {
+        TargetCell(None)
+    }
 }
