@@ -18,7 +18,6 @@ pub mod utils;
 const COLOR_GRID: Srgba = GRAY;
 const COLOR_ARROWS: Srgba = CYAN_100;
 const COLOR_OCCUPIED_CELL: Srgba = RED;
-const CELL_SIZE: f32 = 10.0;
 const NEIGHBOR_OFFSETS: [(isize, isize); 8] = [
     (1, 0),
     (-1, 0),
@@ -101,7 +100,13 @@ fn set_flow_field(
     }
 
     let target_cell = target_cell.0.unwrap();
-    let mut new_flowfield = FlowField::new(grid.rows, grid.columns, target_cell.0, target_cell.1);
+    let mut new_flowfield = FlowField::new(
+        grid.rows,
+        grid.columns,
+        target_cell.0,
+        target_cell.1,
+        grid.cell_size,
+    );
 
     for unit_entity in unit_q.iter_mut() {
         // remove units index that may be currently subscribed to existing flowfield
@@ -135,7 +140,7 @@ fn detect_colliders(
                 let cell = &mut flowfield.cells[x][z];
                 cell.occupied = false; // Reset obstacle status
 
-                let cell_size = CELL_SIZE / 2.0;
+                let cell_size = grid.cell_size / 2.0;
                 let cell_shape = Collider::cuboid(cell_size, cell_size, cell_size);
                 let mut cell_occupied = false;
 
@@ -143,7 +148,7 @@ fn detect_colliders(
                 let selected_entities = &selected_entities;
 
                 rapier_context.intersections_with_shape(
-                    cell.position,
+                    cell.world_position,
                     Quat::IDENTITY, // No rotation
                     &cell_shape,
                     QueryFilter::default().exclude_sensors(),
@@ -254,8 +259,9 @@ fn calculate_flowfield_vectors(
 
                         if neighbor.cost < min_cost {
                             min_cost = neighbor.cost;
-                            min_direction =
-                                (neighbor.position - flowfield.cells[x][z].position).normalize();
+                            min_direction = (neighbor.world_position
+                                - flowfield.cells[x][z].world_position)
+                                .normalize();
                         }
                     }
                 }

@@ -8,16 +8,18 @@ pub struct Grid {
     pub columns: usize,
     pub width: f32,
     pub depth: f32,
+    pub cell_size: f32,
     pub colors: GridColors,
 }
 
 impl Grid {
-    pub fn new(rows: usize, columns: usize, width: f32, depth: f32) -> Self {
+    pub fn new(rows: usize, columns: usize, cell_size: f32) -> Self {
         Self {
             rows,
             columns,
-            width,
-            depth,
+            width: cell_size * rows as f32,
+            depth: cell_size * columns as f32,
+            cell_size,
             colors: GridColors::default(),
         }
     }
