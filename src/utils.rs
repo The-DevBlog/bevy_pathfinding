@@ -15,6 +15,15 @@ pub fn get_world_coords(
     return ray.get_point(distance);
 }
 
+pub fn to_viewport_coords(
+    cam: &Camera,
+    cam_transform: &GlobalTransform,
+    world_position: Vec3,
+) -> Vec2 {
+    let viewport_position = cam.world_to_viewport(cam_transform, world_position);
+    return viewport_position.unwrap();
+}
+
 // retrieves the cell row/column given a set a world coordinates
 pub fn get_cell(grid: &Grid, coords: &Vec3) -> (u32, u32) {
     // Adjust mouse coordinates to the grid's coordinate system
