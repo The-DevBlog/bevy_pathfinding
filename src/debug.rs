@@ -17,6 +17,9 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
 #[derive(Event)]
 pub struct DrawCostFieldEv;
 
+#[derive(Component)]
+struct CostTxt;
+
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos) {
     let grid = grid_controller.get_single().unwrap();
 
@@ -33,38 +36,37 @@ fn draw_costfield(
     _trigger: Trigger<DrawCostFieldEv>,
     mut cmds: Commands,
     grid_controller: Query<&GridController>,
+    cost_q: Query<Entity, With<CostTxt>>,
 ) {
-    let grid = grid_controller.get_single().unwrap();
+    // remove current cost field before rendering new one
+    for cost_entity in cost_q.iter() {
+        cmds.entity(cost_entity).despawn_recursive();
+    }
 
-    // Calculate the offset based on the map size
-    let offset_x = -grid.map_size.x / 2.;
-    let offset_z = -grid.map_size.y / 2.;
+    let grid = grid_controller.get_single().unwrap();
 
     for cell_row in grid.current_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            let adjusted_position = Vec3::new(
-                cell.world_position.x + offset_x,
-                cell.world_position.y,
-                cell.world_position.z + offset_z,
-            );
-
-            let cost = BillboardTextBundle {
-                billboard_depth: BillboardDepth(false),
-                text: Text::from_section(
-                    cell.cost.to_string(),
-                    TextStyle {
-                        color: COLOR_COST.into(),
-                        font_size: 100.0,
+            let cost = (
+                BillboardTextBundle {
+                    billboard_depth: BillboardDepth(false),
+                    text: Text::from_section(
+                        cell.cost.to_string(),
+                        TextStyle {
+                            color: COLOR_COST.into(),
+                            font_size: 100.0,
+                            ..default()
+                        },
+                    ),
+                    transform: Transform {
+                        translation: cell.world_position,
+                        scale: Vec3::splat(0.03),
                         ..default()
                     },
-                ),
-                transform: Transform {
-                    translation: adjusted_position,
-                    scale: Vec3::splat(0.035),
                     ..default()
                 },
-                ..default()
-            };
+                CostTxt,
+            );
 
             cmds.spawn(cost);
         }

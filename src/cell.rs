@@ -1,10 +1,13 @@
+use std::u16;
+
 use bevy::prelude::*;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Copy)]
 pub struct Cell {
     pub world_position: Vec3,
     pub grid_idx: IVec2,
     pub cost: u8,
+    pub best_cost: u16,
 }
 
 impl Cell {
@@ -13,6 +16,7 @@ impl Cell {
             world_position,
             grid_idx,
             cost: 1,
+            best_cost: u16::MAX,
         }
     }
 
