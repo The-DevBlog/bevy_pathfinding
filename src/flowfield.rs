@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{cell, cmp::min, collections::VecDeque};
 
 use bevy::prelude::*;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
@@ -9,7 +9,7 @@ use crate::{cell::*, grid_direction::GridDirection};
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
-    pub destination_cell: Cell,
+    pub destination_cell: Option<Cell>,
     pub grid: Vec<Vec<Cell>>,
     pub grid_size: IVec2,
 }
@@ -19,6 +19,7 @@ impl FlowField {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.,
+            destination_cell: None,
             grid: Vec::default(),
             grid_size,
         }
@@ -60,65 +61,151 @@ impl FlowField {
         }
     }
 
+    // pub fn create_integration_field(&mut self, destination_cell: Cell) {
+    //     let mut tmp_destination_cell = destination_cell.clone();
+    //     tmp_destination_cell.cost = 0;
+    //     tmp_destination_cell.best_cost = 0;
+    //     self.destination_cell = Some(tmp_destination_cell);
+
+    //     let mut cells_to_check = VecDeque::new();
+    //     let destination_cell = self.destination_cell.unwrap().clone();
+    //     cells_to_check.push_front(destination_cell);
+
+    //     while cells_to_check.len() > 0 {
+    //         let cur_cell = cells_to_check.pop_front();
+
+    //         if let Some(cur_cell) = cur_cell {
+    //             let mut cur_neighbors = self
+    //                 .get_neighbor_cells(cur_cell.grid_idx, GridDirection::cardinal_directions());
+
+    //             for cur_neighbor in cur_neighbors.iter_mut() {
+    //                 if cur_neighbor.cost == u8::MAX {
+    //                     continue;
+    //                 }
+
+    //                 if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
+    //                     cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
+    //                     cells_to_check.push_front(cur_neighbor.clone());
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // fn get_neighbor_cells(&self, node_idx: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
+    //     let mut neighbor_cells = Vec::new();
+
+    //     for cur_direction in directions.iter() {
+    //         let new_neighbor = self.get_cell_at_relative_position(node_idx, cur_direction.vector());
+
+    //         if let Some(new_neighbor) = new_neighbor {
+    //             neighbor_cells.push(new_neighbor);
+    //         }
+    //     }
+
+    //     return neighbor_cells;
+    // }
+
+    // fn get_cell_at_relative_position(
+    //     &self,
+    //     origin_position: IVec2,
+    //     relative_position: IVec2,
+    // ) -> Option<Cell> {
+    //     let final_position = origin_position + relative_position;
+
+    //     if final_position.x < 0
+    //         || final_position.x >= self.grid_size.x
+    //         || final_position.y < 0
+    //         || final_position.y >= self.grid_size.y
+    //     {
+    //         return None;
+    //     }
+
+    //     return Some(self.grid[final_position.x as usize][final_position.y as usize]);
+    // }
+
+    // pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+    //     let mut percent_x = world_pos.x / (self.grid_size.x as f32 * self.cell_diameter);
+    //     let mut percent_y = world_pos.z / (self.grid_size.y as f32 * self.cell_diameter);
+
+    //     percent_x = percent_x.clamp(0., 1.);
+    //     percent_y = percent_y.clamp(0., 1.);
+
+    //     let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
+    //     let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
+
+    //     self.grid[x][y]
+    // }
     pub fn create_integration_field(&mut self, destination_cell: Cell) {
-        self.destination_cell = destination_cell;
-        self.destination_cell.cost = 0;
-        self.destination_cell.best_cost = 0;
+        let mut tmp_destination_cell = destination_cell.clone();
+        tmp_destination_cell.cost = 0;
+        tmp_destination_cell.best_cost = 0;
+        self.destination_cell = Some(tmp_destination_cell);
 
-        let mut cells_to_check = VecDeque::new();
-        cells_to_check.push_back(&self.destination_cell);
+        let mut cells_to_check: VecDeque<Cell> = VecDeque::new();
+        let destination_cell = self.destination_cell.unwrap().clone();
+        cells_to_check.push_back(destination_cell);
 
-        while cells_to_check.len() > 0 {
-            let cur_cell = cells_to_check.pop_front();
+        while let Some(cur_cell) = cells_to_check.pop_front() {
+            let cur_neighbors =
+                self.get_neighbor_cells(cur_cell.grid_idx, GridDirection::cardinal_directions());
 
-            if let Some(cur_cell) = cur_cell {
-                let mut cur_neighbors = self
-                    .get_neighbor_cells(cur_cell.grid_idx, GridDirection::cardinal_directions());
+            for mut cur_neighbor in cur_neighbors {
+                if cur_neighbor.cost == u8::MAX {
+                    continue;
+                }
 
-                for cur_neighbor in cur_neighbors.iter_mut() {
-                    if cur_neighbor.cost == u8::MAX {
-                        continue;
-                    }
-
-                    if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
-                        cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
-                        cells_to_check.push_front(cur_neighbor);
-                    }
+                if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
+                    let neighbor_index = cur_neighbor.grid_idx;
+                    cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
+                    self.grid[neighbor_index.x as usize][neighbor_index.y as usize] = cur_neighbor;
+                    cells_to_check.push_back(cur_neighbor);
                 }
             }
         }
     }
 
-    fn get_neighbor_cells(&self, node_idx: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
+    fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
         let mut neighbor_cells = Vec::new();
 
-        for cur_direction in directions.iter() {
-            let new_neighbor = self.get_cell_at_relative_position(node_idx, cur_direction.vector());
-
-            if let Some(new_neighbor) = new_neighbor {
+        for direction in directions {
+            if let Some(new_neighbor) = self.get_cell_at_relative_pos(node_index, direction) {
                 neighbor_cells.push(new_neighbor);
             }
         }
-
-        return neighbor_cells;
+        neighbor_cells
     }
 
-    fn get_cell_at_relative_position(
+    fn get_cell_at_relative_pos(
         &self,
-        origin_position: IVec2,
-        relative_position: IVec2,
+        origin_pos: IVec2,
+        direction: GridDirection,
     ) -> Option<Cell> {
-        let final_position = origin_position + relative_position;
+        let relative_pos = direction.vector();
+        let final_pos = origin_pos + relative_pos;
 
-        if final_position.x < 0
-            || final_position.x >= self.grid_size.x
-            || final_position.y < 0
-            || final_position.y >= self.grid_size.y
+        if final_pos.x < 0
+            || final_pos.x >= self.grid_size.x
+            || final_pos.y < 0
+            || final_pos.y >= self.grid_size.y
         {
-            return None;
+            None
+        } else {
+            Some(self.grid[final_pos.x as usize][final_pos.y as usize])
         }
+    }
 
-        return Some(self.grid[final_position.x as usize][final_position.y as usize]);
+    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+        let mut percent_x = world_pos.x / (self.grid_size.x as f32 * self.cell_diameter);
+        let mut percent_y = world_pos.z / (self.grid_size.y as f32 * self.cell_diameter);
+
+        percent_x = percent_x.clamp(0.0, 1.0);
+        percent_y = percent_y.clamp(0.0, 1.0);
+
+        let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
+        let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
+
+        self.grid[min(x, (self.grid_size.x - 1) as usize)][min(y, (self.grid_size.y - 1) as usize)]
     }
 }
 

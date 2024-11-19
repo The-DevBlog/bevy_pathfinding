@@ -1,6 +1,6 @@
-use bevy::color::palettes;
-use bevy_mod_billboard::{Billboard, BillboardDepth, BillboardTextBundle};
-use bevy_rapier3d::na::Translation;
+use bevy::prelude::*;
+use bevy_inspector_egui::prelude::*;
+use bevy_mod_billboard::*;
 use grid_controller::GridController;
 
 use crate::*;
@@ -9,18 +9,35 @@ pub struct BevyRtsPathFindingDebugPlugin;
 
 impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
-        // app.add_systems(Update, (draw_flowfield, draw_grid));
-        app.add_systems(Update, draw_grid).observe(draw_costfield);
+        app.init_resource::<RtsPfDebug>()
+            .register_type::<RtsPfDebug>()
+            .add_systems(Update, draw_grid)
+            .observe(draw_costfield);
     }
+}
+
+#[derive(Reflect, Resource, Default)]
+#[reflect(Resource)]
+pub struct RtsPfDebug {
+    pub draw_costfield: bool,
+    pub draw_grid: bool,
+    pub draw_integration_field: bool,
 }
 
 #[derive(Event)]
 pub struct DrawCostFieldEv;
 
 #[derive(Component)]
+struct CostField;
+
+#[derive(Component)]
 struct CostTxt;
 
-fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos) {
+fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
+    if !debug.draw_grid {
+        return;
+    }
+
     let grid = grid_controller.get_single().unwrap();
 
     gizmos.grid(
@@ -35,17 +52,23 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos) {
 fn draw_costfield(
     _trigger: Trigger<DrawCostFieldEv>,
     mut cmds: Commands,
-    grid_controller: Query<&GridController>,
-    cost_q: Query<Entity, With<CostTxt>>,
+    q_grid_controller: Query<&GridController>,
+    q_cost: Query<Entity, With<CostTxt>>,
+    debug: Res<RtsPfDebug>,
 ) {
     // remove current cost field before rendering new one
-    for cost_entity in cost_q.iter() {
+    for cost_entity in q_cost.iter() {
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let grid = grid_controller.get_single().unwrap();
+    if !debug.draw_costfield {
+        return;
+    }
 
-    for cell_row in grid.current_flowfield.grid.iter() {
+    let grid_controller = q_grid_controller.get_single().unwrap();
+    let parent = cmds.spawn(CostField).insert(Name::new("CostField")).id(); // Get the entity ID for parenting
+
+    for cell_row in grid_controller.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let cost = (
                 BillboardTextBundle {
@@ -68,72 +91,7 @@ fn draw_costfield(
                 CostTxt,
             );
 
-            cmds.spawn(cost);
+            cmds.spawn(cost).set_parent(parent); // TODO: Not working as expected
         }
     }
 }
-
-// fn draw_flowfield(
-//     flowfield_q: Query<&FlowField>,
-//     selected_q: Query<Entity, With<Selected>>,
-//     grid: Res<Grid>,
-//     mut gizmos: Gizmos,
-// ) {
-//     if selected_q.is_empty() {
-//         return;
-//     }
-
-//     let arrow_length = grid.cell_size * 0.75 / 2.0;
-
-//     let mut selected_entity_ids = Vec::new();
-//     for selected_entity in selected_q.iter() {
-//         selected_entity_ids.push(selected_entity);
-//     }
-
-//     for flowfield in flowfield_q.iter() {
-//         if !selected_entity_ids
-//             .iter()
-//             .any(|item| flowfield.entities.contains(item))
-//         {
-//             continue;
-//         }
-
-//         for x in 0..grid.rows {
-//             for z in 0..grid.columns {
-//                 let cell = &flowfield.cells[x][z];
-//                 if cell.occupied || cell.flow_vector == Vec3::ZERO {
-//                     // Draw an 'X' for each occupied cell
-//                     let top_left =
-//                         cell.world_position + Vec3::new(-arrow_length, 0.0, -arrow_length);
-//                     let top_right =
-//                         cell.world_position + Vec3::new(arrow_length, 0.0, -arrow_length);
-//                     let bottom_left =
-//                         cell.world_position + Vec3::new(-arrow_length, 0.0, arrow_length);
-//                     let bottom_right =
-//                         cell.world_position + Vec3::new(arrow_length, 0.0, arrow_length);
-
-//                     gizmos.line(top_left, bottom_right, RED);
-//                     gizmos.line(top_right, bottom_left, RED);
-//                     continue;
-//                 }
-
-//                 let flow_direction = cell.flow_vector.normalize();
-
-//                 let start = cell.world_position - flow_direction * arrow_length;
-//                 let end = cell.world_position + flow_direction * arrow_length;
-
-//                 gizmos.arrow(start, end, COLOR_ARROWS);
-//             }
-//         }
-//     }
-// }
-
-// fn draw_grid(mut gizmos: Gizmos, grid: Res<Grid>) {
-//     gizmos.grid(
-//         Vec3::ZERO,
-//         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-//         UVec2::new(grid.rows as u32, grid.columns as u32),
-//         Vec2::new(grid.cell_size, grid.cell_size),
-//         COLOR_GRID,
-//     );
-// }
