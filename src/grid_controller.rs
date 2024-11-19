@@ -1,16 +1,23 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_rapier3d::plugin::RapierContext;
 
-use crate::{
-    debug::DrawCostFieldEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase,
-};
+use crate::{debug::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase};
 
 pub struct GridControllerPlugin;
 
 impl Plugin for GridControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.observe(initialize_flowfield);
+        app.observe(initialize_flowfield).add_systems(Update, t);
     }
+}
+
+fn t(q: Query<&GridController>) {
+    // for grid in q.iter() {
+    //     println!(
+    //         "Destination Cell: {:?}",
+    //         grid.cur_flowfield.destination_cell
+    //     );
+    // }
 }
 
 #[derive(Component)]
@@ -63,7 +70,9 @@ fn initialize_flowfield(
         grid_controller
             .cur_flowfield
             .create_integration_field(destination_cell);
+
+        grid_controller.cur_flowfield.create_flowfield();
     }
 
-    cmds.trigger(DrawCostFieldEv);
+    cmds.trigger(DrawDebugEv);
 }

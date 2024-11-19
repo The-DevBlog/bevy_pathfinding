@@ -124,18 +124,6 @@ impl FlowField {
     //     return Some(self.grid[final_position.x as usize][final_position.y as usize]);
     // }
 
-    // pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-    //     let mut percent_x = world_pos.x / (self.grid_size.x as f32 * self.cell_diameter);
-    //     let mut percent_y = world_pos.z / (self.grid_size.y as f32 * self.cell_diameter);
-
-    //     percent_x = percent_x.clamp(0., 1.);
-    //     percent_y = percent_y.clamp(0., 1.);
-
-    //     let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
-    //     let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
-
-    //     self.grid[x][y]
-    // }
     pub fn create_integration_field(&mut self, destination_cell: Cell) {
         let mut tmp_destination_cell = destination_cell.clone();
         tmp_destination_cell.cost = 0;
@@ -164,6 +152,66 @@ impl FlowField {
             }
         }
     }
+
+    pub fn create_flowfield(&mut self) {
+        // Collect all neighbors' data before making mutable changes
+        let neighbors_data: Vec<Vec<Vec<Cell>>> = self
+            .grid
+            .iter()
+            .map(|cell_row| {
+                cell_row
+                    .iter()
+                    .map(|cell| {
+                        self.get_neighbor_cells(cell.grid_idx, GridDirection::all_directions())
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Iterate over the grid and update cells' best_direction
+        for (row_idx, cell_row) in self.grid.iter_mut().enumerate() {
+            for (col_idx, cell) in cell_row.iter_mut().enumerate() {
+                let cur_neighbors = &neighbors_data[row_idx][col_idx];
+                let mut best_cost = cell.best_cost;
+
+                for cur_neighbor in cur_neighbors.iter() {
+                    if cur_neighbor.best_cost < best_cost {
+                        best_cost = cur_neighbor.best_cost;
+
+                        let best_direction =
+                            GridDirection::from_vector2(cur_neighbor.grid_idx - cell.grid_idx);
+
+                        if let Some(best_direction) = best_direction {
+                            cell.best_direction = best_direction;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // pub fn create_flowfield(&self) {
+    //     for cell_row in &self.grid {
+    //         for cell in cell_row.iter() {
+    //             let mut cur_neighbors =
+    //                 self.get_neighbor_cells(cell.grid_idx, GridDirection::all_directions());
+
+    //             let mut best_cost = cell.best_cost;
+
+    //             for cur_neighbor in cur_neighbors.iter() {
+    //                 if cur_neighbor.best_cost < best_cost {
+    //                     best_cost = cur_neighbor.best_cost;
+    //                     let best_direction =
+    //                         GridDirection::from_vector2(cur_neighbor.grid_idx - cell.grid_idx);
+
+    //                     if let Some(best_direction) = best_direction {
+    //                         cell.best_direction = best_direction;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
         let mut neighbor_cells = Vec::new();
@@ -196,16 +244,24 @@ impl FlowField {
     }
 
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-        let mut percent_x = world_pos.x / (self.grid_size.x as f32 * self.cell_diameter);
-        let mut percent_y = world_pos.z / (self.grid_size.y as f32 * self.cell_diameter);
+        // Adjust world position relative to the grid's top-left corner
+        let adjusted_x = world_pos.x - (-self.grid_size.x as f32 * self.cell_diameter / 2.0);
+        let adjusted_y = world_pos.z - (-self.grid_size.y as f32 * self.cell_diameter / 2.0);
 
+        // Calculate percentages within the grid
+        let mut percent_x = adjusted_x / (self.grid_size.x as f32 * self.cell_diameter);
+        let mut percent_y = adjusted_y / (self.grid_size.y as f32 * self.cell_diameter);
+
+        // Clamp percentages to ensure they're within [0.0, 1.0]
         percent_x = percent_x.clamp(0.0, 1.0);
         percent_y = percent_y.clamp(0.0, 1.0);
 
+        // Calculate grid indices
         let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
         let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
 
-        self.grid[min(x, (self.grid_size.x - 1) as usize)][min(y, (self.grid_size.y - 1) as usize)]
+        // Return the cell at the calculated indices
+        self.grid[min(x, self.grid_size.x as usize - 1)][min(y, self.grid_size.y as usize - 1)]
     }
 }
 

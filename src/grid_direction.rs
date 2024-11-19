@@ -13,8 +13,9 @@ const DIRECTIONS: [GridDirection; 9] = [
     GridDirection::NorthWest,
 ];
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub enum GridDirection {
+    #[default]
     None,
     North,
     South,
@@ -43,7 +44,7 @@ impl GridDirection {
     }
 
     /// Get the direction from a given vector
-    pub fn from_vector(vector: IVec2) -> Option<GridDirection> {
+    pub fn from_vector2(vector: IVec2) -> Option<GridDirection> {
         DIRECTIONS.iter().find(|&&d| d.vector() == vector).copied()
     }
 

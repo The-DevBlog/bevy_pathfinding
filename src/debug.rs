@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_inspector_egui::prelude::*;
 use bevy_mod_billboard::*;
 use grid_controller::GridController;
 
@@ -12,26 +11,39 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
         app.init_resource::<RtsPfDebug>()
             .register_type::<RtsPfDebug>()
             .add_systems(Update, draw_grid)
-            .observe(draw_costfield);
+            .observe(draw_costfield)
+            .observe(draw_flowfield);
     }
 }
 
-#[derive(Reflect, Resource, Default)]
+#[derive(Reflect, Resource)]
 #[reflect(Resource)]
 pub struct RtsPfDebug {
-    pub draw_costfield: bool,
     pub draw_grid: bool,
+    pub draw_flowfield: bool,
+    pub draw_costfield: bool,
     pub draw_integration_field: bool,
 }
 
+impl Default for RtsPfDebug {
+    fn default() -> Self {
+        RtsPfDebug {
+            draw_grid: true,
+            draw_flowfield: false,
+            draw_costfield: false,
+            draw_integration_field: false,
+        }
+    }
+}
+
 #[derive(Event)]
-pub struct DrawCostFieldEv;
+pub struct DrawDebugEv;
 
 #[derive(Component)]
 struct CostField;
 
 #[derive(Component)]
-struct CostTxt;
+struct FlowField;
 
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
     if !debug.draw_grid {
@@ -49,12 +61,45 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
     );
 }
 
-fn draw_costfield(
-    _trigger: Trigger<DrawCostFieldEv>,
-    mut cmds: Commands,
-    q_grid_controller: Query<&GridController>,
-    q_cost: Query<Entity, With<CostTxt>>,
+fn draw_integration_field(_trigger: Trigger<DrawDebugEv>, debug: Res<RtsPfDebug>) {
+    if !debug.draw_integration_field {
+        return;
+    }
+}
+
+fn draw_flowfield(
+    _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
+    q_flowfield: Query<Entity, With<FlowField>>,
+    q_grid_controller: Query<&GridController>,
+    mut cmds: Commands,
+) {
+    // remove current cost field before rendering new one
+    for cost_entity in q_flowfield.iter() {
+        cmds.entity(cost_entity).despawn_recursive();
+    }
+
+    if !debug.draw_flowfield {
+        return;
+    }
+
+    let grid_controller = q_grid_controller.get_single().unwrap();
+
+    for cell_row in grid_controller.cur_flowfield.grid.iter() {
+        for cell in cell_row.iter() {
+            let arrow = (FlowField,);
+
+            cmds.spawn(arrow);
+        }
+    }
+}
+
+fn draw_costfield(
+    _trigger: Trigger<DrawDebugEv>,
+    debug: Res<RtsPfDebug>,
+    q_grid_controller: Query<&GridController>,
+    q_cost: Query<Entity, With<CostField>>,
+    mut cmds: Commands,
 ) {
     // remove current cost field before rendering new one
     for cost_entity in q_cost.iter() {
@@ -66,7 +111,6 @@ fn draw_costfield(
     }
 
     let grid_controller = q_grid_controller.get_single().unwrap();
-    let parent = cmds.spawn(CostField).insert(Name::new("CostField")).id(); // Get the entity ID for parenting
 
     for cell_row in grid_controller.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -88,10 +132,10 @@ fn draw_costfield(
                     },
                     ..default()
                 },
-                CostTxt,
+                CostField,
             );
 
-            cmds.spawn(cost).set_parent(parent); // TODO: Not working as expected
+            cmds.spawn(cost);
         }
     }
 }
