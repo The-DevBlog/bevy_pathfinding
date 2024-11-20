@@ -9,6 +9,3 @@ bevy_mod_billboard = "0.7.0"
 bevy_rapier3d = "0.27.0"
 pathfinding = "4.11.0"
 rand = "0.8.5"
-ron = "0.8.1"                #TODO: REmove?
-serde = "1.0.215"            #TODO: REmove?
-thiserror = "2.0.3"          #TODO: Remove?

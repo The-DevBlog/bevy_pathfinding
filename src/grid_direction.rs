@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
 
 /// A static array of all directions for lookup
 const DIRECTIONS: [GridDirection; 9] = [
@@ -85,5 +86,19 @@ impl GridDirection {
             GridDirection::West,
             GridDirection::NorthWest,
         ]
+    }
+
+    pub fn to_angle(&self) -> f32 {
+        match self {
+            GridDirection::None => 0.0,
+            GridDirection::North => -FRAC_PI_2,
+            GridDirection::NorthEast => -FRAC_PI_4,
+            GridDirection::East => 0.0,
+            GridDirection::SouthEast => FRAC_PI_4,
+            GridDirection::South => FRAC_PI_2,
+            GridDirection::SouthWest => 3.0 * FRAC_PI_4,
+            GridDirection::West => PI,
+            GridDirection::NorthWest => -3.0 * FRAC_PI_4,
+        }
     }
 }

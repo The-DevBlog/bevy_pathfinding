@@ -1,22 +1,16 @@
 use crate::*;
-use bevy::{
-    asset::{io::Reader, AssetLoader, AsyncReadExt, LoadContext},
-    prelude::*,
-    reflect::TypePath,
-};
 use bevy_mod_billboard::*;
 use grid_controller::GridController;
-use serde::Deserialize; //TODO: REmove?
-use thiserror::Error; //TODO: Remove?
+
+const FONT: &[u8] = include_bytes!("../assets/fonts/FiraSans-Bold.ttf");
 
 pub struct BevyRtsPathFindingDebugPlugin;
 
 impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ArrowImgHandle>()
-            .init_resource::<RtsPfDebug>()
+        app.init_resource::<RtsPfDebug>()
             .register_type::<RtsPfDebug>()
-            // .add_systems(Startup, load_assets)
+            .add_systems(Startup, setup)
             .add_systems(Update, draw_grid)
             .observe(draw_costfield)
             .observe(draw_flowfield);
@@ -36,15 +30,15 @@ impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
             draw_grid: true,
-            draw_flowfield: false,
-            draw_costfield: false,
+            draw_flowfield: true,
+            draw_costfield: true,
             draw_integration_field: false,
         }
     }
 }
 
-#[derive(Resource, Default)]
-struct ArrowImgHandle(pub Handle<Image>);
+#[derive(Resource)]
+struct EmbeddedFontHandle(Handle<Font>);
 
 #[derive(Event)]
 pub struct DrawDebugEv;
@@ -55,50 +49,25 @@ struct CostField;
 #[derive(Component)]
 struct FlowFieldArrow;
 
-// #[derive(Asset, TypePath, Debug, Deserialize)]
-// struct CustomAsset {
-//     #[allow(dead_code)]
-//     value: i32,
-// }
+fn setup(mut cmds: Commands, mut fonts: ResMut<Assets<Font>>, q_cam: Query<&Camera2d>) {
+    let font =
+        Font::try_from_bytes(FONT.to_vec()).expect("Failed to create Font from embedded font data");
 
-// #[derive(Default)]
-// struct CustomAssetLoader;
+    let font_handle = fonts.add(font);
 
-// /// Possible errors that can be produced by [`CustomAssetLoader`]
-// #[non_exhaustive]
-// #[derive(Debug, Error)]
-// enum CustomAssetLoaderError {
-//     /// An [IO](std::io) Error
-//     #[error("Could not load asset: {0}")]
-//     Io(#[from] std::io::Error),
-//     /// A [RON](ron) Error
-//     #[error("Could not parse RON: {0}")]
-//     RonSpannedError(#[from] ron::error::SpannedError),
-// }
+    cmds.insert_resource(EmbeddedFontHandle(font_handle));
 
-// impl AssetLoader for CustomAssetLoader {
-//     type Asset = CustomAsset;
-//     type Settings = ();
-//     type Error = CustomAssetLoaderError;
-//     async fn load<'a>(
-//         &'a self,
-//         reader: &'a mut Reader<'_>,
-//         _settings: &'a (),
-//         _load_context: &'a mut LoadContext<'_>,
-//     ) -> Result<Self::Asset, Self::Error> {
-//         let mut bytes = Vec::new();
-//         reader.read_to_end(&mut bytes).await?;
-//         let custom_asset = ron::de::from_bytes::<CustomAsset>(&bytes)?;
-//         Ok(custom_asset)
-//     }
-
-//     fn extensions(&self) -> &[&str] {
-//         &["custom"]
-//     }
-// }
-// fn load_assets(mut arrow_img_handle: ResMut<ArrowImgHandle>, assets: Res<AssetServer>) {
-//     arrow_img_handle.0 = assets.load("arrow.png");
-// }
+    // set up a 2d camera if there is none
+    if q_cam.is_empty() {
+        cmds.spawn(Camera2dBundle {
+            camera: Camera {
+                order: 2,
+                ..default()
+            },
+            ..default()
+        });
+    }
+}
 
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
     if !debug.draw_grid {
@@ -125,103 +94,177 @@ fn draw_integration_field(_trigger: Trigger<DrawDebugEv>, debug: Res<RtsPfDebug>
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
-    arrow_img_handle: Res<ArrowImgHandle>,
     q_grid_controller: Query<&GridController>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // remove current cost field before rendering new one
-    for cost_entity in q_flowfield_arrow.iter() {
-        cmds.entity(cost_entity).despawn_recursive();
+    // Remove current arrows before rendering new ones
+    for arrow_entity in q_flowfield_arrow.iter() {
+        cmds.entity(arrow_entity).despawn_recursive();
     }
 
     if !debug.draw_flowfield {
         return;
     }
 
-    let color = Color::WHITE;
-    let arrow = (
-        PbrBundle {
-            mesh: meshes.add(Plane3d::default().mesh().size(8., 2.)),
-            material: materials.add(color),
-            transform: Transform {
-                translation: Vec3::new(0.0, 0.2, 0.0),
-                rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                ..default()
-            },
-            // transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
-            ..default()
-        },
-        Name::new("Flowfield Arrow"),
-    );
+    let grid_controller = q_grid_controller.get_single().unwrap();
 
-    cmds.spawn(arrow);
+    let arrow_length = 6.0;
+    let arrow_width = 1.0;
+    let arrow_clr = Color::WHITE;
 
-    // for cell_row in grid_controller.cur_flowfield.grid.iter() {
-    //     for cell in cell_row.iter() {
-    //         let arrow = (FlowField,);
+    // Create shared meshes and materials
+    let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+    let arrow_material = materials.add(StandardMaterial {
+        base_color: arrow_clr,
+        ..default()
+    });
 
-    //         cmds.spawn(arrow);
-    //     }
-    // }
+    // Create the arrowhead mesh
+    let half_arrow_size = arrow_length / 2.0;
+    let a = Vec2::new(half_arrow_size + 1.0, 0.0); // Tip of the arrowhead
+    let b = Vec2::new(half_arrow_size - 1.5, arrow_width + 0.25);
+    let c = Vec2::new(half_arrow_size - 1.5, -arrow_width - 0.25);
+    let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
-    // let arrow = (
-    //     // Image
-    //     FlowFieldArrow,
-    //     Name::new("FlowField Arrow"),
-    // );
+    for cell_row in grid_controller.cur_flowfield.grid.iter() {
+        for cell in cell_row.iter() {
+            let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
+            let mut translation = cell.world_position;
+            translation.y += 0.01;
+            translation.x -= 0.5;
 
-    // cmds.spawn(arrow);
+            // Use the shared mesh and material
+            let arrow_shaft = (
+                PbrBundle {
+                    mesh: arrow_shaft_mesh.clone(),
+                    material: arrow_material.clone(),
+                    transform: Transform {
+                        translation,
+                        rotation,
+                        ..default()
+                    },
+                    ..default()
+                },
+                FlowFieldArrow,
+                Name::new("Flowfield Arrow"),
+            );
+
+            // Use the shared arrowhead mesh and material
+            let arrow_head = (
+                PbrBundle {
+                    mesh: arrow_head_mesh.clone(),
+                    material: arrow_material.clone(),
+                    transform: Transform {
+                        translation: Vec3::ZERO,
+                        rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                        ..default()
+                    },
+                    ..default()
+                },
+                Name::new("Arrowhead"),
+            );
+
+            cmds.spawn(arrow_shaft).with_children(|parent| {
+                parent.spawn(arrow_head);
+            });
+        }
+    }
 }
 
-// OG flowfield
-// fn draw_flowfield(
-//     flowfield_q: Query<&FlowField>,
-//     selected_q: Query<Entity, With<Selected>>,
-//     grid: Res<Grid>,
-//     mut gizmos: Gizmos,
+// fn draw_costfield(
+//     _trigger: Trigger<DrawDebugEv>,
+//     debug: Res<RtsPfDebug>,
+//     q_grid_controller: Query<&GridController>,
+//     q_cost: Query<Entity, With<CostField>>,
+//     mut cmds: Commands,
 // ) {
-//     if selected_q.is_empty() {
+//     // remove current cost field before rendering new one
+//     for cost_entity in q_cost.iter() {
+//         cmds.entity(cost_entity).despawn_recursive();
+//     }
+
+//     if !debug.draw_costfield {
 //         return;
 //     }
 
-//     let mut selected_entity_ids = Vec::new();
-//     for selected_entity in selected_q.iter() {
-//         selected_entity_ids.push(selected_entity);
+//     let grid_controller = q_grid_controller.get_single().unwrap();
+
+//     for cell_row in grid_controller.cur_flowfield.grid.iter() {
+//         for cell in cell_row.iter() {
+//             let cost = (
+//                 BillboardTextBundle {
+//                     billboard_depth: BillboardDepth(false),
+//                     text: Text::from_section(
+//                         cell.cost.to_string(),
+//                         TextStyle {
+//                             color: COLOR_COST.into(),
+//                             font_size: 100.0,
+//                             ..default()
+//                         },
+//                     ),
+//                     transform: Transform {
+//                         translation: cell.world_position,
+//                         scale: Vec3::splat(0.03),
+//                         ..default()
+//                     },
+//                     ..default()
+//                 },
+//                 CostField,
+//             );
+
+//             cmds.spawn(cost);
+//         }
+//     }
+// }
+
+// fn draw_costfield(
+//     _trigger: Trigger<DrawDebugEv>,
+//     debug: Res<RtsPfDebug>,
+//     q_grid_controller: Query<&GridController>,
+//     q_cost: Query<Entity, With<CostField>>,
+//     mut cmds: Commands,
+//     asset_server: Res<AssetServer>,
+// ) {
+//     // Remove current cost field before rendering a new one
+//     for cost_entity in q_cost.iter() {
+//         cmds.entity(cost_entity).despawn_recursive();
 //     }
 
-//     for flowfield in flowfield_q.iter() {
-//         if !selected_entity_ids
-//             .iter()
-//             .any(|item| flowfield.entities.contains(item))
-//         {
-//             continue;
-//         }
+//     if !debug.draw_costfield {
+//         return;
+//     }
 
-//         for x in 0..grid.rows {
-//             for z in 0..grid.columns {
-//                 let cell = &flowfield.cells[x][z];
-//                 if cell.occupied || cell.flow_vector == Vec3::ZERO {
-//                     // Draw an 'X' for each occupied cell
-//                     let top_left = cell.position + Vec3::new(-ARROW_LENGTH, 0.0, -ARROW_LENGTH);
-//                     let top_right = cell.position + Vec3::new(ARROW_LENGTH, 0.0, -ARROW_LENGTH);
-//                     let bottom_left = cell.position + Vec3::new(-ARROW_LENGTH, 0.0, ARROW_LENGTH);
-//                     let bottom_right = cell.position + Vec3::new(ARROW_LENGTH, 0.0, ARROW_LENGTH);
+//     let grid_controller = q_grid_controller.get_single().unwrap();
 
-//                     gizmos.line(top_left, bottom_right, RED);
-//                     gizmos.line(top_right, bottom_left, RED);
-//                     continue;
-//                 }
+//     // Load the font once
+//     let font_handle = asset_server.load("fonts/FiraSans-Bold.ttf");
 
-//                 let flow_direction = cell.flow_vector.normalize();
+//     // Create a shared TextStyle
+//     let text_style = TextStyle {
+//         font: font_handle.clone(),
+//         font_size: 100.0,
+//         color: COLOR_COST.into(),
+//     };
 
-//                 let start = cell.position - flow_direction * ARROW_LENGTH;
-//                 let end = cell.position + flow_direction * ARROW_LENGTH;
+//     for cell_row in grid_controller.cur_flowfield.grid.iter() {
+//         for cell in cell_row.iter() {
+//             let cost_text = cell.cost.to_string();
 
-//                 gizmos.arrow(start, end, COLOR_ARROWS);
-//             }
+//             cmds.spawn((
+//                 Text2dBundle {
+//                     text: Text::from_section(cost_text, text_style.clone()),
+//                     transform: Transform {
+//                         translation: cell.world_position + Vec3::Y * 0.01,
+//                         scale: Vec3::splat(0.03),
+//                         ..default()
+//                     },
+//                     ..default()
+//                 },
+//                 CostField,
+//             ));
 //         }
 //     }
 // }
@@ -232,8 +275,9 @@ fn draw_costfield(
     q_grid_controller: Query<&GridController>,
     q_cost: Query<Entity, With<CostField>>,
     mut cmds: Commands,
+    embedded_font_handle: Res<EmbeddedFontHandle>,
 ) {
-    // remove current cost field before rendering new one
+    // Remove current cost field before rendering a new one
     for cost_entity in q_cost.iter() {
         cmds.entity(cost_entity).despawn_recursive();
     }
@@ -244,30 +288,27 @@ fn draw_costfield(
 
     let grid_controller = q_grid_controller.get_single().unwrap();
 
+    // Create a shared TextStyle using the embedded font
+    let text_style = TextStyle {
+        font: embedded_font_handle.0.clone(),
+        font_size: 100.0,
+        color: COLOR_COST.into(),
+    };
+
     for cell_row in grid_controller.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            let cost = (
-                BillboardTextBundle {
-                    billboard_depth: BillboardDepth(false),
-                    text: Text::from_section(
-                        cell.cost.to_string(),
-                        TextStyle {
-                            color: COLOR_COST.into(),
-                            font_size: 100.0,
-                            ..default()
-                        },
-                    ),
+            cmds.spawn((
+                Text2dBundle {
+                    text: Text::from_section(cell.cost.to_string(), text_style.clone()),
                     transform: Transform {
                         translation: cell.world_position,
-                        scale: Vec3::splat(0.03),
+                        scale: Vec3::splat(0.035),
                         ..default()
                     },
                     ..default()
                 },
                 CostField,
-            );
-
-            cmds.spawn(cost);
+            ));
         }
     }
 }

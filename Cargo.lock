@@ -148,7 +148,7 @@ dependencies = [
  "ndk-context",
  "ndk-sys 0.6.0+11769913",
  "num_enum",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -341,7 +341,7 @@ dependencies = [
  "petgraph",
  "ron",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
  "thread_local",
  "uuid",
 ]
@@ -359,7 +359,7 @@ dependencies = [
  "bevy_utils",
  "console_error_panic_hook",
  "downcast-rs",
- "thiserror 1.0.67",
+ "thiserror",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -389,7 +389,7 @@ dependencies = [
  "parking_lot",
  "ron",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -438,7 +438,7 @@ dependencies = [
  "bytemuck",
  "encase",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
  "wgpu-types",
 ]
 
@@ -478,7 +478,7 @@ dependencies = [
  "radsort",
  "serde",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -526,7 +526,7 @@ dependencies = [
  "nonmax",
  "petgraph",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -563,7 +563,7 @@ dependencies = [
  "bevy_time",
  "bevy_utils",
  "gilrs",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -629,7 +629,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -658,7 +658,7 @@ dependencies = [
  "bevy_reflect",
  "bevy_utils",
  "smol_str",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -740,7 +740,7 @@ dependencies = [
  "rand",
  "serde",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -825,7 +825,7 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
- "thiserror 1.0.67",
+ "thiserror",
  "uuid",
 ]
 
@@ -884,7 +884,7 @@ dependencies = [
  "send_wrapper",
  "serde",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
  "wasm-bindgen",
  "web-sys",
  "wgpu",
@@ -911,9 +911,6 @@ dependencies = [
  "bevy_rapier3d",
  "pathfinding",
  "rand",
- "ron",
- "serde",
- "thiserror 2.0.3",
 ]
 
 [[package]]
@@ -932,7 +929,7 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
  "uuid",
 ]
 
@@ -959,7 +956,7 @@ dependencies = [
  "guillotiere",
  "radsort",
  "rectangle-pack",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1021,7 +1018,7 @@ dependencies = [
  "bevy_window",
  "glyph_brush_layout",
  "serde",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1035,7 +1032,7 @@ dependencies = [
  "bevy_reflect",
  "bevy_utils",
  "crossbeam-channel",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1049,7 +1046,7 @@ dependencies = [
  "bevy_hierarchy",
  "bevy_math",
  "bevy_reflect",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1079,7 +1076,7 @@ dependencies = [
  "nonmax",
  "smallvec",
  "taffy",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1296,7 +1293,7 @@ dependencies = [
  "polling",
  "rustix",
  "slab",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -1709,7 +1706,7 @@ dependencies = [
  "const_panic",
  "encase_derive",
  "glam",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -2069,7 +2066,7 @@ checksum = "6f56f6318968d03c18e1bcf4857ff88c61157e9da8e47c5f29055d60e1228884"
 dependencies = [
  "log",
  "presser",
- "thiserror 1.0.67",
+ "thiserror",
  "winapi",
  "windows 0.52.0",
 ]
@@ -2137,7 +2134,7 @@ dependencies = [
  "com",
  "libc",
  "libloading 0.8.5",
- "thiserror 1.0.67",
+ "thiserror",
  "widestring",
  "winapi",
 ]
@@ -2266,7 +2263,7 @@ dependencies = [
  "combine",
  "jni-sys",
  "log",
- "thiserror 1.0.67",
+ "thiserror",
  "walkdir",
  "windows-sys 0.45.0",
 ]
@@ -2520,7 +2517,7 @@ dependencies = [
  "rustc-hash 1.1.0",
  "spirv",
  "termcolor",
- "thiserror 1.0.67",
+ "thiserror",
  "unicode-xid",
 ]
 
@@ -2539,7 +2536,7 @@ dependencies = [
  "regex",
  "regex-syntax 0.8.5",
  "rustc-hash 1.1.0",
- "thiserror 1.0.67",
+ "thiserror",
  "tracing",
  "unicode-ident",
 ]
@@ -2583,7 +2580,7 @@ dependencies = [
  "log",
  "ndk-sys 0.5.0+25.2.9519653",
  "num_enum",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -2598,7 +2595,7 @@ dependencies = [
  "ndk-sys 0.6.0+11769913",
  "num_enum",
  "raw-window-handle",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -3086,7 +3083,7 @@ dependencies = [
  "slab",
  "smallvec",
  "spade",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -3106,7 +3103,7 @@ dependencies = [
  "integer-sqrt",
  "num-traits",
  "rustc-hash 2.0.0",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -3326,7 +3323,7 @@ dependencies = [
  "parry3d",
  "rustc-hash 2.0.0",
  "simba",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -3429,7 +3426,7 @@ checksum = "d1fceb9d127d515af1586d8d0cc601e1245bdb0af38e75c865a156290184f5b3"
 dependencies = [
  "cpal",
  "lewton",
- "thiserror 1.0.67",
+ "thiserror",
 ]
 
 [[package]]
@@ -3643,7 +3640,7 @@ dependencies = [
  "log",
  "memmap2",
  "rustix",
- "thiserror 1.0.67",
+ "thiserror",
  "wayland-backend",
  "wayland-client",
  "wayland-csd-frame",
@@ -3766,16 +3763,7 @@ version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b3c6efbfc763e64eb85c11c25320f0737cb7364c4b6336db90aa9ebe27a0bbd"
 dependencies = [
- "thiserror-impl 1.0.67",
-]
-
-[[package]]
-name = "thiserror"
-version = "2.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c006c85c7651b3cf2ada4584faa36773bd07bac24acfb39f3c431b36d7e667aa"
-dependencies = [
- "thiserror-impl 2.0.3",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -3783,17 +3771,6 @@ name = "thiserror-impl"
 version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b607164372e89797d78b8e23a6d67d5d1038c1c65efd52e1389ef8b77caba2a6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "2.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f077553d607adc1caf65430528a576c757a71ed73944b66ebb58ef2bbd243568"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4277,7 +4254,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 1.1.0",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
  "web-sys",
  "wgpu-hal",
  "wgpu-types",
@@ -4321,7 +4298,7 @@ dependencies = [
  "renderdoc-sys",
  "rustc-hash 1.1.0",
  "smallvec",
- "thiserror 1.0.67",
+ "thiserror",
  "wasm-bindgen",
  "web-sys",
  "wgpu-types",
