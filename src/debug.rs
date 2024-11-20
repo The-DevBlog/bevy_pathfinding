@@ -10,7 +10,6 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RtsPfDebug>()
             .register_type::<RtsPfDebug>()
-            .add_systems(Startup, setup)
             .add_systems(Update, draw_grid)
             .observe(draw_costfield)
             .observe(draw_flowfield);
@@ -37,9 +36,6 @@ impl Default for RtsPfDebug {
     }
 }
 
-#[derive(Resource)]
-struct EmbeddedFontHandle(Handle<Font>);
-
 #[derive(Event)]
 pub struct DrawDebugEv;
 
@@ -48,26 +44,6 @@ struct CostField;
 
 #[derive(Component)]
 struct FlowFieldArrow;
-
-fn setup(mut cmds: Commands, mut fonts: ResMut<Assets<Font>>, q_cam: Query<&Camera2d>) {
-    let font =
-        Font::try_from_bytes(FONT.to_vec()).expect("Failed to create Font from embedded font data");
-
-    let font_handle = fonts.add(font);
-
-    cmds.insert_resource(EmbeddedFontHandle(font_handle));
-
-    // set up a 2d camera if there is none
-    if q_cam.is_empty() {
-        cmds.spawn(Camera2dBundle {
-            camera: Camera {
-                order: 2,
-                ..default()
-            },
-            ..default()
-        });
-    }
-}
 
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
     if !debug.draw_grid {
@@ -174,110 +150,14 @@ fn draw_flowfield(
     }
 }
 
-// fn draw_costfield(
-//     _trigger: Trigger<DrawDebugEv>,
-//     debug: Res<RtsPfDebug>,
-//     q_grid_controller: Query<&GridController>,
-//     q_cost: Query<Entity, With<CostField>>,
-//     mut cmds: Commands,
-// ) {
-//     // remove current cost field before rendering new one
-//     for cost_entity in q_cost.iter() {
-//         cmds.entity(cost_entity).despawn_recursive();
-//     }
-
-//     if !debug.draw_costfield {
-//         return;
-//     }
-
-//     let grid_controller = q_grid_controller.get_single().unwrap();
-
-//     for cell_row in grid_controller.cur_flowfield.grid.iter() {
-//         for cell in cell_row.iter() {
-//             let cost = (
-//                 BillboardTextBundle {
-//                     billboard_depth: BillboardDepth(false),
-//                     text: Text::from_section(
-//                         cell.cost.to_string(),
-//                         TextStyle {
-//                             color: COLOR_COST.into(),
-//                             font_size: 100.0,
-//                             ..default()
-//                         },
-//                     ),
-//                     transform: Transform {
-//                         translation: cell.world_position,
-//                         scale: Vec3::splat(0.03),
-//                         ..default()
-//                     },
-//                     ..default()
-//                 },
-//                 CostField,
-//             );
-
-//             cmds.spawn(cost);
-//         }
-//     }
-// }
-
-// fn draw_costfield(
-//     _trigger: Trigger<DrawDebugEv>,
-//     debug: Res<RtsPfDebug>,
-//     q_grid_controller: Query<&GridController>,
-//     q_cost: Query<Entity, With<CostField>>,
-//     mut cmds: Commands,
-//     asset_server: Res<AssetServer>,
-// ) {
-//     // Remove current cost field before rendering a new one
-//     for cost_entity in q_cost.iter() {
-//         cmds.entity(cost_entity).despawn_recursive();
-//     }
-
-//     if !debug.draw_costfield {
-//         return;
-//     }
-
-//     let grid_controller = q_grid_controller.get_single().unwrap();
-
-//     // Load the font once
-//     let font_handle = asset_server.load("fonts/FiraSans-Bold.ttf");
-
-//     // Create a shared TextStyle
-//     let text_style = TextStyle {
-//         font: font_handle.clone(),
-//         font_size: 100.0,
-//         color: COLOR_COST.into(),
-//     };
-
-//     for cell_row in grid_controller.cur_flowfield.grid.iter() {
-//         for cell in cell_row.iter() {
-//             let cost_text = cell.cost.to_string();
-
-//             cmds.spawn((
-//                 Text2dBundle {
-//                     text: Text::from_section(cost_text, text_style.clone()),
-//                     transform: Transform {
-//                         translation: cell.world_position + Vec3::Y * 0.01,
-//                         scale: Vec3::splat(0.03),
-//                         ..default()
-//                     },
-//                     ..default()
-//                 },
-//                 CostField,
-//             ));
-//         }
-//     }
-// }
-
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
     q_grid_controller: Query<&GridController>,
     q_cost: Query<Entity, With<CostField>>,
     mut cmds: Commands,
-    embedded_font_handle: Res<EmbeddedFontHandle>,
 ) {
-    // Remove current cost field before rendering a new one
+    // remove current cost field before rendering new one
     for cost_entity in q_cost.iter() {
         cmds.entity(cost_entity).despawn_recursive();
     }
@@ -288,27 +168,30 @@ fn draw_costfield(
 
     let grid_controller = q_grid_controller.get_single().unwrap();
 
-    // Create a shared TextStyle using the embedded font
-    let text_style = TextStyle {
-        font: embedded_font_handle.0.clone(),
-        font_size: 100.0,
-        color: COLOR_COST.into(),
-    };
-
     for cell_row in grid_controller.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            cmds.spawn((
-                Text2dBundle {
-                    text: Text::from_section(cell.cost.to_string(), text_style.clone()),
+            let cost = (
+                BillboardTextBundle {
+                    billboard_depth: BillboardDepth(false),
+                    text: Text::from_section(
+                        cell.cost.to_string(),
+                        TextStyle {
+                            color: COLOR_COST.into(),
+                            font_size: 100.0,
+                            ..default()
+                        },
+                    ),
                     transform: Transform {
                         translation: cell.world_position,
-                        scale: Vec3::splat(0.035),
+                        scale: Vec3::splat(0.03),
                         ..default()
                     },
                     ..default()
                 },
                 CostField,
-            ));
+            );
+
+            cmds.spawn(cost);
         }
     }
 }
