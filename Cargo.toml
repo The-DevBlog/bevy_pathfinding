@@ -5,7 +5,19 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.14.2"
-bevy_mod_billboard = "0.7.0"
+# bevy_mod_billboard = "0.7.0"
 bevy_rapier3d = "0.27.0"
+# bevy_sprite3d = "3.0.0"
+image = "0.25.5"
 pathfinding = "4.11.0"
-rand = "0.8.5"
+
+[profile.dev]
+opt-level = 3          # Optimize slightly, but keep debug info
+debug = true           # Include debug information
+overflow-checks = true # Enable integer overflow checks
+
+[profile.release]
+opt-level = 3     # Maximize runtime performance
+debug = false     # Strip debug info
+lto = "thin"      # Enable Link Time Optimization for smaller and faster binaries
+codegen-units = 1 # Reduce codegen units for better optimization

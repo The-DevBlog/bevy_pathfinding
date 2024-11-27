@@ -1,19 +1,36 @@
 use crate::*;
-use bevy_mod_billboard::*;
+use bevy::render::{
+    mesh::VertexAttributeValues,
+    render_resource::{
+        Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    },
+    texture::{ImageSampler, ImageSamplerDescriptor},
+};
 use grid_controller::GridController;
+use image::ImageFormat;
+use std::f32::consts::FRAC_PI_2;
 
-const FONT: &[u8] = include_bytes!("../assets/fonts/FiraSans-Bold.ttf");
+const DIGIT_ATLAS: &[u8] = include_bytes!("../assets/digits/digit_atlas.png");
 
 pub struct BevyRtsPathFindingDebugPlugin;
 
 impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RtsPfDebug>()
+            .init_resource::<ImageAssets>()
+            // .add_plugins((Sprite3dPlugin, CustomMaterialPlugin))
             .register_type::<RtsPfDebug>()
+            .add_systems(Startup, load_texture_atlas)
             .add_systems(Update, draw_grid)
             .observe(draw_costfield)
             .observe(draw_flowfield);
     }
+}
+
+#[derive(Resource, Default)]
+struct ImageAssets {
+    image: Handle<Image>, // the `image` field here is only used to query the load state, lots of the
+    layout: Handle<TextureAtlasLayout>, // code in this file disappears if something like bevy_asset_loader is used.
 }
 
 #[derive(Reflect, Resource)]
@@ -44,6 +61,60 @@ struct CostField;
 
 #[derive(Component)]
 struct FlowFieldArrow;
+
+fn load_texture_atlas(
+    mut images: ResMut<Assets<Image>>,
+    mut assets: ResMut<ImageAssets>,
+    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
+) {
+    let digit_bytes = DIGIT_ATLAS;
+
+    // Decode the image
+    let image = image::load_from_memory_with_format(digit_bytes, ImageFormat::Png)
+        .expect("Failed to load digit image");
+
+    let rgba_image = image.to_rgba8();
+    let (width, height) = rgba_image.dimensions();
+    let pixel_data = rgba_image.into_raw();
+
+    let size = Extent3d {
+        width,
+        height,
+        depth_or_array_layers: 1,
+    };
+
+    let texture_descriptor = TextureDescriptor {
+        label: None,
+        size,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8UnormSrgb,
+        usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+        view_formats: &[],
+    };
+
+    let sampler_descriptor = ImageSampler::Descriptor(ImageSamplerDescriptor::default());
+
+    let image = Image {
+        data: pixel_data,
+        texture_descriptor,
+        sampler: sampler_descriptor,
+        texture_view_descriptor: None,
+        asset_usage: Default::default(),
+    };
+
+    let image_handle = images.add(image);
+
+    assets.image = image_handle;
+    assets.layout = texture_atlases.add(TextureAtlasLayout::from_grid(
+        UVec2::new(118, 181),
+        10,
+        1,
+        None,
+        None,
+    ));
+}
 
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
     if !debug.draw_grid {
@@ -153,11 +224,14 @@ fn draw_flowfield(
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
+    my_assets: Res<ImageAssets>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     q_grid_controller: Query<&GridController>,
     q_cost: Query<Entity, With<CostField>>,
     mut cmds: Commands,
 ) {
-    // remove current cost field before rendering new one
+    // Remove current cost field before rendering new one
     for cost_entity in q_cost.iter() {
         cmds.entity(cost_entity).despawn_recursive();
     }
@@ -166,32 +240,87 @@ fn draw_costfield(
         return;
     }
 
-    let grid_controller = q_grid_controller.get_single().unwrap();
+    let grid = q_grid_controller.get_single().unwrap();
 
-    for cell_row in grid_controller.cur_flowfield.grid.iter() {
+    let digit_spacing = 1.8;
+    let mut base_offset = Vec3::new(0., 0.01, 0.);
+    let mut scale = Vec3::splat(1.);
+
+    if debug.draw_flowfield {
+        base_offset.x = grid.cell_radius - 3. * digit_spacing;
+        base_offset.z = grid.cell_radius - 2.;
+        scale = Vec3::splat(0.25);
+    }
+
+    // Create and add the quad mesh only once
+    let quad_handle = meshes.add(Rectangle::new(grid.cell_radius * 2., grid.cell_radius * 2.));
+    let mesh = meshes.get(&quad_handle).unwrap().clone();
+
+    // Create a shared material
+    let material = materials.add(StandardMaterial {
+        base_color_texture: Some(my_assets.image.clone()),
+        unlit: true,
+        ..default()
+    });
+
+    for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            let cost = (
-                BillboardTextBundle {
-                    billboard_depth: BillboardDepth(false),
-                    text: Text::from_section(
-                        cell.cost.to_string(),
-                        TextStyle {
-                            color: COLOR_COST.into(),
-                            font_size: 100.0,
+            // Convert the cost value to its individual digits
+            let cost_digits: Vec<u32> = cell
+                .cost
+                .to_string()
+                .chars()
+                .map(|c| c.to_digit(10).unwrap())
+                .collect();
+
+            // Calculate x offset for different cost lengths
+            let x_offset = (3. - cost_digits.len() as f32).abs() * 2.;
+            for (i, &digit) in cost_digits.iter().enumerate() {
+                // Calculate the offset for each digit
+                let mut offset = base_offset;
+                offset.x = offset.x + x_offset + i as f32 * digit_spacing;
+
+                // Clone the quad handle and adjust its UVs for the digit
+                let digit_quad_handle = meshes.add(mesh.clone());
+                update_mesh_uvs(&mut meshes, digit_quad_handle.clone(), digit);
+
+                // Spawn each digit as a separate PBR entity
+                cmds.spawn((
+                    PbrBundle {
+                        mesh: digit_quad_handle,
+                        material: material.clone(),
+                        transform: Transform {
+                            translation: cell.world_position + offset,
+                            rotation: Quat::from_rotation_x(-FRAC_PI_2),
+                            scale,
                             ..default()
                         },
-                    ),
-                    transform: Transform {
-                        translation: cell.world_position,
-                        scale: Vec3::splat(0.03),
                         ..default()
                     },
-                    ..default()
-                },
-                CostField,
-            );
-
-            cmds.spawn(cost);
+                    CostField,
+                ));
+            }
         }
     }
 }
+
+fn update_mesh_uvs(meshes: &mut Assets<Mesh>, quad_handle: Handle<Mesh>, digit: u32) {
+    let mesh = meshes.get_mut(&quad_handle).unwrap();
+
+    // Ensure the mesh has UVs
+    if let Some(VertexAttributeValues::Float32x2(uvs)) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
+        let digit_width = 118. / 1180.; // Each digit's UV width
+        let start_u = digit as f32 * digit_width;
+        let end_u = start_u + digit_width;
+
+        // Update UV coordinates to select the digit
+        *uvs = vec![
+            [end_u, 0.0],   // Bottom-right
+            [start_u, 0.0], // Bottom-left
+            [start_u, 1.0], // Top-left
+            [end_u, 1.0],   // Top-right
+        ];
+    }
+}
+
+// each number is 118 PX wide
