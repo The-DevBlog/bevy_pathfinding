@@ -1,6 +1,5 @@
 use crate::*;
 use bevy::render::{
-    mesh::VertexAttributeValues,
     render_resource::{
         Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     },
@@ -17,8 +16,7 @@ pub struct BevyRtsPathFindingDebugPlugin;
 impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RtsPfDebug>()
-            .init_resource::<ImageAssets>()
-            // .add_plugins((Sprite3dPlugin, CustomMaterialPlugin))
+            .init_resource::<TextureAssets>()
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, load_texture_atlas)
             .add_systems(Update, draw_grid)
@@ -28,9 +26,9 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
 }
 
 #[derive(Resource, Default)]
-struct ImageAssets {
-    image: Handle<Image>, // the `image` field here is only used to query the load state, lots of the
-    layout: Handle<TextureAtlasLayout>, // code in this file disappears if something like bevy_asset_loader is used.
+struct TextureAssets {
+    // image: Handle<Image>,
+    digits: [Handle<Image>; 10], // One handle per digit
 }
 
 #[derive(Reflect, Resource)]
@@ -64,56 +62,48 @@ struct FlowFieldArrow;
 
 fn load_texture_atlas(
     mut images: ResMut<Assets<Image>>,
-    mut assets: ResMut<ImageAssets>,
-    mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
+    mut texture_assets: ResMut<TextureAssets>,
 ) {
     let digit_bytes = DIGIT_ATLAS;
 
     // Decode the image
     let image = image::load_from_memory_with_format(digit_bytes, ImageFormat::Png)
         .expect("Failed to load digit image");
-
     let rgba_image = image.to_rgba8();
     let (width, height) = rgba_image.dimensions();
-    let pixel_data = rgba_image.into_raw();
+    let digit_width = width / 10;
 
-    let size = Extent3d {
-        width,
-        height,
-        depth_or_array_layers: 1,
-    };
+    // Extract each digit as a separate texture
+    for idx in 0..10 {
+        let x_start = idx * digit_width;
+        let cropped_digit_data =
+            image::imageops::crop_imm(&rgba_image, x_start, 0, digit_width, height)
+                .to_image()
+                .into_raw();
 
-    let texture_descriptor = TextureDescriptor {
-        label: None,
-        size,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: TextureDimension::D2,
-        format: TextureFormat::Rgba8UnormSrgb,
-        usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-        view_formats: &[],
-    };
+        let cropped_digit = Image {
+            data: cropped_digit_data,
+            texture_descriptor: TextureDescriptor {
+                label: None,
+                size: Extent3d {
+                    width: digit_width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
+            texture_view_descriptor: None,
+            asset_usage: Default::default(),
+        };
 
-    let sampler_descriptor = ImageSampler::Descriptor(ImageSamplerDescriptor::default());
-
-    let image = Image {
-        data: pixel_data,
-        texture_descriptor,
-        sampler: sampler_descriptor,
-        texture_view_descriptor: None,
-        asset_usage: Default::default(),
-    };
-
-    let image_handle = images.add(image);
-
-    assets.image = image_handle;
-    assets.layout = texture_atlases.add(TextureAtlasLayout::from_grid(
-        UVec2::new(118, 181),
-        10,
-        1,
-        None,
-        None,
-    ));
+        texture_assets.digits[idx as usize] = images.add(cropped_digit);
+    }
 }
 
 fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
@@ -224,7 +214,7 @@ fn draw_flowfield(
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
-    my_assets: Res<ImageAssets>,
+    my_assets: Res<TextureAssets>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_grid_controller: Query<&GridController>,
@@ -253,15 +243,7 @@ fn draw_costfield(
     }
 
     // Create and add the quad mesh only once
-    let quad_handle = meshes.add(Rectangle::new(grid.cell_radius * 2., grid.cell_radius * 2.));
-    let mesh = meshes.get(&quad_handle).unwrap().clone();
-
-    // Create a shared material
-    let material = materials.add(StandardMaterial {
-        base_color_texture: Some(my_assets.image.clone()),
-        unlit: true,
-        ..default()
-    });
+    let mesh = meshes.add(Rectangle::new(grid.cell_radius * 2., grid.cell_radius * 2.));
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -275,20 +257,25 @@ fn draw_costfield(
 
             // Calculate x offset for different cost lengths
             let x_offset = (3. - cost_digits.len() as f32).abs() * 2.;
+
             for (i, &digit) in cost_digits.iter().enumerate() {
                 // Calculate the offset for each digit
                 let mut offset = base_offset;
                 offset.x = offset.x + x_offset + i as f32 * digit_spacing;
 
-                // Clone the quad handle and adjust its UVs for the digit
-                let digit_quad_handle = meshes.add(mesh.clone());
-                update_mesh_uvs(&mut meshes, digit_quad_handle.clone(), digit);
+                let material = materials.add(StandardMaterial {
+                    base_color_texture: Some(my_assets.digits[digit as usize].clone()),
+                    base_color: Color::WHITE,
+                    alpha_mode: AlphaMode::Blend,
+                    unlit: true,
+                    ..default()
+                });
 
                 // Spawn each digit as a separate PBR entity
-                cmds.spawn((
+                let dig = (
                     PbrBundle {
-                        mesh: digit_quad_handle,
-                        material: material.clone(),
+                        mesh: mesh.clone(),
+                        material,
                         transform: Transform {
                             translation: cell.world_position + offset,
                             rotation: Quat::from_rotation_x(-FRAC_PI_2),
@@ -298,29 +285,10 @@ fn draw_costfield(
                         ..default()
                     },
                     CostField,
-                ));
+                );
+
+                cmds.spawn(dig);
             }
         }
     }
 }
-
-fn update_mesh_uvs(meshes: &mut Assets<Mesh>, quad_handle: Handle<Mesh>, digit: u32) {
-    let mesh = meshes.get_mut(&quad_handle).unwrap();
-
-    // Ensure the mesh has UVs
-    if let Some(VertexAttributeValues::Float32x2(uvs)) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0) {
-        let digit_width = 118. / 1180.; // Each digit's UV width
-        let start_u = digit as f32 * digit_width;
-        let end_u = start_u + digit_width;
-
-        // Update UV coordinates to select the digit
-        *uvs = vec![
-            [end_u, 0.0],   // Bottom-right
-            [start_u, 0.0], // Bottom-left
-            [start_u, 1.0], // Top-left
-            [end_u, 1.0],   // Top-right
-        ];
-    }
-}
-
-// each number is 118 PX wide
