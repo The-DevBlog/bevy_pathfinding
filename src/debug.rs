@@ -16,20 +16,18 @@ pub struct BevyRtsPathFindingDebugPlugin;
 impl Plugin for BevyRtsPathFindingDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RtsPfDebug>()
-            .init_resource::<TextureAssets>()
+            .init_resource::<Digits>()
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, load_texture_atlas)
             .add_systems(Update, draw_grid)
+            .add_systems(Update, detect_debug_change)
             .observe(draw_costfield)
             .observe(draw_flowfield);
     }
 }
 
 #[derive(Resource, Default)]
-struct TextureAssets {
-    // image: Handle<Image>,
-    digits: [Handle<Image>; 10], // One handle per digit
-}
+struct Digits([Handle<Image>; 10]);
 
 #[derive(Reflect, Resource)]
 #[reflect(Resource)]
@@ -44,7 +42,7 @@ impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
             draw_grid: true,
-            draw_flowfield: true,
+            draw_flowfield: false,
             draw_costfield: true,
             draw_integration_field: false,
         }
@@ -60,10 +58,7 @@ struct CostField;
 #[derive(Component)]
 struct FlowFieldArrow;
 
-fn load_texture_atlas(
-    mut images: ResMut<Assets<Image>>,
-    mut texture_assets: ResMut<TextureAssets>,
-) {
+fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
     let digit_bytes = DIGIT_ATLAS;
 
     // Decode the image
@@ -102,7 +97,7 @@ fn load_texture_atlas(
             asset_usage: Default::default(),
         };
 
-        texture_assets.digits[idx as usize] = images.add(cropped_digit);
+        digits.0[idx as usize] = images.add(cropped_digit);
     }
 }
 
@@ -148,8 +143,13 @@ fn draw_flowfield(
 
     let grid_controller = q_grid_controller.get_single().unwrap();
 
-    let arrow_length = 6.0;
-    let arrow_width = 1.0;
+    let mut arrow_scale = 1.0;
+    if debug.draw_costfield || debug.draw_flowfield {
+        arrow_scale = 0.7;
+    }
+
+    let arrow_length = 6.0 * arrow_scale;
+    let arrow_width = 1.0 * arrow_scale;
     let arrow_clr = Color::WHITE;
 
     // Create shared meshes and materials
@@ -171,7 +171,9 @@ fn draw_flowfield(
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
             let mut translation = cell.world_position;
             translation.y += 0.01;
-            translation.x -= 0.5;
+            // translation.x -= 0.5;
+            // translation.y += offset_y;
+            // translation.x -= offset_x;
 
             // Use the shared mesh and material
             let arrow_shaft = (
@@ -214,7 +216,7 @@ fn draw_flowfield(
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     debug: Res<RtsPfDebug>,
-    my_assets: Res<TextureAssets>,
+    digits: Res<Digits>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     q_grid_controller: Query<&GridController>,
@@ -232,18 +234,21 @@ fn draw_costfield(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let digit_spacing = 1.8;
-    let mut base_offset = Vec3::new(0., 0.01, 0.);
-    let mut scale = Vec3::splat(1.);
+    let digit_spacing = 2.0;
+    let mut base_offset = Vec3::new(0.0, 0.01, 0.0);
+    let mut scale = Vec3::splat(0.4);
 
-    if debug.draw_flowfield {
-        base_offset.x = grid.cell_radius - 3. * digit_spacing;
-        base_offset.z = grid.cell_radius - 2.;
-        scale = Vec3::splat(0.25);
+    if debug.draw_flowfield || debug.draw_integration_field {
+        base_offset.x = grid.cell_radius - 3.0 * digit_spacing;
+        base_offset.z = grid.cell_radius - 2.0;
+        scale = Vec3::splat(0.2);
     }
 
     // Create and add the quad mesh only once
-    let mesh = meshes.add(Rectangle::new(grid.cell_radius * 2., grid.cell_radius * 2.));
+    let mesh = meshes.add(Rectangle::new(
+        grid.cell_radius * 2.0,
+        grid.cell_radius * 2.0,
+    ));
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -256,7 +261,7 @@ fn draw_costfield(
                 .collect();
 
             // Calculate x offset for different cost lengths
-            let x_offset = (3. - cost_digits.len() as f32).abs() * 2.;
+            let x_offset = (3.0 - cost_digits.len() as f32).abs() * 2.0;
 
             for (i, &digit) in cost_digits.iter().enumerate() {
                 // Calculate the offset for each digit
@@ -264,7 +269,7 @@ fn draw_costfield(
                 offset.x = offset.x + x_offset + i as f32 * digit_spacing;
 
                 let material = materials.add(StandardMaterial {
-                    base_color_texture: Some(my_assets.digits[digit as usize].clone()),
+                    base_color_texture: Some(digits.0[digit as usize].clone()),
                     base_color: Color::WHITE,
                     alpha_mode: AlphaMode::Blend,
                     unlit: true,
@@ -290,5 +295,11 @@ fn draw_costfield(
                 cmds.spawn(dig);
             }
         }
+    }
+}
+
+fn detect_debug_change(mut cmds: Commands, debug: Res<RtsPfDebug>) {
+    if debug.is_changed() {
+        cmds.trigger(DrawDebugEv);
     }
 }
