@@ -234,17 +234,16 @@ fn draw_costfield(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let digit_spacing = 2.0;
+    let mut digit_spacing = 2.75;
     let mut base_offset = Vec3::new(0.0, 0.01, 0.0);
-    let mut scale = Vec3::splat(0.4);
+    let mut scale = Vec3::splat(0.3);
 
     if debug.draw_flowfield || debug.draw_integration_field {
-        base_offset.x = grid.cell_radius - 3.0 * digit_spacing;
+        digit_spacing = 1.5;
         base_offset.z = grid.cell_radius - 2.0;
         scale = Vec3::splat(0.2);
     }
 
-    // Create and add the quad mesh only once
     let mesh = meshes.add(Rectangle::new(
         grid.cell_radius * 2.0,
         grid.cell_radius * 2.0,
@@ -260,13 +259,12 @@ fn draw_costfield(
                 .map(|c| c.to_digit(10).unwrap())
                 .collect();
 
-            // Calculate x offset for different cost lengths
-            let x_offset = (3.0 - cost_digits.len() as f32).abs() * 2.0;
+            let x_offset = -(cost_digits.len() as f32 - 1.0) * digit_spacing / 2.0;
 
             for (i, &digit) in cost_digits.iter().enumerate() {
                 // Calculate the offset for each digit
                 let mut offset = base_offset;
-                offset.x = offset.x + x_offset + i as f32 * digit_spacing;
+                offset.x += x_offset + i as f32 * digit_spacing;
 
                 let material = materials.add(StandardMaterial {
                     base_color_texture: Some(digits.0[digit as usize].clone()),
