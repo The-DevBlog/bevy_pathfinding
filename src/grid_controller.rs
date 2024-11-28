@@ -7,17 +7,8 @@ pub struct GridControllerPlugin;
 
 impl Plugin for GridControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.observe(initialize_flowfield).add_systems(Update, t);
+        app.observe(initialize_flowfield);
     }
-}
-
-fn t(q: Query<&GridController>) {
-    // for grid in q.iter() {
-    //     println!(
-    //         "Destination Cell: {:?}",
-    //         grid.cur_flowfield.destination_cell
-    //     );
-    // }
 }
 
 #[derive(Component)]

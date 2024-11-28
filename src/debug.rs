@@ -141,15 +141,15 @@ fn draw_flowfield(
         return;
     }
 
-    let grid_controller = q_grid_controller.get_single().unwrap();
+    let grid = q_grid_controller.get_single().unwrap();
 
     let mut arrow_scale = 1.0;
-    if debug.draw_costfield || debug.draw_flowfield {
+    if debug.draw_costfield || debug.draw_integration_field {
         arrow_scale = 0.7;
     }
 
-    let arrow_length = 6.0 * arrow_scale;
-    let arrow_width = 1.0 * arrow_scale;
+    let arrow_length = grid.cell_diameter() * 0.6 * arrow_scale;
+    let arrow_width = grid.cell_diameter() * 0.1 * arrow_scale;
     let arrow_clr = Color::WHITE;
 
     // Create shared meshes and materials
@@ -161,19 +161,18 @@ fn draw_flowfield(
 
     // Create the arrowhead mesh
     let half_arrow_size = arrow_length / 2.0;
-    let a = Vec2::new(half_arrow_size + 1.0, 0.0); // Tip of the arrowhead
-    let b = Vec2::new(half_arrow_size - 1.5, arrow_width + 0.25);
-    let c = Vec2::new(half_arrow_size - 1.5, -arrow_width - 0.25);
+    let d1 = half_arrow_size - grid.cell_diameter() * 0.09;
+    let d2 = arrow_width + grid.cell_diameter() * 0.0125;
+    let a = Vec2::new(half_arrow_size + grid.cell_diameter() * 0.05, 0.0); // Tip of the arrowhead
+    let b = Vec2::new(d1, d2);
+    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter() * 0.0125);
     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
-    for cell_row in grid_controller.cur_flowfield.grid.iter() {
+    for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
             let mut translation = cell.world_position;
             translation.y += 0.01;
-            // translation.x -= 0.5;
-            // translation.y += offset_y;
-            // translation.x -= offset_x;
 
             // Use the shared mesh and material
             let arrow_shaft = (
@@ -234,13 +233,13 @@ fn draw_costfield(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let mut digit_spacing = 2.75;
+    let mut digit_spacing = grid.cell_diameter() * 0.275;
     let mut base_offset = Vec3::new(0.0, 0.01, 0.0);
     let mut scale = Vec3::splat(0.3);
 
     if debug.draw_flowfield || debug.draw_integration_field {
-        digit_spacing = 1.5;
-        base_offset.z = grid.cell_radius - 2.0;
+        digit_spacing = grid.cell_diameter() * 0.15;
+        base_offset.z = grid.cell_radius - (grid.cell_diameter() * 0.1);
         scale = Vec3::splat(0.2);
     }
 
