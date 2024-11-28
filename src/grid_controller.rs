@@ -33,6 +33,10 @@ impl GridController {
         self.cur_flowfield = FlowField::new(self.cell_radius, self.grid_size);
         self.cur_flowfield.create_grid();
     }
+
+    pub fn cell_diameter(&self) -> f32 {
+        self.cell_radius * 2.0
+    }
 }
 
 fn initialize_flowfield(

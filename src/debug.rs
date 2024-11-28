@@ -244,10 +244,7 @@ fn draw_costfield(
         scale = Vec3::splat(0.2);
     }
 
-    let mesh = meshes.add(Rectangle::new(
-        grid.cell_radius * 2.0,
-        grid.cell_radius * 2.0,
-    ));
+    let mesh = meshes.add(Rectangle::new(grid.cell_diameter(), grid.cell_diameter()));
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
