@@ -34,12 +34,12 @@ struct Digits([Handle<Image>; 10]);
 #[reflect(Resource)]
 pub struct RtsPfDebug {
     draw_grid: bool,
-    draw_mode_1: DrawMode1,
-    draw_mode_2: DrawMode2,
+    draw_mode_1: DrawMode,
+    draw_mode_2: DrawMode,
 }
 
 #[derive(Reflect, PartialEq)]
-enum DrawMode1 {
+enum DrawMode {
     None,
     CostField,
     FlowField,
@@ -47,21 +47,21 @@ enum DrawMode1 {
     Index,
 }
 
-#[derive(Reflect, PartialEq)]
-enum DrawMode2 {
-    None,
-    CostField,
-    FlowField,
-    IntegrationField,
-    Index,
-}
+// #[derive(Reflect, PartialEq)]
+// enum DrawMode2 {
+//     None,
+//     CostField,
+//     FlowField,
+//     IntegrationField,
+//     Index,
+// }
 
 impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
             draw_grid: true,
-            draw_mode_1: DrawMode1::FlowField,
-            draw_mode_2: DrawMode2::None,
+            draw_mode_1: DrawMode::FlowField,
+            draw_mode_2: DrawMode::None,
         }
     }
 }
@@ -161,14 +161,14 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    if dbg.draw_mode_1 != DrawMode1::FlowField {
+    if dbg.draw_mode_1 != DrawMode::FlowField {
         return;
     }
 
     let grid = q_grid_controller.get_single().unwrap();
 
     let mut arrow_scale = 1.0;
-    if dbg.draw_mode_1 != DrawMode1::None {
+    if dbg.draw_mode_1 != DrawMode::None {
         arrow_scale = 0.7;
     }
 
@@ -253,8 +253,7 @@ fn draw_costfield(
 
     let grid = q_grid.get_single().unwrap();
 
-    let offset = calculate_offset(dbg, DrawMode1::CostField, DrawMode2::CostField);
-    let offset = match offset {
+    let offset = match calculate_offset(dbg, DrawMode::CostField) {
         Some(offset) => offset,
         None => return,
     };
@@ -282,8 +281,7 @@ fn draw_index(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let offset = calculate_offset(dbg, DrawMode1::Index, DrawMode2::Index);
-    let offset = match offset {
+    let offset = match calculate_offset(dbg, DrawMode::Index) {
         Some(offset) => offset,
         None => return,
     };
@@ -292,26 +290,24 @@ fn draw_index(
     draw(meshes, materials, &grid, digits, Index, cmds, str, offset);
 }
 
-fn calculate_offset(
-    dbg: Res<RtsPfDebug>,
-    draw_mode_1: DrawMode1,
-    draw_mode_2: DrawMode2,
-) -> Option<Vec3> {
-    let mode = if dbg.draw_mode_1 == draw_mode_1 {
+fn calculate_offset(dbg: Res<RtsPfDebug>, draw_mode: DrawMode) -> Option<Vec3> {
+    let mode = if dbg.draw_mode_1 == draw_mode {
         Some(1)
-    } else if dbg.draw_mode_2 == draw_mode_2 {
+    } else if dbg.draw_mode_2 == draw_mode {
         Some(2)
     } else {
         None
     };
 
     if mode.is_none() {
-        return None; // Index mode is not active; nothing to draw
+        return None; // nothing to draw
     }
 
     // Base offset when only one mode is active
     let mut offset = Vec3::new(0.0, 0.01, 0.0);
-    if dbg.draw_mode_1 == DrawMode1::None || dbg.draw_mode_2 == DrawMode2::None {
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == draw_mode && dbg.draw_mode_2 == draw_mode)
+    {
         offset.z = 0.0;
     } else {
         match mode {
