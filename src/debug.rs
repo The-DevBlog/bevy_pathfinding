@@ -253,61 +253,15 @@ fn draw_costfield(
 
     let grid = q_grid.get_single().unwrap();
 
-    // Check if Index is in either draw_mode_1 or draw_mode_2
-    let mode = if dbg.draw_mode_1 == DrawMode1::CostField {
-        Some(1)
-    } else if dbg.draw_mode_2 == DrawMode2::CostField {
-        Some(2)
-    } else {
-        None
-    };
-
-    if mode.is_none() {
-        return; // Index mode is not active; nothing to draw
-    }
-    // Determine if both modes are active
-    let both_modes_active =
-        dbg.draw_mode_1 != DrawMode1::None && dbg.draw_mode_2 != DrawMode2::None;
-
-    // Base offset when only one mode is active
-    let base_offset_single = Vec3::new(0.0, 0.01, 0.0);
-
-    // Offsets for each mode when both are active
-    // let base_offset_mode_1 = if both_modes_active {
-    let base_offset_mode_1 = if dbg.draw_mode_1 != DrawMode1::None {
-        // Move upwards
-        Vec3::new(0.0, 0.01, -8.0)
-        // Vec3::new(0.0, 0.01, 8.0)
-    } else {
-        base_offset_single
-    };
-
-    // let base_offset_mode_2 = if both_modes_active {
-    let base_offset_mode_2 = if dbg.draw_mode_2 != DrawMode2::None {
-        // Move downwards
-        Vec3::new(0.0, 0.01, 8.0)
-        // Vec3::new(0.0, 0.01, -8.0)
-    } else {
-        base_offset_single
-    };
-
-    // Select base_offset based on which mode Index is in
-    let base_offset = match mode {
-        Some(1) => base_offset_mode_1,
-        Some(2) => base_offset_mode_2,
-        _ => base_offset_single, // Should not occur
+    let offset = calculate_offset(dbg, DrawMode1::CostField, DrawMode2::CostField);
+    let offset = match offset {
+        Some(offset) => offset,
+        None => return,
     };
 
     let str = |cell: &Cell| format!("{}", cell.cost);
     draw::<CostField>(
-        meshes,
-        materials,
-        &grid,
-        digits,
-        CostField,
-        cmds,
-        str,
-        base_offset,
+        meshes, materials, &grid, digits, CostField, cmds, str, offset,
     );
 }
 
@@ -328,63 +282,46 @@ fn draw_index(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    // Check if Index is in either draw_mode_1 or draw_mode_2
-    let mode = if dbg.draw_mode_1 == DrawMode1::Index {
+    let offset = calculate_offset(dbg, DrawMode1::Index, DrawMode2::Index);
+    let offset = match offset {
+        Some(offset) => offset,
+        None => return,
+    };
+
+    let str = |cell: &Cell| format!("{}{}", cell.grid_idx.y, cell.grid_idx.x);
+    draw(meshes, materials, &grid, digits, Index, cmds, str, offset);
+}
+
+fn calculate_offset(
+    dbg: Res<RtsPfDebug>,
+    draw_mode_1: DrawMode1,
+    draw_mode_2: DrawMode2,
+) -> Option<Vec3> {
+    let mode = if dbg.draw_mode_1 == draw_mode_1 {
         Some(1)
-    } else if dbg.draw_mode_2 == DrawMode2::Index {
+    } else if dbg.draw_mode_2 == draw_mode_2 {
         Some(2)
     } else {
         None
     };
 
     if mode.is_none() {
-        return; // Index mode is not active; nothing to draw
+        return None; // Index mode is not active; nothing to draw
     }
 
-    // Determine if both modes are active
-    let both_modes_active =
-        dbg.draw_mode_1 != DrawMode1::None && dbg.draw_mode_2 != DrawMode2::None;
-
     // Base offset when only one mode is active
-    let base_offset_single = Vec3::new(0.0, 0.01, 0.0);
-
-    // Offsets for each mode when both are active
-    // let base_offset_mode_1 = if both_modes_active {
-    let base_offset_mode_1 = if dbg.draw_mode_1 != DrawMode1::None {
-        // Move upwards
-        Vec3::new(0.0, 0.01, -8.0)
-        // Vec3::new(0.0, 0.01, 8.0)
+    let mut offset = Vec3::new(0.0, 0.01, 0.0);
+    if dbg.draw_mode_1 == DrawMode1::None || dbg.draw_mode_2 == DrawMode2::None {
+        offset.z = 0.0;
     } else {
-        base_offset_single
-    };
+        match mode {
+            Some(1) => offset.z = -6.0,
+            Some(2) => offset.z = 6.0,
+            _ => (),
+        };
+    }
 
-    // let base_offset_mode_2 = if both_modes_active {
-    let base_offset_mode_2 = if dbg.draw_mode_2 != DrawMode2::None {
-        // Move downwards
-        Vec3::new(0.0, 0.01, 8.0)
-        // Vec3::new(0.0, 0.01, -8.0)
-    } else {
-        base_offset_single
-    };
-
-    // Select base_offset based on which mode Index is in
-    let base_offset = match mode {
-        Some(1) => base_offset_mode_1,
-        Some(2) => base_offset_mode_2,
-        _ => base_offset_single, // Should not occur
-    };
-
-    let str = |cell: &Cell| format!("{}{}", cell.grid_idx.y, cell.grid_idx.x);
-    draw(
-        meshes,
-        materials,
-        &grid,
-        digits,
-        Index,
-        cmds,
-        str,
-        base_offset,
-    );
+    return Some(offset);
 }
 
 fn draw<T: Component + Copy>(
