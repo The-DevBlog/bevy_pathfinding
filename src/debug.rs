@@ -161,16 +161,19 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    if dbg.draw_mode_1 != DrawMode::FlowField {
-        return;
-    }
-
     let grid = q_grid_controller.get_single().unwrap();
 
-    let mut arrow_scale = 1.0;
-    if dbg.draw_mode_1 != DrawMode::None {
-        arrow_scale = 0.7;
+    let mut arrow_scale = 0.7;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        arrow_scale = 1.0;
     }
+
+    let offset = match calculate_offset(&grid, dbg, DrawMode::FlowField) {
+        Some(offset) => offset,
+        None => return,
+    };
 
     let arrow_length = grid.cell_diameter() * 0.6 * arrow_scale;
     let arrow_width = grid.cell_diameter() * 0.1 * arrow_scale;
@@ -195,8 +198,6 @@ fn draw_flowfield(
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
-            let mut translation = cell.world_position;
-            translation.y += 0.01;
 
             // Use the shared mesh and material
             let arrow_shaft = (
@@ -204,7 +205,7 @@ fn draw_flowfield(
                     mesh: arrow_shaft_mesh.clone(),
                     material: arrow_material.clone(),
                     transform: Transform {
-                        translation,
+                        translation: cell.world_position + offset,
                         rotation,
                         ..default()
                     },
@@ -253,7 +254,7 @@ fn draw_costfield(
 
     let grid = q_grid.get_single().unwrap();
 
-    let offset = match calculate_offset(dbg, DrawMode::CostField) {
+    let offset = match calculate_offset(&grid, dbg, DrawMode::CostField) {
         Some(offset) => offset,
         None => return,
     };
@@ -281,7 +282,7 @@ fn draw_index(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let offset = match calculate_offset(dbg, DrawMode::Index) {
+    let offset = match calculate_offset(&grid, dbg, DrawMode::Index) {
         Some(offset) => offset,
         None => return,
     };
@@ -290,7 +291,11 @@ fn draw_index(
     draw(meshes, materials, &grid, digits, Index, cmds, str, offset);
 }
 
-fn calculate_offset(dbg: Res<RtsPfDebug>, draw_mode: DrawMode) -> Option<Vec3> {
+fn calculate_offset(
+    grid: &GridController,
+    dbg: Res<RtsPfDebug>,
+    draw_mode: DrawMode,
+) -> Option<Vec3> {
     let mode = if dbg.draw_mode_1 == draw_mode {
         Some(1)
     } else if dbg.draw_mode_2 == draw_mode {
@@ -311,8 +316,8 @@ fn calculate_offset(dbg: Res<RtsPfDebug>, draw_mode: DrawMode) -> Option<Vec3> {
         offset.z = 0.0;
     } else {
         match mode {
-            Some(1) => offset.z = -6.0,
-            Some(2) => offset.z = 6.0,
+            Some(1) => offset.z = -grid.cell_diameter() * 0.25,
+            Some(2) => offset.z = grid.cell_diameter() * 0.25,
             _ => (),
         };
     }
