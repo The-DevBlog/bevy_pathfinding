@@ -260,8 +260,14 @@ impl FlowField {
         let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
         let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
 
+        let x = min(x, self.grid_size.x as usize - 1);
+        let y = min(y, self.grid_size.y as usize - 1);
+
         // Return the cell at the calculated indices
-        self.grid[min(x, self.grid_size.x as usize - 1)][min(y, self.grid_size.y as usize - 1)]
+        // why am I returning [y][x] instead of [x][y]?
+        // The columns run across the Y axis (Z axis in 3D, but I am treating the plane as a 2D space)
+        // The rows run across the X axis
+        self.grid[y][x]
     }
 }
 
