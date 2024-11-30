@@ -5,7 +5,7 @@ use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 
 use crate::{cell::*, grid_direction::GridDirection};
 
-#[derive(Component, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
@@ -92,38 +92,6 @@ impl FlowField {
     //     }
     // }
 
-    // fn get_neighbor_cells(&self, node_idx: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
-    //     let mut neighbor_cells = Vec::new();
-
-    //     for cur_direction in directions.iter() {
-    //         let new_neighbor = self.get_cell_at_relative_position(node_idx, cur_direction.vector());
-
-    //         if let Some(new_neighbor) = new_neighbor {
-    //             neighbor_cells.push(new_neighbor);
-    //         }
-    //     }
-
-    //     return neighbor_cells;
-    // }
-
-    // fn get_cell_at_relative_position(
-    //     &self,
-    //     origin_position: IVec2,
-    //     relative_position: IVec2,
-    // ) -> Option<Cell> {
-    //     let final_position = origin_position + relative_position;
-
-    //     if final_position.x < 0
-    //         || final_position.x >= self.grid_size.x
-    //         || final_position.y < 0
-    //         || final_position.y >= self.grid_size.y
-    //     {
-    //         return None;
-    //     }
-
-    //     return Some(self.grid[final_position.x as usize][final_position.y as usize]);
-    // }
-
     pub fn create_integration_field(&mut self, destination_cell: Cell) {
         let mut tmp_destination_cell = destination_cell.clone();
         tmp_destination_cell.cost = 0;
@@ -190,29 +158,6 @@ impl FlowField {
         }
     }
 
-    // pub fn create_flowfield(&self) {
-    //     for cell_row in &self.grid {
-    //         for cell in cell_row.iter() {
-    //             let mut cur_neighbors =
-    //                 self.get_neighbor_cells(cell.grid_idx, GridDirection::all_directions());
-
-    //             let mut best_cost = cell.best_cost;
-
-    //             for cur_neighbor in cur_neighbors.iter() {
-    //                 if cur_neighbor.best_cost < best_cost {
-    //                     best_cost = cur_neighbor.best_cost;
-    //                     let best_direction =
-    //                         GridDirection::from_vector2(cur_neighbor.grid_idx - cell.grid_idx);
-
-    //                     if let Some(best_direction) = best_direction {
-    //                         cell.best_direction = best_direction;
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
         let mut neighbor_cells = Vec::new();
 
@@ -263,11 +208,7 @@ impl FlowField {
         let x = min(x, self.grid_size.x as usize - 1);
         let y = min(y, self.grid_size.y as usize - 1);
 
-        // Return the cell at the calculated indices
-        // why am I returning [y][x] instead of [x][y]?
-        // The columns run across the Y axis (Z axis in 3D, but I am treating the plane as a 2D space)
-        // The rows run across the X axis
-        self.grid[y][x]
+        self.grid[x][y]
     }
 }
 

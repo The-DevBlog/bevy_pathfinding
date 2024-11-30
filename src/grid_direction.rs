@@ -91,11 +91,11 @@ impl GridDirection {
     pub fn to_angle(&self) -> f32 {
         match self {
             GridDirection::None => 0.0,
-            GridDirection::North => -FRAC_PI_2,
+            GridDirection::North => FRAC_PI_2,
             GridDirection::NorthEast => -FRAC_PI_4,
             GridDirection::East => 0.0,
             GridDirection::SouthEast => FRAC_PI_4,
-            GridDirection::South => FRAC_PI_2,
+            GridDirection::South => -FRAC_PI_2,
             GridDirection::SouthWest => 3.0 * FRAC_PI_4,
             GridDirection::West => PI,
             GridDirection::NorthWest => -3.0 * FRAC_PI_4,

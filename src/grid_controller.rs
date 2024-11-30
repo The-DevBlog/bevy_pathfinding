@@ -38,6 +38,7 @@ fn initialize_flowfield(
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     rapier_ctx: Res<RapierContext>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
+    mut gizmos: Gizmos,
 ) {
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
@@ -62,6 +63,7 @@ fn initialize_flowfield(
             .cur_flowfield
             .get_cell_from_world_position(world_mouse_pos);
 
+        // println!("destination cell: {:?}", destination_cell.grid_idx);
         grid_controller
             .cur_flowfield
             .create_integration_field(destination_cell);

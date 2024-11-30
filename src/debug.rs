@@ -47,15 +47,6 @@ enum DrawMode {
     Index,
 }
 
-// #[derive(Reflect, PartialEq)]
-// enum DrawMode2 {
-//     None,
-//     CostField,
-//     FlowField,
-//     IntegrationField,
-//     Index,
-// }
-
 impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
@@ -197,6 +188,11 @@ fn draw_flowfield(
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
+            // print!(
+            //     "({},{}) {:?},  ",
+            //     cell.grid_idx.x, cell.grid_idx.y, cell.best_direction
+            // );
+
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
 
             // Use the shared mesh and material
@@ -234,6 +230,7 @@ fn draw_flowfield(
                 parent.spawn(arrow_head);
             });
         }
+        // println!();
     }
 }
 
