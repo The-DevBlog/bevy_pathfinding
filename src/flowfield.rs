@@ -7,7 +7,8 @@ use std::{cmp::min, collections::VecDeque};
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
-    pub destination_cell: Option<Cell>,
+    // pub destination_cell: Option<Cell>,
+    pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
     pub grid_size: IVec2,
 }
@@ -17,7 +18,7 @@ impl FlowField {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.,
-            destination_cell: None,
+            destination_cell: Cell::default(),
             grid: Vec::default(),
             grid_size,
         }
@@ -65,7 +66,8 @@ impl FlowField {
         let dest_cell = &mut self.grid[dest_idx.y as usize][dest_idx.x as usize];
         dest_cell.cost = 0;
         dest_cell.best_cost = 0;
-        self.destination_cell = Some(dest_cell.clone());
+        // self.destination_cell = Some(dest_cell.clone());
+        self.destination_cell = dest_cell.clone();
 
         let mut cells_to_check: VecDeque<IVec2> = VecDeque::new();
         cells_to_check.push_back(dest_idx);

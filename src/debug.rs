@@ -20,27 +20,10 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
             .init_resource::<Digits>()
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas))
-            .add_systems(
-                Update,
-                (draw_grid, detect_debug_change, highlight_destination_cell),
-            )
+            .add_systems(Update, (draw_grid, detect_debug_change))
             .observe(draw_costfield)
             .observe(draw_flowfield)
             .observe(draw_index);
-    }
-}
-
-// TODO: Remove before shipping
-fn highlight_destination_cell(mut gizmos: Gizmos, q_grid: Query<&GridController>) {
-    for grid in q_grid.iter() {
-        if let Some(destination_cell) = grid.cur_flowfield.destination_cell {
-            gizmos.rect(
-                destination_cell.world_position + Vec3::Y,
-                Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                Vec2::new(grid.cell_diameter(), grid.cell_diameter()),
-                Srgba::GREEN,
-            );
-        }
     }
 }
 
@@ -171,11 +154,11 @@ fn draw_flowfield(
 
     let grid = q_grid_controller.get_single().unwrap();
 
-    let mut arrow_scale = 0.7;
+    let mut marker_scale = 0.7;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
     {
-        arrow_scale = 1.0;
+        marker_scale = 1.0;
     }
 
     let offset = match calculate_offset(&grid, dbg, DrawMode::FlowField) {
@@ -183,16 +166,9 @@ fn draw_flowfield(
         None => return,
     };
 
-    let arrow_length = grid.cell_diameter() * 0.6 * arrow_scale;
-    let arrow_width = grid.cell_diameter() * 0.1 * arrow_scale;
+    let arrow_length = grid.cell_diameter() * 0.6 * marker_scale;
+    let arrow_width = grid.cell_diameter() * 0.1 * marker_scale;
     let arrow_clr = Color::WHITE;
-
-    // Create shared meshes and materials
-    let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-    let arrow_material = materials.add(StandardMaterial {
-        base_color: arrow_clr,
-        ..default()
-    });
 
     // Create the arrowhead mesh
     let half_arrow_size = arrow_length / 2.0;
@@ -201,7 +177,15 @@ fn draw_flowfield(
     let a = Vec2::new(half_arrow_size + grid.cell_diameter() * 0.05, 0.0); // Tip of the arrowhead
     let b = Vec2::new(d1, d2);
     let c = Vec2::new(d1, -arrow_width - grid.cell_diameter() * 0.0125);
+
+    // Create shared meshes and materials
+    let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
+
+    let material = materials.add(StandardMaterial {
+        base_color: arrow_clr,
+        ..default()
+    });
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -210,13 +194,23 @@ fn draw_flowfield(
             //     cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
             // );
 
-            let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
+            let is_destination_cell = grid.cur_flowfield.destination_cell.grid_idx == cell.grid_idx;
+
+            let rotation = match is_destination_cell {
+                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
+            };
+
+            let mesh = match is_destination_cell {
+                true => meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale)),
+                false => arrow_mesh.clone(),
+            };
 
             // Use the shared mesh and material
-            let arrow_shaft = (
+            let marker = (
                 PbrBundle {
-                    mesh: arrow_shaft_mesh.clone(),
-                    material: arrow_material.clone(),
+                    mesh,
+                    material: material.clone(),
                     transform: Transform {
                         translation: cell.world_position + offset,
                         rotation,
@@ -232,7 +226,7 @@ fn draw_flowfield(
             let arrow_head = (
                 PbrBundle {
                     mesh: arrow_head_mesh.clone(),
-                    material: arrow_material.clone(),
+                    material: material.clone(),
                     transform: Transform {
                         translation: Vec3::ZERO,
                         rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
@@ -243,9 +237,13 @@ fn draw_flowfield(
                 Name::new("Arrowhead"),
             );
 
-            cmds.spawn(arrow_shaft).with_children(|parent| {
-                parent.spawn(arrow_head);
-            });
+            let mut draw = cmds.spawn(marker);
+
+            if !is_destination_cell {
+                draw.with_children(|parent| {
+                    parent.spawn(arrow_head);
+                });
+            }
         }
         // println!();
     }

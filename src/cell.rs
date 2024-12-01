@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::grid_direction::GridDirection;
 
-#[derive(Clone, Default, Copy, Debug)]
+#[derive(Clone, Default, Copy, Debug, PartialEq)]
 pub struct Cell {
     pub world_position: Vec3,
     pub grid_idx: IVec2,
