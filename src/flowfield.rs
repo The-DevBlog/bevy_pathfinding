@@ -89,45 +89,33 @@ impl FlowField {
     }
 
     pub fn create_flowfield(&mut self) {
-        // Collect all neighbors' data before making mutable changes
-        let neighbors_data: Vec<Vec<Vec<Cell>>> = self
-            .grid
-            .iter()
-            .map(|cell_row| {
-                cell_row
-                    .iter()
-                    .map(|cell| {
-                        self.get_neighbor_cells(cell.grid_idx, GridDirection::all_directions())
-                    })
-                    .collect()
-            })
-            .collect();
+        let grid_size_y = self.grid_size.y as usize;
+        let grid_size_x = self.grid_size.x as usize;
 
-        // Iterate over the grid and update cells' best_direction
-        for (row_idx, cell_row) in self.grid.iter_mut().enumerate() {
-            for (col_idx, cell) in cell_row.iter_mut().enumerate() {
-                let cur_neighbors = &neighbors_data[row_idx][col_idx];
+        for y in 0..grid_size_y {
+            for x in 0..grid_size_x {
+                let cell = &self.grid[y][x]; // Immutable borrow to get best_cost
                 let mut best_cost = cell.best_cost;
+                let mut best_direction = GridDirection::None;
 
-                for cur_neighbor in cur_neighbors.iter() {
-                    if cur_neighbor.best_cost < best_cost {
-                        best_cost = cur_neighbor.best_cost;
+                // Get all possible directions
+                for direction in GridDirection::all_directions() {
+                    let delta = direction.vector();
+                    let nx = x as isize + delta.x as isize;
+                    let ny = y as isize + delta.y as isize;
 
-                        // Calculate the difference in grid indices
-                        let delta_x = cur_neighbor.grid_idx.x - cell.grid_idx.x; // Columns (X-axis)
-                        let delta_y = cur_neighbor.grid_idx.y - cell.grid_idx.y; // Rows (Y-axis)
-
-                        // Create the direction vector
-                        let direction_vector = IVec2::new(delta_x, delta_y);
-
-                        // Get the corresponding GridDirection
-                        let best_direction = GridDirection::from_vector2(direction_vector);
-
-                        if let Some(best_direction) = best_direction {
-                            cell.best_direction = best_direction;
+                    if nx >= 0 && nx < grid_size_x as isize && ny >= 0 && ny < grid_size_y as isize
+                    {
+                        let neighbor = &self.grid[ny as usize][nx as usize];
+                        if neighbor.best_cost < best_cost {
+                            best_cost = neighbor.best_cost;
+                            best_direction = direction;
                         }
                     }
                 }
+
+                // Now, set the best_direction for the cell
+                self.grid[y][x].best_direction = best_direction;
             }
         }
     }

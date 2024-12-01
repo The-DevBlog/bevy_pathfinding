@@ -207,7 +207,7 @@ fn draw_flowfield(
         for cell in cell_row.iter() {
             print!(
                 "({},{}) {:?},  ",
-                cell.grid_idx.x, cell.grid_idx.y, cell.best_direction
+                cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
             );
 
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
