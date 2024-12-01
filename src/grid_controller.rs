@@ -54,10 +54,7 @@ fn initialize_flowfield(
     };
 
     for mut grid_controller in q_grid_controller.iter_mut() {
-        println!("Initializing flowfield");
         grid_controller.initialize_flowfield();
-
-        println!("Creating costfield");
         grid_controller.cur_flowfield.create_costfield(&rapier_ctx);
 
         let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
@@ -65,12 +62,11 @@ fn initialize_flowfield(
             .cur_flowfield
             .get_cell_from_world_position(world_mouse_pos);
 
-        println!("Creating Integration Field");
+        // println!("Destination cell: {}", destination_cell.grid_idx);
         grid_controller
             .cur_flowfield
             .create_integration_field(destination_cell);
 
-        println!("Creating Flowfield");
         grid_controller.cur_flowfield.create_flowfield();
     }
 

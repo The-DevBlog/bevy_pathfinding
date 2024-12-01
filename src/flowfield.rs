@@ -60,29 +60,46 @@ impl FlowField {
     }
 
     pub fn create_integration_field(&mut self, destination_cell: Cell) {
-        let mut tmp_destination_cell = destination_cell.clone();
-        tmp_destination_cell.cost = 0;
-        tmp_destination_cell.best_cost = 0;
-        self.destination_cell = Some(tmp_destination_cell);
+        // Initialize the destination cell in the grid
+        let dest_idx = destination_cell.grid_idx;
+        let dest_cell = &mut self.grid[dest_idx.y as usize][dest_idx.x as usize];
+        dest_cell.cost = 0;
+        dest_cell.best_cost = 0;
+        self.destination_cell = Some(dest_cell.clone());
 
-        let mut cells_to_check: VecDeque<Cell> = VecDeque::new();
-        let destination_cell = self.destination_cell.unwrap().clone();
-        cells_to_check.push_back(destination_cell);
+        let mut cells_to_check: VecDeque<IVec2> = VecDeque::new();
+        cells_to_check.push_back(dest_idx);
 
-        while let Some(cur_cell) = cells_to_check.pop_front() {
-            let cur_neighbors =
-                self.get_neighbor_cells(cur_cell.grid_idx, GridDirection::cardinal_directions());
+        while let Some(cur_idx) = cells_to_check.pop_front() {
+            let cur_x = cur_idx.x as usize;
+            let cur_y = cur_idx.y as usize;
 
-            for mut cur_neighbor in cur_neighbors {
-                if cur_neighbor.cost == u8::MAX {
-                    continue;
-                }
+            let cur_cell_best_cost = self.grid[cur_y][cur_x].best_cost;
 
-                if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
-                    let neighbor_index = cur_neighbor.grid_idx;
-                    cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
-                    self.grid[neighbor_index.y as usize][neighbor_index.x as usize] = cur_neighbor;
-                    cells_to_check.push_back(cur_neighbor);
+            // Iterate over cardinal directions
+            for direction in GridDirection::cardinal_directions() {
+                let delta = direction.vector();
+                let neighbor_idx = cur_idx + delta;
+
+                if neighbor_idx.x >= 0
+                    && neighbor_idx.x < self.grid_size.x
+                    && neighbor_idx.y >= 0
+                    && neighbor_idx.y < self.grid_size.y
+                {
+                    let neighbor_x = neighbor_idx.x as usize;
+                    let neighbor_y = neighbor_idx.y as usize;
+
+                    let neighbor_cell = &mut self.grid[neighbor_y][neighbor_x];
+
+                    if neighbor_cell.cost == u8::MAX {
+                        continue;
+                    }
+
+                    let tentative_best_cost = neighbor_cell.cost as u16 + cur_cell_best_cost;
+                    if tentative_best_cost < neighbor_cell.best_cost {
+                        neighbor_cell.best_cost = tentative_best_cost;
+                        cells_to_check.push_back(neighbor_idx);
+                    }
                 }
             }
         }

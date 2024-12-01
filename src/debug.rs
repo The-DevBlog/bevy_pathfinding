@@ -205,10 +205,10 @@ fn draw_flowfield(
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            print!(
-                "({},{}) {:?},  ",
-                cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
-            );
+            // print!(
+            //     "({},{}) {:?},  ",
+            //     cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
+            // );
 
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
 
@@ -247,7 +247,7 @@ fn draw_flowfield(
                 parent.spawn(arrow_head);
             });
         }
-        println!();
+        // println!();
     }
 }
 
