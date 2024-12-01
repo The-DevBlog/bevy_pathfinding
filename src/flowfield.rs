@@ -1,9 +1,7 @@
-use std::{cell, cmp::min, collections::VecDeque};
-
+use crate::{cell::*, grid_direction::GridDirection};
 use bevy::prelude::*;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
-
-use crate::{cell::*, grid_direction::GridDirection};
+use std::{cmp::min, collections::VecDeque};
 
 #[derive(Clone, Default)]
 pub struct FlowField {
@@ -83,7 +81,6 @@ impl FlowField {
                 if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
                     let neighbor_index = cur_neighbor.grid_idx;
                     cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
-                    // self.grid[neighbor_index.x as usize][neighbor_index.y as usize] = cur_neighbor;
                     self.grid[neighbor_index.y as usize][neighbor_index.x as usize] = cur_neighbor;
                     cells_to_check.push_back(cur_neighbor);
                 }
