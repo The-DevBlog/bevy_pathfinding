@@ -21,8 +21,9 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (draw_grid, detect_debug_change))
-            .observe(draw_costfield)
             .observe(draw_flowfield)
+            .observe(draw_integration_field)
+            .observe(draw_costfield)
             .observe(draw_index);
     }
 }
@@ -61,7 +62,10 @@ impl Default for RtsPfDebug {
 pub struct DrawDebugEv;
 
 #[derive(Component, Copy, Clone)]
-struct CostField;
+struct Cost;
+
+#[derive(Component, Copy, Clone)]
+struct BestCost;
 
 #[derive(Component, Copy, Clone)]
 struct Index;
@@ -130,12 +134,6 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
         Vec2::new(grid.cell_radius * 2., grid.cell_radius * 2.),
         COLOR_GRID,
     );
-}
-
-fn draw_integration_field(_trigger: Trigger<DrawDebugEv>, debug: Res<RtsPfDebug>) {
-    // if !debug.draw_integration_field {
-    //     return;
-    // }
 }
 
 fn draw_flowfield(
@@ -249,6 +247,34 @@ fn draw_flowfield(
     }
 }
 
+fn draw_integration_field(
+    _trigger: Trigger<DrawDebugEv>,
+    dbg: Res<RtsPfDebug>,
+    digits: Res<Digits>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<StandardMaterial>>,
+    q_grid: Query<&GridController>,
+    q_cost: Query<Entity, With<BestCost>>,
+    mut cmds: Commands,
+) {
+    // Remove current cost field before rendering new one
+    for cost_entity in q_cost.iter() {
+        cmds.entity(cost_entity).despawn_recursive();
+    }
+
+    let grid = q_grid.get_single().unwrap();
+
+    let offset = match calculate_offset(&grid, dbg, DrawMode::IntegrationField) {
+        Some(offset) => offset,
+        None => return,
+    };
+
+    let str = |cell: &Cell| format!("{}", cell.best_cost);
+    draw::<BestCost>(
+        meshes, materials, &grid, digits, BestCost, cmds, str, offset,
+    );
+}
+
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<RtsPfDebug>,
@@ -256,7 +282,7 @@ fn draw_costfield(
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
     q_grid: Query<&GridController>,
-    q_cost: Query<Entity, With<CostField>>,
+    q_cost: Query<Entity, With<Cost>>,
     mut cmds: Commands,
 ) {
     // Remove current cost field before rendering new one
@@ -272,9 +298,7 @@ fn draw_costfield(
     };
 
     let str = |cell: &Cell| format!("{}", cell.cost);
-    draw::<CostField>(
-        meshes, materials, &grid, digits, CostField, cmds, str, offset,
-    );
+    draw::<Cost>(meshes, materials, &grid, digits, Cost, cmds, str, offset);
 }
 
 fn draw_index(
