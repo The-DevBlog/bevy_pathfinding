@@ -20,10 +20,27 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
             .init_resource::<Digits>()
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas))
-            .add_systems(Update, (draw_grid, detect_debug_change))
+            .add_systems(
+                Update,
+                (draw_grid, detect_debug_change, highlight_destination_cell),
+            )
             .observe(draw_costfield)
             .observe(draw_flowfield)
             .observe(draw_index);
+    }
+}
+
+// TODO: Remove before shipping
+fn highlight_destination_cell(mut gizmos: Gizmos, q_grid: Query<&GridController>) {
+    for grid in q_grid.iter() {
+        if let Some(destination_cell) = grid.cur_flowfield.destination_cell {
+            gizmos.rect(
+                destination_cell.world_position + Vec3::Y,
+                Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                Vec2::new(grid.cell_diameter(), grid.cell_diameter()),
+                Srgba::GREEN,
+            );
+        }
     }
 }
 
@@ -51,8 +68,8 @@ impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
             draw_grid: true,
-            draw_mode_1: DrawMode::FlowField,
-            draw_mode_2: DrawMode::None,
+            draw_mode_1: DrawMode::Index,
+            draw_mode_2: DrawMode::FlowField,
         }
     }
 }
@@ -188,10 +205,10 @@ fn draw_flowfield(
 
     for cell_row in grid.cur_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            // print!(
-            //     "({},{}) {:?},  ",
-            //     cell.grid_idx.x, cell.grid_idx.y, cell.best_direction
-            // );
+            print!(
+                "({},{}) {:?},  ",
+                cell.grid_idx.x, cell.grid_idx.y, cell.best_direction
+            );
 
             let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
 
@@ -230,7 +247,7 @@ fn draw_flowfield(
                 parent.spawn(arrow_head);
             });
         }
-        // println!();
+        println!();
     }
 }
 

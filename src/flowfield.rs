@@ -61,37 +61,6 @@ impl FlowField {
         }
     }
 
-    // pub fn create_integration_field(&mut self, destination_cell: Cell) {
-    //     let mut tmp_destination_cell = destination_cell.clone();
-    //     tmp_destination_cell.cost = 0;
-    //     tmp_destination_cell.best_cost = 0;
-    //     self.destination_cell = Some(tmp_destination_cell);
-
-    //     let mut cells_to_check = VecDeque::new();
-    //     let destination_cell = self.destination_cell.unwrap().clone();
-    //     cells_to_check.push_front(destination_cell);
-
-    //     while cells_to_check.len() > 0 {
-    //         let cur_cell = cells_to_check.pop_front();
-
-    //         if let Some(cur_cell) = cur_cell {
-    //             let mut cur_neighbors = self
-    //                 .get_neighbor_cells(cur_cell.grid_idx, GridDirection::cardinal_directions());
-
-    //             for cur_neighbor in cur_neighbors.iter_mut() {
-    //                 if cur_neighbor.cost == u8::MAX {
-    //                     continue;
-    //                 }
-
-    //                 if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
-    //                     cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
-    //                     cells_to_check.push_front(cur_neighbor.clone());
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
     pub fn create_integration_field(&mut self, destination_cell: Cell) {
         let mut tmp_destination_cell = destination_cell.clone();
         tmp_destination_cell.cost = 0;
@@ -146,8 +115,10 @@ impl FlowField {
                     if cur_neighbor.best_cost < best_cost {
                         best_cost = cur_neighbor.best_cost;
 
-                        let best_direction =
-                            GridDirection::from_vector2(cur_neighbor.grid_idx - cell.grid_idx);
+                        let best_direction = GridDirection::from_vector2(IVec2::new(
+                            cur_neighbor.grid_idx.y - cell.grid_idx.y, // Rows (Y-axis)
+                            cur_neighbor.grid_idx.x - cell.grid_idx.x, // Columns (X-axis)
+                        ));
 
                         if let Some(best_direction) = best_direction {
                             cell.best_direction = best_direction;
@@ -211,54 +182,3 @@ impl FlowField {
         self.grid[x][y]
     }
 }
-
-// // Phase 3
-// fn detect_colliders(
-//     _trigger: Trigger<DetectCollidersEv>,
-//     mut cmds: Commands,
-//     mut flowfield_q: Query<&mut FlowField>,
-//     rapier_context: Res<RapierContext>,
-//     grid: Res<Grid>,
-//     selected_q: Query<Entity, With<Selected>>,
-// ) {
-//     // println!("PHASE 3: Detect Colliders");
-//     let selected_entities: HashSet<Entity> = selected_q.iter().collect();
-
-//     for mut flowfield in flowfield_q.iter_mut() {
-//         for x in 0..grid.rows {
-//             for z in 0..grid.columns {
-//                 let cell = &mut flowfield.cells[x][z];
-//                 cell.occupied = false; // Reset obstacle status
-
-//                 let cell_size = grid.cell_size / 2.0;
-//                 let cell_shape = Collider::cuboid(cell_size, cell_size, cell_size);
-//                 let mut cell_occupied = false;
-
-//                 // Capture selected_entities by reference for use in the closure
-//                 let selected_entities = &selected_entities;
-
-//                 rapier_context.intersections_with_shape(
-//                     cell.world_position,
-//                     Quat::IDENTITY, // No rotation
-//                     &cell_shape,
-//                     QueryFilter::default().exclude_sensors(),
-//                     |collider_entity| {
-//                         if !selected_entities.contains(&collider_entity) {
-//                             // Collider is overlapping the cell and is not a selected unit
-//                             cell_occupied = true;
-//                             false
-//                         } else {
-//                             // Collider is a selected unit, ignore it
-//                             true
-//                         }
-//                     },
-//                 );
-
-//                 cell.occupied = cell_occupied;
-//             }
-//         }
-//     }
-
-//     // println!("PHASE 3: Detect Colliders Done");
-//     cmds.trigger(CalculateFlowFieldEv);
-// }
