@@ -29,41 +29,17 @@ pub enum GridDirection {
 }
 
 impl GridDirection {
-    /// Get the vector associated with the direction
-    // pub fn vector(self) -> IVec2 {
-    //     match self {
-    //         GridDirection::None => IVec2::new(0, 0),
-    //         GridDirection::North => IVec2::new(0, -1), // Flipped Y
-    //         GridDirection::South => IVec2::new(0, 1),  // Flipped Y
-    //         GridDirection::East => IVec2::new(1, 0),
-    //         GridDirection::West => IVec2::new(-1, 0),
-    //         GridDirection::NorthEast => IVec2::new(1, -1), // Flipped Y
-    //         GridDirection::NorthWest => IVec2::new(-1, -1), // Flipped Y
-    //         GridDirection::SouthEast => IVec2::new(1, 1),  // Flipped Y
-    //         GridDirection::SouthWest => IVec2::new(-1, 1), // Flipped Y
-    //                                                         // GridDirection::None => IVec2::new(0, 0),
-    //                                                         // GridDirection::North => IVec2::new(0, 1),
-    //                                                         // GridDirection::South => IVec2::new(0, -1),
-    //                                                         // GridDirection::East => IVec2::new(1, 0),
-    //                                                         // GridDirection::West => IVec2::new(-1, 0),
-    //                                                         // GridDirection::NorthEast => IVec2::new(1, 1),
-    //                                                         // GridDirection::NorthWest => IVec2::new(-1, 1),
-    //                                                         // GridDirection::SouthEast => IVec2::new(1, -1),
-    //                                                         // GridDirection::SouthWest => IVec2::new(-1, -1),
-    //     }
-    // }
-
     pub fn vector(self) -> IVec2 {
         match self {
             GridDirection::None => IVec2::new(0, 0),
-            GridDirection::North => IVec2::new(-1, 0), // Up one row
-            GridDirection::South => IVec2::new(1, 0),  // Down one row
-            GridDirection::East => IVec2::new(0, 1),   // Right one column
-            GridDirection::West => IVec2::new(0, -1),  // Left one column
-            GridDirection::NorthEast => IVec2::new(-1, 1), // Up-right
-            GridDirection::NorthWest => IVec2::new(-1, -1), // Up-left
-            GridDirection::SouthEast => IVec2::new(1, 1), // Down-right
-            GridDirection::SouthWest => IVec2::new(1, -1), // Down-left
+            GridDirection::West => IVec2::new(-1, 0),
+            GridDirection::East => IVec2::new(1, 0),
+            GridDirection::South => IVec2::new(0, 1),
+            GridDirection::North => IVec2::new(0, -1),
+            GridDirection::SouthWest => IVec2::new(-1, 1),
+            GridDirection::NorthWest => IVec2::new(-1, -1),
+            GridDirection::SouthEast => IVec2::new(1, 1),
+            GridDirection::NorthEast => IVec2::new(1, -1),
         }
     }
 
@@ -71,15 +47,6 @@ impl GridDirection {
     pub fn from_vector2(vector: IVec2) -> Option<GridDirection> {
         DIRECTIONS.iter().find(|&&d| d.vector() == vector).copied()
     }
-
-    // pub fn from_vector2(vector: IVec2) -> Option<GridDirection> {
-    //     // Flip the Z-axis to account for Bevy's coordinate system
-    //     let flipped_vector = IVec2::new(vector.x, -vector.y);
-    //     DIRECTIONS
-    //         .iter()
-    //         .find(|&&d| d.vector() == flipped_vector)
-    //         .copied()
-    // }
 
     /// Cardinal directions (N, S, E, W)
     pub fn cardinal_directions() -> Vec<GridDirection> {
@@ -125,16 +92,12 @@ impl GridDirection {
             GridDirection::None => 0.0,
             GridDirection::North => FRAC_PI_2,
             GridDirection::NorthEast => FRAC_PI_4,
-            // GridDirection::NorthEast => -FRAC_PI_4,
             GridDirection::East => 0.0,
             GridDirection::SouthEast => -FRAC_PI_4,
-            // GridDirection::SouthEast => FRAC_PI_4,
             GridDirection::South => -FRAC_PI_2,
-            // GridDirection::SouthWest => 3.0 * FRAC_PI_4,
             GridDirection::SouthWest => -3.0 * FRAC_PI_4,
             GridDirection::West => PI,
             GridDirection::NorthWest => 3.0 * FRAC_PI_4,
-            // GridDirection::NorthWest => -3.0 * FRAC_PI_4,
         }
     }
 }

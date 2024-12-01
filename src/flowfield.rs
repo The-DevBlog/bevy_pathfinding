@@ -30,10 +30,10 @@ impl FlowField {
         let offset_x = -(self.grid_size.x as f32 * self.cell_diameter) / 2.;
         let offset_y = -(self.grid_size.y as f32 * self.cell_diameter) / 2.;
 
-        self.grid = (0..self.grid_size.x)
-            .map(|x| {
-                (0..self.grid_size.y)
-                    .map(|y| {
+        self.grid = (0..self.grid_size.y)
+            .map(|y| {
+                (0..self.grid_size.x)
+                    .map(|x| {
                         let x_pos = self.cell_diameter * x as f32 + self.cell_radius + offset_x;
                         let y_pos = self.cell_diameter * y as f32 + self.cell_radius + offset_y;
                         let world_pos = Vec3::new(x_pos, 0.0, y_pos);
@@ -83,7 +83,8 @@ impl FlowField {
                 if cur_neighbor.cost as u16 + cur_cell.best_cost < cur_neighbor.best_cost {
                     let neighbor_index = cur_neighbor.grid_idx;
                     cur_neighbor.best_cost = cur_neighbor.cost as u16 + cur_cell.best_cost;
-                    self.grid[neighbor_index.x as usize][neighbor_index.y as usize] = cur_neighbor;
+                    // self.grid[neighbor_index.x as usize][neighbor_index.y as usize] = cur_neighbor;
+                    self.grid[neighbor_index.y as usize][neighbor_index.x as usize] = cur_neighbor;
                     cells_to_check.push_back(cur_neighbor);
                 }
             }
@@ -115,10 +116,15 @@ impl FlowField {
                     if cur_neighbor.best_cost < best_cost {
                         best_cost = cur_neighbor.best_cost;
 
-                        let best_direction = GridDirection::from_vector2(IVec2::new(
-                            cur_neighbor.grid_idx.y - cell.grid_idx.y, // Rows (Y-axis)
-                            cur_neighbor.grid_idx.x - cell.grid_idx.x, // Columns (X-axis)
-                        ));
+                        // Calculate the difference in grid indices
+                        let delta_x = cur_neighbor.grid_idx.x - cell.grid_idx.x; // Columns (X-axis)
+                        let delta_y = cur_neighbor.grid_idx.y - cell.grid_idx.y; // Rows (Y-axis)
+
+                        // Create the direction vector
+                        let direction_vector = IVec2::new(delta_x, delta_y);
+
+                        // Get the corresponding GridDirection
+                        let best_direction = GridDirection::from_vector2(direction_vector);
 
                         if let Some(best_direction) = best_direction {
                             cell.best_direction = best_direction;
@@ -155,7 +161,7 @@ impl FlowField {
         {
             None
         } else {
-            Some(self.grid[final_pos.x as usize][final_pos.y as usize])
+            Some(self.grid[final_pos.y as usize][final_pos.x as usize]) // Note the swap of y and x
         }
     }
 
@@ -179,6 +185,6 @@ impl FlowField {
         let x = min(x, self.grid_size.x as usize - 1);
         let y = min(y, self.grid_size.y as usize - 1);
 
-        self.grid[x][y]
+        self.grid[y][x] // Swap x and y
     }
 }

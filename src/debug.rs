@@ -68,8 +68,8 @@ impl Default for RtsPfDebug {
     fn default() -> Self {
         RtsPfDebug {
             draw_grid: true,
-            draw_mode_1: DrawMode::Index,
-            draw_mode_2: DrawMode::FlowField,
+            draw_mode_1: DrawMode::FlowField,
+            draw_mode_2: DrawMode::Index,
         }
     }
 }
