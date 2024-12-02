@@ -19,13 +19,123 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
         app.init_resource::<RtsPfDebug>()
             .init_resource::<Digits>()
             .register_type::<RtsPfDebug>()
-            .add_systems(Startup, (setup, load_texture_atlas))
+            .add_systems(Startup, (setup, load_texture_atlas, test))
             .add_systems(Update, (draw_grid, detect_debug_change))
+            .add_systems(Update, get_text)
             .observe(draw_flowfield)
             .observe(draw_integration_field)
             .observe(draw_costfield)
             .observe(draw_index);
     }
+}
+
+fn get_text(
+    my_q: Query<(&Interaction, &DropdownType), (Changed<Interaction>, With<DropdownType>)>,
+) {
+    for (interaction, dropdown_type) in my_q.iter() {
+        match interaction {
+            Interaction::Pressed => println!("DropDown Type: {}", dropdown_type.0),
+            _ => (),
+        }
+    }
+}
+
+#[derive(Component)]
+struct DropdownType(pub String);
+
+#[derive(Component)]
+struct Dropdown1;
+
+#[derive(Component)]
+struct Dropdown2;
+
+fn test(mut cmds: Commands) {
+    let container_bundle = || -> NodeBundle {
+        NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            border_radius: BorderRadius::all(Val::Px(5.0)),
+            background_color: Srgba::BLACK.into(),
+            ..default()
+        }
+    };
+
+    let draw_container = || -> NodeBundle {
+        NodeBundle {
+            style: Style {
+                padding: UiRect::all(Val::Px(5.0)),
+                ..default()
+            },
+            ..default()
+        }
+    };
+
+    let draw_mode_txt = |txt: &str| -> TextBundle {
+        TextBundle {
+            text: Text::from_section(txt, TextStyle { ..default() }),
+            ..default()
+        }
+    };
+
+    let dropdown = || -> NodeBundle {
+        NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ..default()
+        }
+    };
+
+    let option_txt = |txt: &str| -> TextBundle {
+        TextBundle {
+            text: Text::from_section(txt, TextStyle { ..default() }),
+            ..default()
+        }
+    };
+
+    let button = |txt: &str| -> (ButtonBundle, DropdownType) {
+        (ButtonBundle::default(), DropdownType(txt.to_string()))
+    };
+
+    let create_dropdown = |parent: &mut ChildBuilder, options: &[&str]| {
+        parent.spawn(dropdown()).with_children(|dropdown| {
+            for &option in options {
+                dropdown
+                    .spawn(button(option))
+                    .with_children(|button_parent| {
+                        button_parent.spawn(option_txt(option));
+                    });
+            }
+        });
+    };
+
+    let create_draw_mode_1 = |parent: &mut ChildBuilder, label: &str| {
+        parent.spawn(draw_container()).with_children(|draw_mode| {
+            draw_mode.spawn(draw_mode_txt(label));
+
+            let dropdown_options = ["None", "IntegrationField", "FlowField", "Index"];
+            create_dropdown(draw_mode, &dropdown_options);
+        });
+        parent.spawn(Dropdown1);
+    };
+
+    let create_draw_mode_2 = |parent: &mut ChildBuilder, label: &str| {
+        parent.spawn(draw_container()).with_children(|draw_mode| {
+            draw_mode.spawn(draw_mode_txt(label));
+
+            let dropdown_options = ["None", "IntegrationField", "FlowField", "Index"];
+            create_dropdown(draw_mode, &dropdown_options);
+        });
+        parent.spawn(Dropdown2);
+    };
+
+    cmds.spawn(container_bundle()).with_children(|container| {
+        create_draw_mode_1(container, "Draw Mode 1");
+        create_draw_mode_2(container, "Draw Mode 2");
+    });
 }
 
 #[derive(Resource, Default)]
@@ -39,6 +149,16 @@ pub struct RtsPfDebug {
     draw_mode_2: DrawMode,
 }
 
+impl Default for RtsPfDebug {
+    fn default() -> Self {
+        RtsPfDebug {
+            draw_grid: true,
+            draw_mode_1: DrawMode::FlowField,
+            draw_mode_2: DrawMode::Index,
+        }
+    }
+}
+
 #[derive(Reflect, PartialEq)]
 enum DrawMode {
     None,
@@ -48,12 +168,14 @@ enum DrawMode {
     Index,
 }
 
-impl Default for RtsPfDebug {
-    fn default() -> Self {
-        RtsPfDebug {
-            draw_grid: true,
-            draw_mode_1: DrawMode::FlowField,
-            draw_mode_2: DrawMode::Index,
+impl DrawMode {
+    fn equals(&self, txt: String) -> bool {
+        match self {
+            DrawMode::None => "None".to_string() == txt,
+            DrawMode::CostField => "CostField".to_string() == txt,
+            DrawMode::FlowField => "FlowField".to_string() == txt,
+            DrawMode::IntegrationField => "IntegrationField".to_string() == txt,
+            DrawMode::Index => "Index".to_string() == txt,
         }
     }
 }

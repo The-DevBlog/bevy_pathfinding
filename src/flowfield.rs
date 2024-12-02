@@ -7,7 +7,6 @@ use std::{cmp::min, collections::VecDeque};
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
-    // pub destination_cell: Option<Cell>,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
     pub grid_size: IVec2,
