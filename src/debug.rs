@@ -11,6 +11,10 @@ use image::ImageFormat;
 use std::f32::consts::FRAC_PI_2;
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../assets/digits/digit_atlas.png");
+const BTN_HOVER_CLR: Color = Color::srgba(0.27, 0.27, 0.27, 1.0);
+const BACKGROUND_CLR: Color = Color::srgba(0.18, 0.18, 0.18, 1.0);
+const BACKGROUND_CLR_2: Color = Color::srgba(0.11, 0.11, 0.11, 1.0);
+const BACKGROUND_CLR_2_BORDER: Srgba = DARK_GRAY;
 
 pub struct BevyRtsPathFindingDebugPlugin;
 
@@ -21,8 +25,8 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas, test))
             .add_systems(Update, (draw_grid, detect_debug_change))
-            .add_systems(Update, set_draw_mode_onclick)
-            .add_systems(Update, (t_1, t_2))
+            .add_systems(Update, hanlde_draw_mode_interaction)
+            .add_systems(Update, handle_dropdown_click)
             .observe(draw_flowfield)
             .observe(draw_integration_field)
             .observe(draw_costfield)
@@ -33,25 +37,44 @@ impl Plugin for BevyRtsPathFindingDebugPlugin {
     }
 }
 
-fn set_draw_mode_onclick(
-    q_option_1: Query<(&Interaction, &ActiveOption1), (Changed<Interaction>, With<ActiveOption1>)>,
-    q_option_2: Query<(&Interaction, &ActiveOption2), (Changed<Interaction>, With<ActiveOption2>)>,
+fn hanlde_draw_mode_interaction(
+    mut cmds: Commands,
+    mut q_option_1: Query<
+        (&Interaction, &ActiveOption1, &mut BackgroundColor),
+        (Changed<Interaction>, With<ActiveOption1>),
+    >,
+    mut q_option_2: Query<
+        (&Interaction, &ActiveOption2, &mut BackgroundColor),
+        (
+            Changed<Interaction>,
+            With<ActiveOption2>,
+            Without<ActiveOption1>,
+        ),
+    >,
     mut dbg: ResMut<RtsPfDebug>,
 ) {
-    if let Ok((interaction, option)) = q_option_1.get_single() {
+    if let Ok((interaction, option, mut background)) = q_option_1.get_single_mut() {
+        background.0 = BACKGROUND_CLR_2.into();
         match interaction {
             Interaction::Pressed => {
                 dbg.draw_mode_1 = DrawMode::cast(option.0.clone());
+                cmds.trigger(UpdateDropdownOptionEv);
             }
+            Interaction::Hovered => background.0 = BTN_HOVER_CLR.into(),
+            Interaction::None => background.0 = BACKGROUND_CLR_2.into(),
             _ => (),
         }
     };
 
-    if let Ok((interaction, option)) = q_option_2.get_single() {
+    if let Ok((interaction, option, mut background)) = q_option_2.get_single_mut() {
+        background.0 = BACKGROUND_CLR_2.into();
         match interaction {
             Interaction::Pressed => {
                 dbg.draw_mode_2 = DrawMode::cast(option.0.clone());
+                cmds.trigger(UpdateDropdownOptionEv);
             }
+            Interaction::Hovered => background.0 = BTN_HOVER_CLR.into(),
+            Interaction::None => background.0 = BACKGROUND_CLR_2.into(),
             _ => (),
         }
     };
@@ -60,12 +83,10 @@ fn set_draw_mode_onclick(
 fn update_active_dropdown_option(
     _trigger: Trigger<UpdateDropdownOptionEv>,
     dbg: Res<RtsPfDebug>,
-    mut q_txt_1: Query<&mut Text, (With<ActiveOption1>, Without<ActiveOption2>)>,
-    mut q_txt_2: Query<&mut Text, With<ActiveOption2>>,
+    mut q_txt_1: Query<&mut Text, (With<OptionBox1>, Without<OptionBox2>)>,
+    mut q_txt_2: Query<&mut Text, (With<OptionBox2>, Without<OptionBox1>)>,
 ) {
-    println!("Getting Active Option");
     if let Ok(mut txt) = q_txt_1.get_single_mut() {
-        println!("Setting Active Option");
         txt.sections[0].value = dbg.mode1_string();
     }
 
@@ -74,17 +95,19 @@ fn update_active_dropdown_option(
     }
 }
 
-fn t_1(mut cmds: Commands, q_btn: Query<&Interaction, With<ExpandBtn1>>) {
-    if let Ok(interaction) = q_btn.get_single() {
+fn handle_dropdown_click(
+    mut cmds: Commands,
+    q_btn_1: Query<&Interaction, With<ExpandBtn1>>,
+    q_btn_2: Query<&Interaction, With<ExpandBtn2>>,
+) {
+    if let Ok(interaction) = q_btn_1.get_single() {
         match interaction {
             Interaction::Pressed => cmds.trigger(ToggleMode1Ev),
             _ => (),
         }
     }
-}
 
-fn t_2(mut cmds: Commands, q_btn: Query<&Interaction, With<ExpandBtn2>>) {
-    if let Ok(interaction) = q_btn.get_single() {
+    if let Ok(interaction) = q_btn_2.get_single() {
         match interaction {
             Interaction::Pressed => cmds.trigger(ToggleMode2Ev),
             _ => (),
@@ -94,7 +117,6 @@ fn t_2(mut cmds: Commands, q_btn: Query<&Interaction, With<ExpandBtn2>>) {
 
 fn toggle_dropdown_visibility_1(
     _trigger: Trigger<ToggleMode1Ev>,
-    mut cmds: Commands,
     mut q_dropdown: Query<&mut Style, With<Dropdown1>>,
 ) {
     if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
@@ -104,13 +126,10 @@ fn toggle_dropdown_visibility_1(
             dropdown.display = Display::Flex
         }
     }
-
-    cmds.trigger(UpdateDropdownOptionEv);
 }
 
 fn toggle_dropdown_visibility_2(
     _trigger: Trigger<ToggleMode2Ev>,
-    mut cmds: Commands,
     mut q_dropdown: Query<&mut Style, With<Dropdown2>>,
 ) {
     if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
@@ -120,8 +139,6 @@ fn toggle_dropdown_visibility_2(
             dropdown.display = Display::Flex
         }
     }
-
-    cmds.trigger(UpdateDropdownOptionEv);
 }
 
 #[derive(Event)]
@@ -140,6 +157,12 @@ struct ActiveOption1(pub String);
 struct ActiveOption2(pub String);
 
 #[derive(Component)]
+struct OptionBox1;
+
+#[derive(Component)]
+struct OptionBox2;
+
+#[derive(Component)]
 struct Dropdown1;
 
 #[derive(Component)]
@@ -151,15 +174,16 @@ struct ExpandBtn1;
 #[derive(Component)]
 struct ExpandBtn2;
 
-fn test(mut cmds: Commands, mut dbg: ResMut<RtsPfDebug>) {
+fn test(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let root_container = (
         NodeBundle {
             style: Style {
+                padding: UiRect::all(Val::Px(5.0)),
                 flex_direction: FlexDirection::Column,
                 ..default()
             },
             border_radius: BorderRadius::all(Val::Px(5.0)),
-            background_color: Srgba::BLACK.into(),
+            background_color: BACKGROUND_CLR.into(),
             ..default()
         },
         Name::new("Debug Container"),
@@ -184,7 +208,11 @@ fn test(mut cmds: Commands, mut dbg: ResMut<RtsPfDebug>) {
 
     let options_container = || -> NodeBundle {
         NodeBundle {
+            background_color: BACKGROUND_CLR_2.into(),
+            border_color: BACKGROUND_CLR_2_BORDER.into(),
+            border_radius: BorderRadius::all(Val::Px(5.0)),
             style: Style {
+                padding: UiRect::all(Val::Px(5.0)),
                 flex_direction: FlexDirection::Column,
                 display: Display::None,
                 ..default()
@@ -231,10 +259,12 @@ fn test(mut cmds: Commands, mut dbg: ResMut<RtsPfDebug>) {
     let active_option_1 = (
         active_option(dbg.mode1_string()),
         ActiveOption1(dbg.mode1_string()),
+        OptionBox1,
     );
     let active_option_2 = (
         active_option(dbg.mode2_string()),
         ActiveOption2(dbg.mode2_string()),
+        OptionBox2,
     );
 
     // Root Container
@@ -252,39 +282,39 @@ fn test(mut cmds: Commands, mut dbg: ResMut<RtsPfDebug>) {
                     dropdown.spawn(change_option_btn_1).with_children(|btn| {
                         btn.spawn(change_option_txt());
                     });
-
-                    // Dropdown Options Container
-                    dropdown
-                        .spawn((options_container(), Dropdown1))
-                        // Dropdown Options
-                        .with_children(|options| {
-                            options
-                                .spawn(btn_1("None".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("None".to_string()));
-                                });
-                            options
-                                .spawn(btn_1("IntegrationField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("IntegrationField".to_string()));
-                                });
-                            options
-                                .spawn(btn_1("FlowField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("FlowField".to_string()));
-                                });
-                            options
-                                .spawn(btn_1("CostField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("CostField".to_string()));
-                                });
-                            options
-                                .spawn(btn_1("Index".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("Index".to_string()));
-                                });
-                        });
                 });
+            });
+
+        // Dropdown Options Container
+        container
+            .spawn((options_container(), Dropdown1))
+            // Dropdown Options
+            .with_children(|options| {
+                options
+                    .spawn(btn_1("None".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("None".to_string()));
+                    });
+                options
+                    .spawn(btn_1("IntegrationField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("IntegrationField".to_string()));
+                    });
+                options
+                    .spawn(btn_1("FlowField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("FlowField".to_string()));
+                    });
+                options
+                    .spawn(btn_1("CostField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("CostField".to_string()));
+                    });
+                options
+                    .spawn(btn_1("Index".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("Index".to_string()));
+                    });
             });
 
         // Draw Mode 2 Container
@@ -300,39 +330,39 @@ fn test(mut cmds: Commands, mut dbg: ResMut<RtsPfDebug>) {
                     dropdown.spawn(change_option_btn_2).with_children(|btn| {
                         btn.spawn(change_option_txt());
                     });
-
-                    // Dropdown Options Container
-                    dropdown
-                        .spawn((options_container(), Dropdown2))
-                        // Dropdown Options
-                        .with_children(|options| {
-                            options
-                                .spawn(btn_2("None".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("None".to_string()));
-                                });
-                            options
-                                .spawn(btn_2("IntegrationField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("IntegrationField".to_string()));
-                                });
-                            options
-                                .spawn(btn_2("FlowField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("FlowField".to_string()));
-                                });
-                            options
-                                .spawn(btn_1("CostField".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("CostField".to_string()));
-                                });
-                            options
-                                .spawn(btn_2("Index".to_string()))
-                                .with_children(|btn| {
-                                    btn.spawn(option_txt("Index".to_string()));
-                                });
-                        });
                 });
+            });
+
+        // Dropdown Options Container
+        container
+            .spawn((options_container(), Dropdown2))
+            // Dropdown Options
+            .with_children(|options| {
+                options
+                    .spawn(btn_2("None".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("None".to_string()));
+                    });
+                options
+                    .spawn(btn_2("IntegrationField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("IntegrationField".to_string()));
+                    });
+                options
+                    .spawn(btn_2("FlowField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("FlowField".to_string()));
+                    });
+                options
+                    .spawn(btn_1("CostField".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("CostField".to_string()));
+                    });
+                options
+                    .spawn(btn_2("Index".to_string()))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("Index".to_string()));
+                    });
             });
     });
 }
