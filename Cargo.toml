@@ -6,5 +6,16 @@ edition = "2021"
 [dependencies]
 bevy = "0.14.2"
 bevy_rapier3d = "0.27.0"
+image = "0.25.5"
 pathfinding = "4.11.0"
-rand = "0.8.5"
+
+[profile.dev]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+[profile.release]
+opt-level = 3
+debug = false
+lto = "thin"
+codegen-units = 1

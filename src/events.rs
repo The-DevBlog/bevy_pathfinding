@@ -19,3 +19,6 @@ pub struct CalculateFlowFieldEv;
 // Phase 5
 #[derive(Event)]
 pub struct CalculateFlowVectorsEv;
+
+#[derive(Event)]
+pub struct InitializeFlowFieldEv;
