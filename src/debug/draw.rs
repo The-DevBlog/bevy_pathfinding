@@ -10,361 +10,22 @@ use grid_controller::GridController;
 use image::ImageFormat;
 use std::f32::consts::FRAC_PI_2;
 
-const DIGIT_ATLAS: &[u8] = include_bytes!("../assets/digits/digit_atlas.png");
-const BTN_HOVER_CLR: Color = Color::srgba(0.27, 0.27, 0.27, 1.0);
-const BACKGROUND_CLR: Color = Color::srgba(0.18, 0.18, 0.18, 1.0);
-const BACKGROUND_CLR_2: Color = Color::srgba(0.11, 0.11, 0.11, 1.0);
-const BACKGROUND_CLR_2_BORDER: Srgba = DARK_GRAY;
+const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
 
-pub struct BevyRtsPathFindingDebugPlugin;
+pub struct DrawPlugin;
 
-impl Plugin for BevyRtsPathFindingDebugPlugin {
+impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RtsPfDebug>()
             .init_resource::<Digits>()
             .register_type::<RtsPfDebug>()
-            .add_systems(Startup, (setup, load_texture_atlas, test))
+            .add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (draw_grid, detect_debug_change))
-            .add_systems(Update, hanlde_draw_mode_interaction)
-            .add_systems(Update, handle_dropdown_click)
             .observe(draw_flowfield)
             .observe(draw_integration_field)
             .observe(draw_costfield)
-            .observe(draw_index)
-            .observe(toggle_dropdown_visibility_1)
-            .observe(toggle_dropdown_visibility_2)
-            .observe(update_active_dropdown_option);
+            .observe(draw_index);
     }
-}
-
-fn hanlde_draw_mode_interaction(
-    mut cmds: Commands,
-    mut q_option_1: Query<
-        (&Interaction, &ActiveOption1, &mut BackgroundColor),
-        (Changed<Interaction>, With<ActiveOption1>),
-    >,
-    mut q_option_2: Query<
-        (&Interaction, &ActiveOption2, &mut BackgroundColor),
-        (
-            Changed<Interaction>,
-            With<ActiveOption2>,
-            Without<ActiveOption1>,
-        ),
-    >,
-    mut dbg: ResMut<RtsPfDebug>,
-) {
-    if let Ok((interaction, option, mut background)) = q_option_1.get_single_mut() {
-        background.0 = BACKGROUND_CLR_2.into();
-        match interaction {
-            Interaction::Pressed => {
-                dbg.draw_mode_1 = DrawMode::cast(option.0.clone());
-                cmds.trigger(UpdateDropdownOptionEv);
-            }
-            Interaction::Hovered => background.0 = BTN_HOVER_CLR.into(),
-            Interaction::None => background.0 = BACKGROUND_CLR_2.into(),
-            _ => (),
-        }
-    };
-
-    if let Ok((interaction, option, mut background)) = q_option_2.get_single_mut() {
-        background.0 = BACKGROUND_CLR_2.into();
-        match interaction {
-            Interaction::Pressed => {
-                dbg.draw_mode_2 = DrawMode::cast(option.0.clone());
-                cmds.trigger(UpdateDropdownOptionEv);
-            }
-            Interaction::Hovered => background.0 = BTN_HOVER_CLR.into(),
-            Interaction::None => background.0 = BACKGROUND_CLR_2.into(),
-            _ => (),
-        }
-    };
-}
-
-fn update_active_dropdown_option(
-    _trigger: Trigger<UpdateDropdownOptionEv>,
-    dbg: Res<RtsPfDebug>,
-    mut q_txt_1: Query<&mut Text, (With<OptionBox1>, Without<OptionBox2>)>,
-    mut q_txt_2: Query<&mut Text, (With<OptionBox2>, Without<OptionBox1>)>,
-) {
-    if let Ok(mut txt) = q_txt_1.get_single_mut() {
-        txt.sections[0].value = dbg.mode1_string();
-    }
-
-    if let Ok(mut txt) = q_txt_2.get_single_mut() {
-        txt.sections[0].value = dbg.mode2_string();
-    }
-}
-
-fn handle_dropdown_click(
-    mut cmds: Commands,
-    q_btn_1: Query<&Interaction, With<ExpandBtn1>>,
-    q_btn_2: Query<&Interaction, With<ExpandBtn2>>,
-) {
-    if let Ok(interaction) = q_btn_1.get_single() {
-        match interaction {
-            Interaction::Pressed => cmds.trigger(ToggleMode1Ev),
-            _ => (),
-        }
-    }
-
-    if let Ok(interaction) = q_btn_2.get_single() {
-        match interaction {
-            Interaction::Pressed => cmds.trigger(ToggleMode2Ev),
-            _ => (),
-        }
-    }
-}
-
-fn toggle_dropdown_visibility_1(
-    _trigger: Trigger<ToggleMode1Ev>,
-    mut q_dropdown: Query<&mut Style, With<Dropdown1>>,
-) {
-    if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
-        if dropdown.display == Display::Flex {
-            dropdown.display = Display::None;
-        } else if dropdown.display == Display::None {
-            dropdown.display = Display::Flex
-        }
-    }
-}
-
-fn toggle_dropdown_visibility_2(
-    _trigger: Trigger<ToggleMode2Ev>,
-    mut q_dropdown: Query<&mut Style, With<Dropdown2>>,
-) {
-    if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
-        if dropdown.display == Display::Flex {
-            dropdown.display = Display::None;
-        } else if dropdown.display == Display::None {
-            dropdown.display = Display::Flex
-        }
-    }
-}
-
-#[derive(Event)]
-struct UpdateDropdownOptionEv;
-
-#[derive(Event)]
-struct ToggleMode1Ev;
-
-#[derive(Event)]
-struct ToggleMode2Ev;
-
-#[derive(Component)]
-struct ActiveOption1(pub String);
-
-#[derive(Component)]
-struct ActiveOption2(pub String);
-
-#[derive(Component)]
-struct OptionBox1;
-
-#[derive(Component)]
-struct OptionBox2;
-
-#[derive(Component)]
-struct Dropdown1;
-
-#[derive(Component)]
-struct Dropdown2;
-
-#[derive(Component)]
-struct ExpandBtn1;
-
-#[derive(Component)]
-struct ExpandBtn2;
-
-fn test(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
-    let root_container = (
-        NodeBundle {
-            style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            border_radius: BorderRadius::all(Val::Px(5.0)),
-            background_color: BACKGROUND_CLR.into(),
-            ..default()
-        },
-        Name::new("Debug Container"),
-    );
-
-    let draw_container = || -> NodeBundle {
-        NodeBundle {
-            style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
-                ..default()
-            },
-            ..default()
-        }
-    };
-
-    let draw_mode_txt = |txt: String| -> TextBundle {
-        TextBundle {
-            text: Text::from_section(txt, TextStyle::default()),
-            ..default()
-        }
-    };
-
-    let options_container = || -> NodeBundle {
-        NodeBundle {
-            background_color: BACKGROUND_CLR_2.into(),
-            border_color: BACKGROUND_CLR_2_BORDER.into(),
-            border_radius: BorderRadius::all(Val::Px(5.0)),
-            style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
-                flex_direction: FlexDirection::Column,
-                display: Display::None,
-                ..default()
-            },
-            ..default()
-        }
-    };
-
-    let option_txt = |txt: String| -> TextBundle {
-        TextBundle {
-            text: Text::from_section(txt.clone(), TextStyle::default()),
-            ..default()
-        }
-    };
-
-    let btn_1 = |txt: String| -> (ButtonBundle, ActiveOption1) {
-        (ButtonBundle::default(), ActiveOption1(txt))
-    };
-
-    let btn_2 = |txt: String| -> (ButtonBundle, ActiveOption2) {
-        (ButtonBundle::default(), ActiveOption2(txt))
-    };
-
-    let active_option = |txt: String| -> TextBundle {
-        TextBundle {
-            text: Text::from_section(txt, TextStyle::default()),
-            ..default()
-        }
-    };
-
-    let change_option_btn_1 = (ButtonBundle::default(), ExpandBtn1);
-    let change_option_btn_2 = (ButtonBundle::default(), ExpandBtn2);
-
-    let change_option_txt = || -> TextBundle {
-        TextBundle {
-            text: Text::from_section(String::from("V"), TextStyle::default()),
-            ..default()
-        }
-    };
-
-    let dropdown_1 = NodeBundle::default();
-    let dropdown_2 = NodeBundle::default();
-
-    let active_option_1 = (
-        active_option(dbg.mode1_string()),
-        ActiveOption1(dbg.mode1_string()),
-        OptionBox1,
-    );
-    let active_option_2 = (
-        active_option(dbg.mode2_string()),
-        ActiveOption2(dbg.mode2_string()),
-        OptionBox2,
-    );
-
-    // Root Container
-    cmds.spawn(root_container).with_children(|container| {
-        // Draw Mode 1 Container
-        container
-            .spawn(draw_container())
-            .with_children(|draw_mode_1| {
-                draw_mode_1.spawn(draw_mode_txt("Draw Mode 1".to_string()));
-
-                // Dropdown Container
-                draw_mode_1.spawn(dropdown_1).with_children(|dropdown| {
-                    // Dropdown Active Option
-                    dropdown.spawn(active_option_1);
-                    dropdown.spawn(change_option_btn_1).with_children(|btn| {
-                        btn.spawn(change_option_txt());
-                    });
-                });
-            });
-
-        // Dropdown Options Container
-        container
-            .spawn((options_container(), Dropdown1))
-            // Dropdown Options
-            .with_children(|options| {
-                options
-                    .spawn(btn_1("None".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("None".to_string()));
-                    });
-                options
-                    .spawn(btn_1("IntegrationField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("IntegrationField".to_string()));
-                    });
-                options
-                    .spawn(btn_1("FlowField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("FlowField".to_string()));
-                    });
-                options
-                    .spawn(btn_1("CostField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("CostField".to_string()));
-                    });
-                options
-                    .spawn(btn_1("Index".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("Index".to_string()));
-                    });
-            });
-
-        // Draw Mode 2 Container
-        container
-            .spawn(draw_container())
-            .with_children(|draw_mode_2| {
-                draw_mode_2.spawn(draw_mode_txt("Draw Mode 2".to_string()));
-
-                // Dropdown Container
-                draw_mode_2.spawn(dropdown_2).with_children(|dropdown| {
-                    // Dropdown Active Option
-                    dropdown.spawn(active_option_2);
-                    dropdown.spawn(change_option_btn_2).with_children(|btn| {
-                        btn.spawn(change_option_txt());
-                    });
-                });
-            });
-
-        // Dropdown Options Container
-        container
-            .spawn((options_container(), Dropdown2))
-            // Dropdown Options
-            .with_children(|options| {
-                options
-                    .spawn(btn_2("None".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("None".to_string()));
-                    });
-                options
-                    .spawn(btn_2("IntegrationField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("IntegrationField".to_string()));
-                    });
-                options
-                    .spawn(btn_2("FlowField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("FlowField".to_string()));
-                    });
-                options
-                    .spawn(btn_1("CostField".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("CostField".to_string()));
-                    });
-                options
-                    .spawn(btn_2("Index".to_string()))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("Index".to_string()));
-                    });
-            });
-    });
 }
 
 #[derive(Resource, Default)]
@@ -373,9 +34,9 @@ struct Digits([Handle<Image>; 10]);
 #[derive(Reflect, Resource)]
 #[reflect(Resource)]
 pub struct RtsPfDebug {
-    draw_grid: bool,
-    draw_mode_1: DrawMode,
-    draw_mode_2: DrawMode,
+    pub draw_grid: bool,
+    pub draw_mode_1: DrawMode,
+    pub draw_mode_2: DrawMode,
 }
 
 impl Default for RtsPfDebug {
@@ -389,7 +50,7 @@ impl Default for RtsPfDebug {
 }
 
 impl RtsPfDebug {
-    fn draw_mode_to_string(mode: DrawMode) -> String {
+    pub fn draw_mode_to_string(mode: DrawMode) -> String {
         match mode {
             DrawMode::None => String::from("None"),
             DrawMode::CostField => String::from("CostField"),
@@ -399,17 +60,17 @@ impl RtsPfDebug {
         }
     }
 
-    fn mode1_string(&self) -> String {
+    pub fn mode1_string(&self) -> String {
         Self::draw_mode_to_string(self.draw_mode_1)
     }
 
-    fn mode2_string(&self) -> String {
+    pub fn mode2_string(&self) -> String {
         Self::draw_mode_to_string(self.draw_mode_2)
     }
 }
 
 #[derive(Reflect, PartialEq, Clone, Copy)]
-enum DrawMode {
+pub enum DrawMode {
     None,
     CostField,
     FlowField,
@@ -418,7 +79,7 @@ enum DrawMode {
 }
 
 impl DrawMode {
-    fn cast(mode: String) -> Self {
+    pub fn cast(mode: String) -> Self {
         match mode.as_str() {
             "None" => DrawMode::None,
             "CostField" => DrawMode::CostField,

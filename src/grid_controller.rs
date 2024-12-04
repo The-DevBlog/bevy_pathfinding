@@ -1,7 +1,9 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_rapier3d::plugin::RapierContext;
 
-use crate::{debug::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase};
+use crate::{
+    debug::draw::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase,
+};
 
 pub struct GridControllerPlugin;
 

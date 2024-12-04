@@ -1,14 +1,14 @@
+use crate::components::*;
+use crate::events::*;
+use crate::resources::*;
 use bevy::color::palettes::{css::*, tailwind::*};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
+use debug::BevyRtsPathFindingDebugPlugin;
+use grid_controller::GridControllerPlugin;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-
-use crate::components::*;
-use crate::events::*;
-use crate::resources::*;
-use grid_controller::GridControllerPlugin;
 
 mod cell;
 pub mod components;
