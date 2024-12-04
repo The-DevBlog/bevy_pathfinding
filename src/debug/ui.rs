@@ -58,7 +58,11 @@ fn handle_draw_mode_interaction(
     mut cmds: Commands,
     mut q_option_1: Query<
         (&Interaction, &ActiveOption1, &mut BackgroundColor),
-        (Changed<Interaction>, With<ActiveOption1>),
+        (
+            Changed<Interaction>,
+            With<ActiveOption1>,
+            Without<ActiveOption2>,
+        ),
     >,
     mut q_option_2: Query<
         (&Interaction, &ActiveOption2, &mut BackgroundColor),
@@ -70,7 +74,7 @@ fn handle_draw_mode_interaction(
     >,
     mut dbg: ResMut<RtsPfDebug>,
 ) {
-    if let Ok((interaction, option, mut background)) = q_option_1.get_single_mut() {
+    for (interaction, option, mut background) in q_option_1.iter_mut() {
         background.0 = CLR_BACKGROUND_2.into();
         match interaction {
             Interaction::Pressed => {
@@ -80,9 +84,9 @@ fn handle_draw_mode_interaction(
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
         }
-    };
+    }
 
-    if let Ok((interaction, option, mut background)) = q_option_2.get_single_mut() {
+    for (interaction, option, mut background) in q_option_2.iter_mut() {
         background.0 = CLR_BACKGROUND_2.into();
         match interaction {
             Interaction::Pressed => {
@@ -92,7 +96,7 @@ fn handle_draw_mode_interaction(
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
         }
-    };
+    }
 }
 
 fn update_active_dropdown_option(
@@ -112,8 +116,8 @@ fn update_active_dropdown_option(
 
 fn handle_dropdown_click(
     mut cmds: Commands,
-    q_btn_1: Query<&Interaction, With<DropdownBtn1>>,
-    q_btn_2: Query<&Interaction, With<DropdownBtn2>>,
+    q_btn_1: Query<&Interaction, (Changed<Interaction>, With<DropdownBtn1>)>,
+    q_btn_2: Query<&Interaction, (Changed<Interaction>, With<DropdownBtn2>)>,
 ) {
     if let Ok(interaction) = q_btn_1.get_single() {
         match interaction {
@@ -273,16 +277,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let dropdown_1 = NodeBundle::default();
     let dropdown_2 = NodeBundle::default();
 
-    let active_option_1 = (
-        active_option(dbg.mode1_string()),
-        ActiveOption1(dbg.mode1_string()),
-        OptionBox1,
-    );
-    let active_option_2 = (
-        active_option(dbg.mode2_string()),
-        ActiveOption2(dbg.mode2_string()),
-        OptionBox2,
-    );
+    let active_option_1 = (active_option(dbg.mode1_string()), OptionBox1);
+    let active_option_2 = (active_option(dbg.mode2_string()), OptionBox2);
 
     // Root Container
     cmds.spawn(root_container).with_children(|container| {
