@@ -27,60 +27,55 @@ impl Plugin for UiPlugin {
 struct UpdateDropdownOptionEv;
 
 #[derive(Event)]
-struct ToggleModeEv(pub i32);
+struct ToggleModeEv(pub OptionsSet);
 
 #[derive(Component)]
-struct ActiveOption1(pub String);
+struct OptionBox(pub OptionsSet);
 
 #[derive(Component)]
-struct ActiveOption2(pub String);
+struct DropdownOptions(pub OptionsSet);
 
 #[derive(Component)]
-struct OptionBox(pub i32);
+struct ActiveOption {
+    set: OptionsSet,
+    txt: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum OptionsSet {
+    One,
+    Two,
+}
+
+impl OptionsSet {
+    fn to_num(&self) -> i32 {
+        match self {
+            OptionsSet::One => 1,
+            OptionsSet::Two => 2,
+        }
+    }
+}
 
 #[derive(Component)]
-struct DropdownOptions(pub i32);
-
-#[derive(Component)]
-struct DropdownBtn(pub i32);
+struct DropdownBtn(pub OptionsSet);
 
 fn handle_draw_mode_interaction(
     mut cmds: Commands,
-    mut q_option_1: Query<
-        (&Interaction, &ActiveOption1, &mut BackgroundColor),
-        (
-            Changed<Interaction>,
-            With<ActiveOption1>,
-            Without<ActiveOption2>,
-        ),
-    >,
-    mut q_option_2: Query<
-        (&Interaction, &ActiveOption2, &mut BackgroundColor),
-        (
-            Changed<Interaction>,
-            With<ActiveOption2>,
-            Without<ActiveOption1>,
-        ),
+    mut q_option: Query<
+        (&Interaction, &ActiveOption, &mut BackgroundColor),
+        (Changed<Interaction>,),
     >,
     mut dbg: ResMut<RtsPfDebug>,
 ) {
-    for (interaction, option, mut background) in q_option_1.iter_mut() {
+    for (interaction, option, mut background) in q_option.iter_mut() {
         background.0 = CLR_BACKGROUND_2.into();
         match interaction {
             Interaction::Pressed => {
-                dbg.draw_mode_1 = DrawMode::cast(option.0.clone());
-                cmds.trigger(UpdateDropdownOptionEv);
-            }
-            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
-            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
-        }
-    }
+                match option.set {
+                    OptionsSet::One => dbg.draw_mode_1 = DrawMode::cast(option.txt.clone()),
+                    OptionsSet::Two => dbg.draw_mode_2 = DrawMode::cast(option.txt.clone()),
+                }
 
-    for (interaction, option, mut background) in q_option_2.iter_mut() {
-        background.0 = CLR_BACKGROUND_2.into();
-        match interaction {
-            Interaction::Pressed => {
-                dbg.draw_mode_2 = DrawMode::cast(option.0.clone());
                 cmds.trigger(UpdateDropdownOptionEv);
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -95,7 +90,12 @@ fn update_active_dropdown_option(
     mut q_txt: Query<(&mut Text, &OptionBox)>,
 ) {
     for (mut txt, options) in q_txt.iter_mut() {
-        txt.sections[0].value = dbg.mode_string(options.0);
+        let num = match options.0 {
+            OptionsSet::One => 1,
+            OptionsSet::Two => 2,
+        };
+
+        txt.sections[0].value = dbg.mode_string(num);
     }
 }
 
@@ -118,19 +118,17 @@ fn handle_dropdown_click(
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
     mut q_dropdown: Query<(&mut Style, &DropdownOptions)>,
-    // mut q_dropdown: Query<&mut Style, With<Options1>>,
-    // mut q_dropdown_2: Query<&mut Style, (With<Options2>, Without<Options1>)>,
 ) {
     let option = trigger.event().0;
 
     for (mut dropdown, dropdown_options) in q_dropdown.iter_mut() {
-        if option == 0 && dropdown_options.0 == 0 {
+        if option == OptionsSet::One && dropdown_options.0.to_num() == 1 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
                 dropdown.display = Display::Flex
             }
-        } else if option == 1 && dropdown_options.0 == 1 {
+        } else if option == OptionsSet::Two && dropdown_options.0.to_num() == 2 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
@@ -191,7 +189,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let active_option_container_1 = active_option_container(UiRect::bottom(Val::Px(0.25)));
     let active_option_container_2 = active_option_container(UiRect::top(Val::Px(0.25)));
 
-    let active_option = |txt: String, option: i32| -> (TextBundle, OptionBox) {
+    let active_option = |txt: String, set: OptionsSet| -> (TextBundle, OptionBox) {
         (
             TextBundle {
                 text: Text::from_section(
@@ -204,7 +202,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 ),
                 ..default()
             },
-            OptionBox(option),
+            OptionBox(set),
         )
     };
 
@@ -241,19 +239,14 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         }
     };
 
-    let btn_option_1 = |txt: String| -> (ButtonBundle, ActiveOption1) {
-        (ButtonBundle::default(), ActiveOption1(txt))
+    let btn_option = |set: OptionsSet, txt: String| -> (ButtonBundle, ActiveOption) {
+        (ButtonBundle::default(), ActiveOption { set, txt })
     };
 
-    let btn_option_2 = |txt: String| -> (ButtonBundle, ActiveOption2) {
-        (ButtonBundle::default(), ActiveOption2(txt))
-    };
-
-    let dropdown_btn = |idx: i32| -> (ButtonBundle, DropdownBtn, Name) {
-        let radius = match idx {
-            0 => BorderRadius::top(Val::Px(10.0)),
-            1 => BorderRadius::bottom(Val::Px(10.0)),
-            _ => BorderRadius::all(Val::Px(10.0)), // should not be hit
+    let dropdown_btn = |set: OptionsSet| -> (ButtonBundle, DropdownBtn, Name) {
+        let radius = match set {
+            OptionsSet::One => BorderRadius::top(Val::Px(10.0)),
+            OptionsSet::Two => BorderRadius::bottom(Val::Px(10.0)),
         };
 
         (
@@ -261,7 +254,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 border_radius: radius,
                 ..default()
             },
-            DropdownBtn(idx),
+            DropdownBtn(set),
             Name::new("Dropdown Button"),
         )
     };
@@ -270,44 +263,44 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     cmds.spawn(root_container).with_children(|container| {
         // Draw Mode 1 Container
         container
-            .spawn(dropdown_btn(0))
+            .spawn(dropdown_btn(OptionsSet::One))
             .with_children(|dropdown_btn| {
                 dropdown_btn
                     .spawn(active_option_container_1)
                     .with_children(|draw_mode_1| {
                         // Active Dropdown Option
                         draw_mode_1.spawn(draw_mode_txt("Draw Mode 1 : ".to_string()));
-                        draw_mode_1.spawn(active_option(dbg.mode1_string(), 0));
+                        draw_mode_1.spawn(active_option(dbg.mode1_string(), OptionsSet::One));
                     });
             });
 
         // Dropdown Options Container
         container
-            .spawn((options_container(), DropdownOptions(0)))
+            .spawn((options_container(), DropdownOptions(OptionsSet::One)))
             // Dropdown Options
             .with_children(|options| {
                 options
-                    .spawn(btn_option_1("None".to_string()))
+                    .spawn(btn_option(OptionsSet::One, "None".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> None".to_string()));
                     });
                 options
-                    .spawn(btn_option_1("IntegrationField".to_string()))
+                    .spawn(btn_option(OptionsSet::One, "IntegrationField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> IntegrationField".to_string()));
                     });
                 options
-                    .spawn(btn_option_1("FlowField".to_string()))
+                    .spawn(btn_option(OptionsSet::One, "FlowField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> FlowField".to_string()));
                     });
                 options
-                    .spawn(btn_option_1("CostField".to_string()))
+                    .spawn(btn_option(OptionsSet::One, "CostField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> CostField".to_string()));
                     });
                 options
-                    .spawn(btn_option_1("Index".to_string()))
+                    .spawn(btn_option(OptionsSet::One, "Index".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> Index".to_string()));
                     });
@@ -315,44 +308,44 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
 
         // Draw Mode 2 Container
         container
-            .spawn(dropdown_btn(1))
+            .spawn(dropdown_btn(OptionsSet::Two))
             .with_children(|dropdown_btn| {
                 dropdown_btn
                     .spawn(active_option_container_2)
                     .with_children(|draw_mode_2| {
                         // Dropdown Active Option
                         draw_mode_2.spawn(draw_mode_txt("Draw Mode 2 : ".to_string()));
-                        draw_mode_2.spawn(active_option(dbg.mode2_string(), 1));
+                        draw_mode_2.spawn(active_option(dbg.mode2_string(), OptionsSet::Two));
                     });
             });
 
         // Dropdown Options Container
         container
-            .spawn((options_container(), DropdownOptions(1)))
+            .spawn((options_container(), DropdownOptions(OptionsSet::Two)))
             // Dropdown Options
             .with_children(|options| {
                 options
-                    .spawn(btn_option_2("None".to_string()))
+                    .spawn(btn_option(OptionsSet::Two, "None".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> None".to_string()));
                     });
                 options
-                    .spawn(btn_option_2("IntegrationField".to_string()))
+                    .spawn(btn_option(OptionsSet::Two, "IntegrationField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> IntegrationField".to_string()));
                     });
                 options
-                    .spawn(btn_option_2("FlowField".to_string()))
+                    .spawn(btn_option(OptionsSet::Two, "FlowField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> FlowField".to_string()));
                     });
                 options
-                    .spawn(btn_option_2("CostField".to_string()))
+                    .spawn(btn_option(OptionsSet::Two, "CostField".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> CostField".to_string()));
                     });
                 options
-                    .spawn(btn_option_2("Index".to_string()))
+                    .spawn(btn_option(OptionsSet::Two, "Index".to_string()))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> Index".to_string()));
                     });

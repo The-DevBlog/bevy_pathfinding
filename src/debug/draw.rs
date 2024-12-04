@@ -61,7 +61,7 @@ impl RtsPfDebug {
     }
 
     pub fn mode_string(&self, mode: i32) -> String {
-        if mode == 0 {
+        if mode == 1 {
             return Self::draw_mode_to_string(self.draw_mode_1);
         }
 
