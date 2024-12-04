@@ -7,6 +7,7 @@ const CLR_BTN_HOVER: Color = Color::srgba(0.27, 0.27, 0.27, 1.0);
 const CLR_BORDER: Color = Color::srgba(0.53, 0.53, 0.53, 1.0);
 const CLR_BACKGROUND_1: Color = Color::srgba(0.18, 0.18, 0.18, 1.0);
 const CLR_BACKGROUND_2: Color = Color::srgba(0.11, 0.11, 0.11, 1.0);
+const FONT_SIZE: f32 = 20.0;
 
 pub struct UiPlugin;
 
@@ -103,15 +104,16 @@ fn update_active_dropdown_option(
 
 fn handle_dropdown_click(
     mut cmds: Commands,
-    q_btn: Query<(&Interaction, &DropdownBtn), (Changed<Interaction>, With<DropdownBtn>)>,
+    mut q_btn: Query<
+        (&Interaction, &DropdownBtn, &mut BackgroundColor),
+        (Changed<Interaction>, With<DropdownBtn>),
+    >,
 ) {
-    for (interaction, dropdown) in q_btn.iter() {
+    for (interaction, dropdown, mut background) in q_btn.iter_mut() {
         match interaction {
-            Interaction::Pressed => {
-                println!("Triggering toggle mode event");
-                cmds.trigger(ToggleModeEv(dropdown.0))
-            }
-            _ => (),
+            Interaction::Pressed => cmds.trigger(ToggleModeEv(dropdown.0)),
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_1.into(),
         }
     }
 }
@@ -147,64 +149,78 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let root_container = (
         NodeBundle {
             style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
+                padding: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(5.0), Val::Px(5.0)),
                 flex_direction: FlexDirection::Column,
-                border: UiRect::all(Val::Px(0.25)),
+                border: UiRect::all(Val::Px(0.5)),
                 ..default()
             },
             border_color: CLR_BORDER.into(),
-            border_radius: BorderRadius::all(Val::Px(5.0)),
+            border_radius: BorderRadius::all(Val::Px(15.0)),
             background_color: CLR_BACKGROUND_1.into(),
             ..default()
         },
         Name::new("Debug Container"),
     );
 
-    let draw_container = || -> NodeBundle {
-        NodeBundle {
-            style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
+    let dropdown_btn = |radius: BorderRadius| -> (ButtonBundle, Name) {
+        (
+            ButtonBundle {
+                border_radius: radius,
                 ..default()
             },
-            ..default()
-        }
+            Name::new("Dropdown Button"),
+        )
     };
 
-    let dropdown_btn = || ButtonBundle {
-        style: Style {
-            padding: UiRect::all(Val::Px(5.0)),
-            ..default()
-        },
-        ..default()
-    };
-
-    let draw_mode_txt = |txt: String| -> TextBundle {
-        TextBundle {
-            text: Text::from_section(
-                txt,
-                TextStyle {
-                    color: CLR_TXT_DORMANT.into(),
-                    font_size: 16.0,
+    let draw_container = |border: UiRect| -> (NodeBundle, Name) {
+        (
+            NodeBundle {
+                border_color: BorderColor(CLR_BORDER.into()),
+                style: Style {
+                    padding: UiRect::all(Val::Px(5.0)),
+                    border: border,
                     ..default()
                 },
-            ),
-            ..default()
-        }
-    };
-
-    let options_container = || -> NodeBundle {
-        NodeBundle {
-            background_color: CLR_BACKGROUND_2.into(),
-            border_color: CLR_BACKGROUND_2.into(),
-            border_radius: BorderRadius::all(Val::Px(5.0)),
-            style: Style {
-                padding: UiRect::all(Val::Px(5.0)),
-                flex_direction: FlexDirection::Column,
-                display: Display::None,
                 ..default()
             },
-            ..default()
-        }
+            Name::new("Draw Mode Container"),
+        )
+    };
+
+    let draw_container_1 = draw_container(UiRect::bottom(Val::Px(0.25)));
+    let draw_container_2 = draw_container(UiRect::top(Val::Px(0.25)));
+
+    let draw_mode_txt = |txt: String| -> (TextBundle, Name) {
+        (
+            TextBundle {
+                text: Text::from_section(
+                    txt,
+                    TextStyle {
+                        color: CLR_TXT_DORMANT.into(),
+                        font_size: FONT_SIZE,
+                        ..default()
+                    },
+                ),
+                ..default()
+            },
+            Name::new("Draw Mode Text"),
+        )
+    };
+
+    let options_container = || -> (NodeBundle, Name) {
+        (
+            NodeBundle {
+                background_color: CLR_BACKGROUND_2.into(),
+                style: Style {
+                    padding: UiRect::all(Val::Px(5.0)),
+                    flex_direction: FlexDirection::Column,
+                    display: Display::None,
+                    ..default()
+                },
+                ..default()
+            },
+            Name::new("Options Container"),
+        )
     };
 
     let option_txt = |txt: String| -> TextBundle {
@@ -213,7 +229,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 txt.clone(),
                 TextStyle {
                     color: CLR_TXT_DORMANT.into(),
-                    font_size: 16.0,
+                    font_size: FONT_SIZE,
                     ..default()
                 },
             ),
@@ -235,7 +251,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 txt,
                 TextStyle {
                     color: CLR_TXT_DORMANT.into(),
-                    font_size: 16.0,
+                    font_size: FONT_SIZE,
                     ..default()
                 },
             ),
@@ -243,22 +259,18 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         }
     };
 
-    let change_option_txt = || -> TextBundle {
-        TextBundle {
-            text: Text::from_section(
-                String::from(" +"),
-                TextStyle {
-                    color: CLR_TXT_DORMANT.into(),
-                    font_size: 18.0,
-                    ..default()
-                },
-            ),
-            ..default()
-        }
-    };
+    let dropdown_btn_1 = (
+        DropdownBtn(0),
+        dropdown_btn(BorderRadius::top(Val::Px(15.0))),
+    );
 
-    let dropdown_1 = NodeBundle::default();
-    let dropdown_2 = NodeBundle::default();
+    let dropdown_btn_2 = (
+        DropdownBtn(1),
+        dropdown_btn(BorderRadius::bottom(Val::Px(15.0))),
+    );
+
+    let dropdown_container_1 = NodeBundle::default();
+    let dropdown_container_2 = NodeBundle::default();
 
     let active_option_1 = (active_option(dbg.mode1_string()), OptionBox(0));
     let active_option_2 = (active_option(dbg.mode2_string()), OptionBox(1));
@@ -267,21 +279,20 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     cmds.spawn(root_container).with_children(|container| {
         // Draw Mode 1 Container
         container
-            .spawn((DropdownBtn(0), dropdown_btn()))
-            .with_children(|dropdown| {
-                dropdown
-                    .spawn(draw_container())
-                    .with_children(|draw_container_btn| {
-                        draw_container_btn.spawn(change_option_txt());
-                    })
+            .spawn(dropdown_btn_1)
+            .with_children(|dropdown_btn| {
+                dropdown_btn
+                    .spawn(draw_container_1)
                     .with_children(|draw_mode_1| {
                         draw_mode_1.spawn(draw_mode_txt("Draw Mode 1: ".to_string()));
 
                         // Dropdown Container
-                        draw_mode_1.spawn(dropdown_1).with_children(|dropdown| {
-                            // Dropdown Active Option
-                            dropdown.spawn(active_option_1);
-                        });
+                        draw_mode_1
+                            .spawn(dropdown_container_1)
+                            .with_children(|dropdown| {
+                                // Dropdown Active Option
+                                dropdown.spawn(active_option_1);
+                            });
                     });
             });
 
@@ -319,21 +330,20 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
 
         // Draw Mode 2 Container
         container
-            .spawn((DropdownBtn(1), dropdown_btn()))
-            .with_children(|dropdown| {
-                dropdown
-                    .spawn(draw_container())
-                    .with_children(|draw_container_btn| {
-                        draw_container_btn.spawn(change_option_txt());
-                    })
+            .spawn(dropdown_btn_2)
+            .with_children(|dropdown_btn| {
+                dropdown_btn
+                    .spawn(draw_container_2)
                     .with_children(|draw_mode_2| {
                         draw_mode_2.spawn(draw_mode_txt("Draw Mode 2: ".to_string()));
 
                         // Dropdown Container
-                        draw_mode_2.spawn(dropdown_2).with_children(|dropdown| {
-                            // Dropdown Active Option
-                            dropdown.spawn(active_option_2);
-                        });
+                        draw_mode_2
+                            .spawn(dropdown_container_2)
+                            .with_children(|dropdown| {
+                                // Dropdown Active Option
+                                dropdown.spawn(active_option_2);
+                            });
                     });
             });
 
