@@ -7,7 +7,7 @@ const CLR_BTN_HOVER: Color = Color::srgba(0.27, 0.27, 0.27, 1.0);
 const CLR_BORDER: Color = Color::srgba(0.53, 0.53, 0.53, 1.0);
 const CLR_BACKGROUND_1: Color = Color::srgba(0.18, 0.18, 0.18, 1.0);
 const CLR_BACKGROUND_2: Color = Color::srgba(0.11, 0.11, 0.11, 1.0);
-const FONT_SIZE: f32 = 20.0;
+const FONT_SIZE: f32 = 16.0;
 
 pub struct UiPlugin;
 
@@ -149,46 +149,17 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let root_container = (
         NodeBundle {
             style: Style {
-                padding: UiRect::new(Val::Px(0.0), Val::Px(0.0), Val::Px(5.0), Val::Px(5.0)),
                 flex_direction: FlexDirection::Column,
                 border: UiRect::all(Val::Px(0.5)),
                 ..default()
             },
             border_color: CLR_BORDER.into(),
-            border_radius: BorderRadius::all(Val::Px(15.0)),
+            border_radius: BorderRadius::all(Val::Px(10.0)),
             background_color: CLR_BACKGROUND_1.into(),
             ..default()
         },
         Name::new("Debug Container"),
     );
-
-    let dropdown_btn = |radius: BorderRadius| -> (ButtonBundle, Name) {
-        (
-            ButtonBundle {
-                border_radius: radius,
-                ..default()
-            },
-            Name::new("Dropdown Button"),
-        )
-    };
-
-    let draw_container = |border: UiRect| -> (NodeBundle, Name) {
-        (
-            NodeBundle {
-                border_color: BorderColor(CLR_BORDER.into()),
-                style: Style {
-                    padding: UiRect::all(Val::Px(5.0)),
-                    border: border,
-                    ..default()
-                },
-                ..default()
-            },
-            Name::new("Draw Mode Container"),
-        )
-    };
-
-    let draw_container_1 = draw_container(UiRect::bottom(Val::Px(0.25)));
-    let draw_container_2 = draw_container(UiRect::top(Val::Px(0.25)));
 
     let draw_mode_txt = |txt: String| -> (TextBundle, Name) {
         (
@@ -207,12 +178,46 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         )
     };
 
+    let active_option_container = |border: UiRect| -> (NodeBundle, Name) {
+        (
+            NodeBundle {
+                border_color: BorderColor(CLR_BORDER.into()),
+                style: Style {
+                    padding: UiRect::all(Val::Px(5.0)),
+                    border: border,
+                    ..default()
+                },
+                ..default()
+            },
+            Name::new("Draw Mode Container"),
+        )
+    };
+
+    let active_option_container_1 = active_option_container(UiRect::bottom(Val::Px(0.25)));
+    let active_option_container_2 = active_option_container(UiRect::top(Val::Px(0.25)));
+
+    let active_option = |txt: String, option: i32| -> (TextBundle, OptionBox) {
+        (
+            TextBundle {
+                text: Text::from_section(
+                    txt,
+                    TextStyle {
+                        color: CLR_TXT_DORMANT.into(),
+                        font_size: FONT_SIZE,
+                        ..default()
+                    },
+                ),
+                ..default()
+            },
+            OptionBox(option),
+        )
+    };
+
     let options_container = || -> (NodeBundle, Name) {
         (
             NodeBundle {
                 background_color: CLR_BACKGROUND_2.into(),
                 style: Style {
-                    padding: UiRect::all(Val::Px(5.0)),
                     flex_direction: FlexDirection::Column,
                     display: Display::None,
                     ..default()
@@ -233,6 +238,10 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                     ..default()
                 },
             ),
+            style: Style {
+                padding: UiRect::all(Val::Px(2.5)),
+                ..default()
+            },
             ..default()
         }
     };
@@ -245,54 +254,35 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         (ButtonBundle::default(), ActiveOption2(txt))
     };
 
-    let active_option = |txt: String| -> TextBundle {
-        TextBundle {
-            text: Text::from_section(
-                txt,
-                TextStyle {
-                    color: CLR_TXT_DORMANT.into(),
-                    font_size: FONT_SIZE,
-                    ..default()
-                },
-            ),
-            ..default()
-        }
+    let dropdown_btn = |idx: i32| -> (ButtonBundle, DropdownBtn, Name) {
+        let radius = match idx {
+            0 => BorderRadius::top(Val::Px(10.0)),
+            1 => BorderRadius::bottom(Val::Px(10.0)),
+            _ => BorderRadius::all(Val::Px(10.0)), // should not be hit
+        };
+
+        (
+            ButtonBundle {
+                border_radius: radius,
+                ..default()
+            },
+            DropdownBtn(idx),
+            Name::new("Dropdown Button"),
+        )
     };
-
-    let dropdown_btn_1 = (
-        DropdownBtn(0),
-        dropdown_btn(BorderRadius::top(Val::Px(15.0))),
-    );
-
-    let dropdown_btn_2 = (
-        DropdownBtn(1),
-        dropdown_btn(BorderRadius::bottom(Val::Px(15.0))),
-    );
-
-    let dropdown_container_1 = NodeBundle::default();
-    let dropdown_container_2 = NodeBundle::default();
-
-    let active_option_1 = (active_option(dbg.mode1_string()), OptionBox(0));
-    let active_option_2 = (active_option(dbg.mode2_string()), OptionBox(1));
 
     // Root Container
     cmds.spawn(root_container).with_children(|container| {
         // Draw Mode 1 Container
         container
-            .spawn(dropdown_btn_1)
+            .spawn(dropdown_btn(0))
             .with_children(|dropdown_btn| {
                 dropdown_btn
-                    .spawn(draw_container_1)
+                    .spawn(active_option_container_1)
                     .with_children(|draw_mode_1| {
-                        draw_mode_1.spawn(draw_mode_txt("Draw Mode 1: ".to_string()));
-
-                        // Dropdown Container
-                        draw_mode_1
-                            .spawn(dropdown_container_1)
-                            .with_children(|dropdown| {
-                                // Dropdown Active Option
-                                dropdown.spawn(active_option_1);
-                            });
+                        // Active Dropdown Option
+                        draw_mode_1.spawn(draw_mode_txt("Draw Mode 1 : ".to_string()));
+                        draw_mode_1.spawn(active_option(dbg.mode1_string(), 0));
                     });
             });
 
@@ -304,46 +294,40 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 options
                     .spawn(btn_option_1("None".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("None".to_string()));
+                        btn.spawn(option_txt("> None".to_string()));
                     });
                 options
                     .spawn(btn_option_1("IntegrationField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("IntegrationField".to_string()));
+                        btn.spawn(option_txt("> IntegrationField".to_string()));
                     });
                 options
                     .spawn(btn_option_1("FlowField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("FlowField".to_string()));
+                        btn.spawn(option_txt("> FlowField".to_string()));
                     });
                 options
                     .spawn(btn_option_1("CostField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("CostField".to_string()));
+                        btn.spawn(option_txt("> CostField".to_string()));
                     });
                 options
                     .spawn(btn_option_1("Index".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("Index".to_string()));
+                        btn.spawn(option_txt("> Index".to_string()));
                     });
             });
 
         // Draw Mode 2 Container
         container
-            .spawn(dropdown_btn_2)
+            .spawn(dropdown_btn(1))
             .with_children(|dropdown_btn| {
                 dropdown_btn
-                    .spawn(draw_container_2)
+                    .spawn(active_option_container_2)
                     .with_children(|draw_mode_2| {
-                        draw_mode_2.spawn(draw_mode_txt("Draw Mode 2: ".to_string()));
-
-                        // Dropdown Container
-                        draw_mode_2
-                            .spawn(dropdown_container_2)
-                            .with_children(|dropdown| {
-                                // Dropdown Active Option
-                                dropdown.spawn(active_option_2);
-                            });
+                        // Dropdown Active Option
+                        draw_mode_2.spawn(draw_mode_txt("Draw Mode 2 : ".to_string()));
+                        draw_mode_2.spawn(active_option(dbg.mode2_string(), 1));
                     });
             });
 
@@ -355,27 +339,27 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
                 options
                     .spawn(btn_option_2("None".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("None".to_string()));
+                        btn.spawn(option_txt("> None".to_string()));
                     });
                 options
                     .spawn(btn_option_2("IntegrationField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("IntegrationField".to_string()));
+                        btn.spawn(option_txt("> IntegrationField".to_string()));
                     });
                 options
                     .spawn(btn_option_2("FlowField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("FlowField".to_string()));
+                        btn.spawn(option_txt("> FlowField".to_string()));
                     });
                 options
                     .spawn(btn_option_2("CostField".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("CostField".to_string()));
+                        btn.spawn(option_txt("> CostField".to_string()));
                     });
                 options
                     .spawn(btn_option_2("Index".to_string()))
                     .with_children(|btn| {
-                        btn.spawn(option_txt("Index".to_string()));
+                        btn.spawn(option_txt("> Index".to_string()));
                     });
             });
     });
