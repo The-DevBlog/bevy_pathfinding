@@ -39,10 +39,7 @@ struct ActiveOption2(pub String);
 struct OptionBox(pub i32);
 
 #[derive(Component)]
-struct Options1;
-
-#[derive(Component)]
-struct Options2;
+struct DropdownOptions(pub i32);
 
 #[derive(Component)]
 struct DropdownBtn(pub i32);
@@ -120,22 +117,20 @@ fn handle_dropdown_click(
 
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
-    mut q_dropdown: Query<&mut Style, With<Options1>>,
-    mut q_dropdown_2: Query<&mut Style, (With<Options2>, Without<Options1>)>,
+    mut q_dropdown: Query<(&mut Style, &DropdownOptions)>,
+    // mut q_dropdown: Query<&mut Style, With<Options1>>,
+    // mut q_dropdown_2: Query<&mut Style, (With<Options2>, Without<Options1>)>,
 ) {
     let option = trigger.event().0;
-    if option == 0 {
-        if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
+
+    for (mut dropdown, dropdown_options) in q_dropdown.iter_mut() {
+        if option == 0 && dropdown_options.0 == 0 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
                 dropdown.display = Display::Flex
             }
-        }
-    }
-
-    if option == 1 {
-        if let Ok(mut dropdown) = q_dropdown_2.get_single_mut() {
+        } else if option == 1 && dropdown_options.0 == 1 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
@@ -288,7 +283,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
 
         // Dropdown Options Container
         container
-            .spawn((options_container(), Options1))
+            .spawn((options_container(), DropdownOptions(0)))
             // Dropdown Options
             .with_children(|options| {
                 options
@@ -333,7 +328,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
 
         // Dropdown Options Container
         container
-            .spawn((options_container(), Options2))
+            .spawn((options_container(), DropdownOptions(1)))
             // Dropdown Options
             .with_children(|options| {
                 options
