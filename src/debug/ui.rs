@@ -1,5 +1,5 @@
 use super::draw::{DrawMode, RtsPfDebug};
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
 const CLR_TITLE: Color = Color::srgb(0.6, 0.6, 0.6);
@@ -16,12 +16,22 @@ impl Plugin for UiPlugin {
         app.add_systems(Startup, draw_ui_box)
             .add_systems(
                 Update,
-                (handle_dropdown_click, handle_draw_mode_interaction),
+                (
+                    handle_dropdown_click,
+                    handle_draw_mode_interaction,
+                    handle_drag,
+                ),
             )
             .observe(toggle_dropdown_visibility)
             .observe(update_active_dropdown_option);
     }
 }
+
+#[derive(Component)]
+struct DebugUI;
+
+#[derive(Component)]
+struct TitleBar;
 
 #[derive(Event)]
 struct UpdateDropdownOptionEv;
@@ -114,6 +124,30 @@ fn handle_dropdown_click(
     }
 }
 
+fn handle_drag(
+    q_title_bar: Query<&Interaction, With<TitleBar>>,
+    mut q_ui: Query<&mut Style, With<DebugUI>>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+) {
+    let Ok(mut ui_style) = q_ui.get_single_mut() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window_q.single().cursor_position() else {
+        return;
+    };
+
+    for interaction in q_title_bar.iter() {
+        match interaction {
+            Interaction::Pressed => {
+                ui_style.left = Val::Px(cursor_pos.x);
+                ui_style.top = Val::Px(cursor_pos.y)
+            }
+            _ => (),
+        }
+    }
+}
+
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
     mut q_dropdown: Query<(&mut Style, &DropdownOptions)>,
@@ -150,11 +184,12 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
             background_color: CLR_BACKGROUND_1.into(),
             ..default()
         },
+        DebugUI,
         Name::new("Debug Container"),
     );
 
     let title_ctr = (
-        NodeBundle {
+        ButtonBundle {
             border_color: CLR_BORDER.into(),
             style: Style {
                 border: UiRect::bottom(Val::Px(1.0)),
@@ -163,8 +198,10 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
             },
             ..default()
         },
+        TitleBar,
         Name::new("Title Bar"),
     );
+
     let title = TextBundle {
         text: Text::from_section(
             "Pathfinding Debug",
