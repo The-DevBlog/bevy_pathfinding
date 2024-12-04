@@ -13,10 +13,11 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, draw_ui_box)
-            .add_systems(Update, handle_draw_mode_interaction)
-            .add_systems(Update, handle_dropdown_click)
-            .observe(toggle_dropdown_visibility_1)
-            .observe(toggle_dropdown_visibility_2)
+            .add_systems(
+                Update,
+                (handle_dropdown_click, handle_draw_mode_interaction),
+            )
+            .observe(toggle_dropdown_visibility)
             .observe(update_active_dropdown_option);
     }
 }
@@ -25,10 +26,7 @@ impl Plugin for UiPlugin {
 struct UpdateDropdownOptionEv;
 
 #[derive(Event)]
-struct ToggleMode1Ev;
-
-#[derive(Event)]
-struct ToggleMode2Ev;
+struct ToggleModeEv(pub i32);
 
 #[derive(Component)]
 struct ActiveOption1(pub String);
@@ -49,10 +47,7 @@ struct Options1;
 struct Options2;
 
 #[derive(Component)]
-struct DropdownBtn1;
-
-#[derive(Component)]
-struct DropdownBtn2;
+struct DropdownBtn(pub i32);
 
 fn handle_draw_mode_interaction(
     mut cmds: Commands,
@@ -116,46 +111,42 @@ fn update_active_dropdown_option(
 
 fn handle_dropdown_click(
     mut cmds: Commands,
-    q_btn_1: Query<&Interaction, (Changed<Interaction>, With<DropdownBtn1>)>,
-    q_btn_2: Query<&Interaction, (Changed<Interaction>, With<DropdownBtn2>)>,
+    q_btn: Query<(&Interaction, &DropdownBtn), (Changed<Interaction>, With<DropdownBtn>)>,
 ) {
-    if let Ok(interaction) = q_btn_1.get_single() {
+    for (interaction, dropdown) in q_btn.iter() {
         match interaction {
-            Interaction::Pressed => cmds.trigger(ToggleMode1Ev),
-            _ => (),
-        }
-    }
-
-    if let Ok(interaction) = q_btn_2.get_single() {
-        match interaction {
-            Interaction::Pressed => cmds.trigger(ToggleMode2Ev),
+            Interaction::Pressed => {
+                println!("Triggering toggle mode event");
+                cmds.trigger(ToggleModeEv(dropdown.0))
+            }
             _ => (),
         }
     }
 }
 
-fn toggle_dropdown_visibility_1(
-    _trigger: Trigger<ToggleMode1Ev>,
+fn toggle_dropdown_visibility(
+    trigger: Trigger<ToggleModeEv>,
     mut q_dropdown: Query<&mut Style, With<Options1>>,
+    mut q_dropdown_2: Query<&mut Style, (With<Options2>, Without<Options1>)>,
 ) {
-    if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
-        if dropdown.display == Display::Flex {
-            dropdown.display = Display::None;
-        } else if dropdown.display == Display::None {
-            dropdown.display = Display::Flex
+    let option = trigger.event().0;
+    if option == 0 {
+        if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
+            if dropdown.display == Display::Flex {
+                dropdown.display = Display::None;
+            } else if dropdown.display == Display::None {
+                dropdown.display = Display::Flex
+            }
         }
     }
-}
 
-fn toggle_dropdown_visibility_2(
-    _trigger: Trigger<ToggleMode2Ev>,
-    mut q_dropdown: Query<&mut Style, With<Options2>>,
-) {
-    if let Ok(mut dropdown) = q_dropdown.get_single_mut() {
-        if dropdown.display == Display::Flex {
-            dropdown.display = Display::None;
-        } else if dropdown.display == Display::None {
-            dropdown.display = Display::Flex
+    if option == 1 {
+        if let Ok(mut dropdown) = q_dropdown_2.get_single_mut() {
+            if dropdown.display == Display::Flex {
+                dropdown.display = Display::None;
+            } else if dropdown.display == Display::None {
+                dropdown.display = Display::Flex
+            }
         }
     }
 }
@@ -284,7 +275,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     cmds.spawn(root_container).with_children(|container| {
         // Draw Mode 1 Container
         container
-            .spawn((DropdownBtn1, dropdown_btn()))
+            .spawn((DropdownBtn(0), dropdown_btn()))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(draw_container())
@@ -336,7 +327,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
 
         // Draw Mode 2 Container
         container
-            .spawn((DropdownBtn2, dropdown_btn()))
+            .spawn((DropdownBtn(1), dropdown_btn()))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(draw_container())
