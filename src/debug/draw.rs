@@ -60,6 +60,14 @@ impl RtsPfDebug {
         }
     }
 
+    pub fn mode_string(&self, mode: i32) -> String {
+        if mode == 0 {
+            return Self::draw_mode_to_string(self.draw_mode_1);
+        }
+
+        return Self::draw_mode_to_string(self.draw_mode_2);
+    }
+
     pub fn mode1_string(&self) -> String {
         Self::draw_mode_to_string(self.draw_mode_1)
     }

@@ -35,10 +35,7 @@ struct ActiveOption1(pub String);
 struct ActiveOption2(pub String);
 
 #[derive(Component)]
-struct OptionBox1;
-
-#[derive(Component)]
-struct OptionBox2;
+struct OptionBox(pub i32);
 
 #[derive(Component)]
 struct Options1;
@@ -97,15 +94,10 @@ fn handle_draw_mode_interaction(
 fn update_active_dropdown_option(
     _trigger: Trigger<UpdateDropdownOptionEv>,
     dbg: Res<RtsPfDebug>,
-    mut q_txt_1: Query<&mut Text, (With<OptionBox1>, Without<OptionBox2>)>,
-    mut q_txt_2: Query<&mut Text, (With<OptionBox2>, Without<OptionBox1>)>,
+    mut q_txt: Query<(&mut Text, &OptionBox)>,
 ) {
-    if let Ok(mut txt) = q_txt_1.get_single_mut() {
-        txt.sections[0].value = dbg.mode1_string();
-    }
-
-    if let Ok(mut txt) = q_txt_2.get_single_mut() {
-        txt.sections[0].value = dbg.mode2_string();
+    for (mut txt, options) in q_txt.iter_mut() {
+        txt.sections[0].value = dbg.mode_string(options.0);
     }
 }
 
@@ -268,8 +260,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let dropdown_1 = NodeBundle::default();
     let dropdown_2 = NodeBundle::default();
 
-    let active_option_1 = (active_option(dbg.mode1_string()), OptionBox1);
-    let active_option_2 = (active_option(dbg.mode2_string()), OptionBox2);
+    let active_option_1 = (active_option(dbg.mode1_string()), OptionBox(0));
+    let active_option_2 = (active_option(dbg.mode2_string()), OptionBox(1));
 
     // Root Container
     cmds.spawn(root_container).with_children(|container| {
