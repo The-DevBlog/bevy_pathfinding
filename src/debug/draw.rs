@@ -1,9 +1,9 @@
 use crate::*;
-use bevy::render::{
-    render_resource::{
+use bevy::{
+    image::{ImageSampler, ImageSamplerDescriptor},
+    render::render_resource::{
         Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     },
-    texture::{ImageSampler, ImageSamplerDescriptor},
 };
 use cell::Cell;
 use grid_controller::GridController;
@@ -21,10 +21,10 @@ impl Plugin for DrawPlugin {
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (draw_grid, detect_debug_change))
-            .observe(draw_flowfield)
-            .observe(draw_integration_field)
-            .observe(draw_costfield)
-            .observe(draw_index);
+            .add_observer(draw_flowfield)
+            .add_observer(draw_integration_field)
+            .add_observer(draw_costfield)
+            .add_observer(draw_index);
     }
 }
 
@@ -169,7 +169,7 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
     let grid = grid_controller.get_single().unwrap();
 
     gizmos.grid(
-        Isometry2d::default(),
+        Isometry3d::default(),
         UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
         Vec2::new(grid.cell_radius * 2.0, grid.cell_radius * 2.0),
         COLOR_GRID,
@@ -255,14 +255,11 @@ fn draw_flowfield(
 
             // Use the shared mesh and material
             let marker = (
-                PbrBundle {
-                    mesh,
-                    material: material.clone(),
-                    transform: Transform {
-                        translation: cell.world_position + offset,
-                        rotation,
-                        ..default()
-                    },
+                Mesh3d(mesh),
+                MeshMaterial3d(material.clone()),
+                Transform {
+                    translation: cell.world_position + offset,
+                    rotation,
                     ..default()
                 },
                 FlowFieldArrow,
@@ -271,16 +268,9 @@ fn draw_flowfield(
 
             // Use the shared arrowhead mesh and material
             let arrow_head = (
-                PbrBundle {
-                    mesh: arrow_head_mesh.clone(),
-                    material: material.clone(),
-                    transform: Transform {
-                        translation: Vec3::ZERO,
-                        rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                        ..default()
-                    },
-                    ..default()
-                },
+                Mesh3d(arrow_head_mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
                 Name::new("Arrowhead"),
             );
 
@@ -467,18 +457,14 @@ fn draw<T: Component + Copy>(
 
                 // Spawn each digit as a separate PBR entity
                 let dig = (
-                    PbrBundle {
-                        mesh: mesh.clone(),
-                        material,
-                        transform: Transform {
-                            translation: cell.world_position + offset,
-                            rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                            scale,
-                            ..default()
-                        },
-                        ..default()
-                    },
                     comp,
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation: cell.world_position + offset,
+                        rotation: Quat::from_rotation_x(FRAC_PI_2),
+                        scale,
+                    },
                 );
 
                 cmds.spawn(dig);

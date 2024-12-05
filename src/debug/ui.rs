@@ -22,8 +22,8 @@ impl Plugin for UiPlugin {
                     handle_drag,
                 ),
             )
-            .observe(toggle_dropdown_visibility)
-            .observe(update_active_dropdown_option);
+            .add_observer(toggle_dropdown_visibility)
+            .add_observer(update_active_dropdown_option);
     }
 }
 
@@ -36,14 +36,14 @@ struct DrawModeTxt;
 
 #[derive(Component)]
 #[require(Text)]
+struct Title;
+
+#[derive(Component)]
+#[require(Text)]
 struct OptionTxt;
 
 #[derive(Component)]
 #[require(Button, Node)]
-struct TitleBar;
-
-#[derive(Component)]
-#[require(Text)]
 struct TitleBar;
 
 #[derive(Component)]
@@ -65,7 +65,7 @@ struct OptionBox(pub OptionsSet);
 struct DropdownOptions(pub OptionsSet);
 
 #[derive(Component)]
-#[require(Node, DebugUI)]
+#[require(Node)]
 struct RootCtr;
 
 #[derive(Component)]
@@ -129,7 +129,7 @@ fn update_active_dropdown_option(
             OptionsSet::Two => 2,
         };
 
-        txt.sections[0].value = dbg.mode_string(num);
+        txt.0 = dbg.mode_string(num);
     }
 }
 
@@ -151,7 +151,7 @@ fn handle_dropdown_click(
 
 fn handle_drag(
     q_title_bar: Query<&Interaction, With<TitleBar>>,
-    mut q_ui: Query<&mut Style, With<DebugUI>>,
+    mut q_ui: Query<&mut Node, With<DebugUI>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
     let Ok(mut ui_style) = q_ui.get_single_mut() else {
@@ -175,7 +175,7 @@ fn handle_drag(
 
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
-    mut q_dropdown: Query<(&mut Style, &DropdownOptions)>,
+    mut q_dropdown: Query<(&mut Node, &DropdownOptions)>,
 ) {
     let option = trigger.event().0;
 
@@ -196,6 +196,59 @@ fn toggle_dropdown_visibility(
     }
 }
 
+#[derive(Bundle)]
+struct DropDownBtnBundle {
+    comp: DropdownBtn,
+    btn: Button,
+    background_clr: BackgroundColor,
+    border_clr: BorderColor,
+    border_radius: BorderRadius,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct ActiveOptionCtrBundle {
+    comp: ActiveOptionCtr,
+    border_clr: BorderColor,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct DrawModeTxtCtr {
+    comp: DrawModeTxt,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct OptionBoxCtr {
+    comp: OptionBox,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+}
+
+#[derive(Bundle)]
+struct DropdownOptionsCtr {
+    comp: DropdownOptions,
+    background_clr: BackgroundColor,
+    border_radius: BorderRadius,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct OptionTxtCtr {
+    comp: OptionTxt,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+}
+
 fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
     let root_ctr = (
         RootCtr,
@@ -207,7 +260,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         BorderColor::from(CLR_BORDER),
         BorderRadius::all(Val::Px(10.0)),
         BackgroundColor::from(CLR_BACKGROUND_1),
-        // DebugUI,
+        DebugUI,
         Name::new("Debug Container"),
     );
 
@@ -233,99 +286,101 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
         TextColor::from(CLR_TITLE),
     );
 
-    let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropdownBtn {
+    let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropDownBtnBundle {
         let radius = match set {
             OptionsSet::One => BorderRadius::ZERO,
             OptionsSet::Two => BorderRadius::bottom(Val::Px(10.0)),
         };
-
-        (
-            DropdownBtn(set),
-            BackgroundColor::from(CLR_BACKGROUND_2),
-            BorderColor::from(CLR_BORDER),
-            radius,
-            Node {
+        DropDownBtnBundle {
+            comp: DropdownBtn(set),
+            btn: Button::default(),
+            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+            border_clr: BorderColor::from(CLR_BORDER),
+            border_radius: radius,
+            node: Node {
                 border,
                 ..default()
             },
-            Name::new("Dropdown Button"),
-        )
+            name: Name::new("Dropdown Button"),
+        }
     };
 
-    let active_option_ctr = || -> ActiveOptionCtr {
-        (
-            ActiveOptionCtr,
-            BorderColor::from(CLR_BORDER),
-            Node {
-                padding: UiRect::all(Val::Px(5.)),
+    let active_option_ctr = || -> ActiveOptionCtrBundle {
+        ActiveOptionCtrBundle {
+            comp: ActiveOptionCtr,
+            border_clr: BorderColor::from(CLR_BORDER),
+            node: Node {
+                padding: UiRect::all(Val::Px(5.0)),
                 ..default()
             },
-            Name::new("Draw Mode Container"),
-        )
+            name: Name::new("Draw Mode Container"),
+        }
     };
 
-    let draw_mode_txt = |txt: String| -> DrawModeTxt {
-        (
-            DrawModeTxt,
-            Text::new(txt),
-            TextFont::from_font_size(FONT_SIZE),
-            TextColor::from(CLR_TXT),
-            Name::new("Draw Mode Text"),
-        )
+    let draw_mode_txt = |txt: String| -> DrawModeTxtCtr {
+        DrawModeTxtCtr {
+            comp: DrawModeTxt,
+            txt: Text::new(txt),
+            txt_font: TextFont::from_font_size(FONT_SIZE),
+            txt_clr: TextColor::from(CLR_TXT),
+            name: Name::new("Draw Mode Text"),
+        }
     };
 
-    let active_option = |txt: String, set: OptionsSet| -> OptionBox {
-        (
-            OptionBox(set),
-            Text::new(txt),
-            TextColor::from(CLR_TXT),
-            TextFont::from_font_size(FONT_SIZE),
-        )
+    let active_option = |txt: String, set: OptionsSet| -> OptionBoxCtr {
+        OptionBoxCtr {
+            comp: OptionBox(set),
+            txt: Text::new(txt),
+            txt_font: TextFont::from_font_size(FONT_SIZE),
+            txt_clr: TextColor::from(CLR_TXT),
+        }
     };
 
     let options_container =
-        |radius: Option<BorderRadius>, options_set: OptionsSet| -> DropdownOptions {
+        |radius: Option<BorderRadius>, options_set: OptionsSet| -> DropdownOptionsCtr {
             let radius = match radius {
                 Some(r) => r,
                 None => BorderRadius::ZERO,
             };
-            (
-                DropdownOptions(options_set),
-                BackgroundColor::from(CLR_BACKGROUND_2),
-                radius,
-                Node {
+            DropdownOptionsCtr {
+                comp: DropdownOptions(options_set),
+                background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+                border_radius: radius,
+                node: Node {
                     flex_direction: FlexDirection::Column,
                     display: Display::None,
                     ..default()
                 },
-                Name::new("Options Container"),
-            )
+                name: Name::new("Options Container"),
+            }
         };
 
-    let btn_option =
-        |set: OptionsSet, txt: String, radius: Option<BorderRadius>| -> SetActiveOption {
-            let radius = match radius {
-                Some(r) => r,
-                None => BorderRadius::ZERO,
-            };
-
-            (
-                SetActiveOption { set, txt },
-                radius,
-                Node {
-                    padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-                    ..default()
-                },
-            )
+    let btn_option = |set: OptionsSet,
+                      txt: String,
+                      radius: Option<BorderRadius>|
+     -> (SetActiveOption, BorderRadius, Node) {
+        let radius = match radius {
+            Some(r) => r,
+            None => BorderRadius::ZERO,
         };
 
-    let option_txt = |txt: String| -> OptionTxt {
         (
-            OptionTxt,
-            Text::new(txt),
-            TextColor::from(CLR_TXT),
-            TextFont::from_font_size(FONT_SIZE),
+            SetActiveOption { set, txt },
+            radius,
+            Node {
+                padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                ..default()
+            },
         )
+    };
+
+    let option_txt = |txt: String| -> OptionTxtCtr {
+        OptionTxtCtr {
+            comp: OptionTxt,
+            txt: Text::new(txt),
+            txt_font: TextFont::from_font_size(FONT_SIZE),
+            txt_clr: TextColor::from(CLR_TXT),
+        }
     };
 
     // Root Container

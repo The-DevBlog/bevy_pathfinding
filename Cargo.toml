@@ -5,12 +5,10 @@ edition = "2021"
 
 [dependencies]
 bevy = "0.15.0"
-bevy_rapier3d = "0.27.0"
-# bevy_rapier3d = { git = "https://github.com/Vrixyz/bevy_rapier.git", branch = "master-bevy_0.15" }
+# bevy_rapier3d = "0.27.0"
+bevy_rapier3d = { git = "https://github.com/Vrixyz/bevy_rapier.git", branch = "master-bevy_0.15" }
 image = "0.25.5"
 pathfinding = "4.11.0"
-# windows = "0.54.0"
-# windows-sys = "0.52.0"
 
 [profile.dev]
 opt-level = 0

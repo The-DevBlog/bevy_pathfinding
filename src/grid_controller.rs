@@ -9,7 +9,7 @@ pub struct GridControllerPlugin;
 
 impl Plugin for GridControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.observe(initialize_flowfield);
+        app.add_observer(initialize_flowfield);
     }
 }
 
