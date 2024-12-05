@@ -169,12 +169,20 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
     let grid = grid_controller.get_single().unwrap();
 
     gizmos.grid(
-        Vec3::ZERO,
-        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        Isometry2d::default(),
         UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
-        Vec2::new(grid.cell_radius * 2., grid.cell_radius * 2.),
+        Vec2::new(grid.cell_radius * 2.0, grid.cell_radius * 2.0),
         COLOR_GRID,
     );
+
+    // TODO: remove
+    // gizmos.grid(
+    //     Vec3::ZERO,
+    //     Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+    //     UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
+    //     Vec2::new(grid.cell_radius * 2., grid.cell_radius * 2.),
+    //     COLOR_GRID,
+    // );
 }
 
 fn draw_flowfield(
