@@ -40,7 +40,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GridControllerPlugin);
+        // app.add_plugins(GridControllerPlugin);
         // app.init_resource::<TargetCell>()
         //     .add_systems(Update, remove_flowfield)
         //     .observe(set_target_cell)
