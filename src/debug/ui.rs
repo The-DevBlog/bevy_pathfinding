@@ -18,7 +18,7 @@ impl Plugin for UiPlugin {
                 Update,
                 (
                     handle_dropdown_click,
-                    handle_draw_mode_interaction,
+                    handle_drawmode_option_interaction,
                     handle_drag,
                 ),
             )
@@ -69,7 +69,7 @@ impl OptionsSet {
 #[derive(Component)]
 struct DropdownBtn(pub OptionsSet);
 
-fn handle_draw_mode_interaction(
+fn handle_drawmode_option_interaction(
     mut cmds: Commands,
     mut q_option: Query<
         (&Interaction, &ActiveOption, &mut BackgroundColor),
