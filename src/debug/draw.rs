@@ -1,9 +1,9 @@
 use crate::*;
-use bevy::render::{
-    render_resource::{
+use bevy::{
+    image::{ImageSampler, ImageSamplerDescriptor},
+    render::render_resource::{
         Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     },
-    texture::{ImageSampler, ImageSamplerDescriptor},
 };
 use cell::Cell;
 use grid_controller::GridController;
@@ -21,10 +21,10 @@ impl Plugin for DrawPlugin {
             .register_type::<RtsPfDebug>()
             .add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (draw_grid, detect_debug_change))
-            .observe(draw_flowfield)
-            .observe(draw_integration_field)
-            .observe(draw_costfield)
-            .observe(draw_index);
+            .add_observer(draw_flowfield)
+            .add_observer(draw_integration_field)
+            .add_observer(draw_costfield)
+            .add_observer(draw_index);
     }
 }
 
@@ -166,13 +166,14 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
         return;
     }
 
-    let grid = grid_controller.get_single().unwrap();
+    let Ok(grid) = grid_controller.get_single() else {
+        return;
+    };
 
     gizmos.grid(
-        Vec3::ZERO,
-        Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+        Isometry3d::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
-        Vec2::new(grid.cell_radius * 2., grid.cell_radius * 2.),
+        Vec2::new(grid.cell_radius * 2.0, grid.cell_radius * 2.0),
         COLOR_GRID,
     );
 }
@@ -180,7 +181,7 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<RtsPfDebug>,
-    q_grid_controller: Query<&GridController>,
+    q_grid: Query<&GridController>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -191,7 +192,9 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let grid = q_grid_controller.get_single().unwrap();
+    let Ok(grid) = q_grid.get_single() else {
+        return;
+    };
 
     let mut marker_scale = 0.7;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
@@ -200,9 +203,8 @@ fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let offset = match calculate_offset(&grid, dbg, DrawMode::FlowField) {
-        Some(offset) => offset,
-        None => return,
+    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::FlowField) else {
+        return;
     };
 
     let arrow_length = grid.cell_diameter() * 0.6 * marker_scale;
@@ -245,32 +247,24 @@ fn draw_flowfield(
                 false => arrow_mesh.clone(),
             };
 
-            // Use the shared mesh and material
             let marker = (
-                PbrBundle {
-                    mesh,
-                    material: material.clone(),
-                    transform: Transform {
-                        translation: cell.world_position + offset,
-                        rotation,
-                        ..default()
-                    },
+                Mesh3d(mesh),
+                MeshMaterial3d(material.clone()),
+                Transform {
+                    translation: cell.world_position + offset,
+                    rotation,
                     ..default()
                 },
                 FlowFieldArrow,
                 Name::new("Flowfield Arrow"),
             );
 
-            // Use the shared arrowhead mesh and material
             let arrow_head = (
-                PbrBundle {
-                    mesh: arrow_head_mesh.clone(),
-                    material: material.clone(),
-                    transform: Transform {
-                        translation: Vec3::ZERO,
-                        rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                        ..default()
-                    },
+                Mesh3d(arrow_head_mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform {
+                    translation: Vec3::ZERO,
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
                     ..default()
                 },
                 Name::new("Arrowhead"),
@@ -305,9 +299,8 @@ fn draw_integration_field(
 
     let grid = q_grid.get_single().unwrap();
 
-    let offset = match calculate_offset(&grid, dbg, DrawMode::IntegrationField) {
-        Some(offset) => offset,
-        None => return,
+    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::IntegrationField) else {
+        return;
     };
 
     let str = |cell: &Cell| format!("{}", cell.best_cost);
@@ -459,18 +452,14 @@ fn draw<T: Component + Copy>(
 
                 // Spawn each digit as a separate PBR entity
                 let dig = (
-                    PbrBundle {
-                        mesh: mesh.clone(),
-                        material,
-                        transform: Transform {
-                            translation: cell.world_position + offset,
-                            rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                            scale,
-                            ..default()
-                        },
-                        ..default()
-                    },
                     comp,
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation: cell.world_position + offset,
+                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
+                        scale,
+                    },
                 );
 
                 cmds.spawn(dig);

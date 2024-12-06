@@ -65,7 +65,6 @@ impl FlowField {
         let dest_cell = &mut self.grid[dest_idx.y as usize][dest_idx.x as usize];
         dest_cell.cost = 0;
         dest_cell.best_cost = 0;
-        // self.destination_cell = Some(dest_cell.clone());
         self.destination_cell = dest_cell.clone();
 
         let mut cells_to_check: VecDeque<IVec2> = VecDeque::new();
@@ -138,6 +137,7 @@ impl FlowField {
         }
     }
 
+    // TODO: use this in create_integration field above
     fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
         let mut neighbor_cells = Vec::new();
 
@@ -149,6 +149,7 @@ impl FlowField {
         neighbor_cells
     }
 
+    // TODO: use this in create_integration field above
     fn get_cell_at_relative_pos(
         &self,
         origin_pos: IVec2,
