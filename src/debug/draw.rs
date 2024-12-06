@@ -444,7 +444,6 @@ fn draw<T: Component + Copy>(
 
                 let material = materials.add(StandardMaterial {
                     base_color_texture: Some(digits.0[digit as usize].clone()),
-                    base_color: Color::WHITE,
                     alpha_mode: AlphaMode::Blend,
                     unlit: true,
                     ..default()
