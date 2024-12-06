@@ -1,5 +1,5 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_rapier3d::plugin::RapierContext;
+use bevy_rapier3d::plugin::{RapierContext, ReadDefaultRapierContext};
 
 use crate::{
     debug::draw::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase,
@@ -38,7 +38,7 @@ fn initialize_flowfield(
     mut q_grid_controller: Query<&mut GridController>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
-    rapier_ctx: Res<RapierContext>,
+    rapier_ctx: ReadDefaultRapierContext,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
 ) {
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
@@ -64,7 +64,6 @@ fn initialize_flowfield(
             .cur_flowfield
             .get_cell_from_world_position(world_mouse_pos);
 
-        // println!("Destination cell: {}", destination_cell.grid_idx);
         grid_controller
             .cur_flowfield
             .create_integration_field(destination_cell);
