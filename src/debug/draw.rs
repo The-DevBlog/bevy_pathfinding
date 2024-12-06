@@ -457,7 +457,7 @@ fn draw<T: Component + Copy>(
                     MeshMaterial3d(material),
                     Transform {
                         translation: cell.world_position + offset,
-                        rotation: Quat::from_rotation_x(FRAC_PI_2),
+                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
                         scale,
                     },
                 );

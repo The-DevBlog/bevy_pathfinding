@@ -403,7 +403,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
             });
 
         // Dropdown Options Container
-        ctr.spawn((options_container(None, OptionsSet::One)))
+        ctr.spawn(options_container(None, OptionsSet::One))
             // Dropdown Options
             .with_children(|options| {
                 options
