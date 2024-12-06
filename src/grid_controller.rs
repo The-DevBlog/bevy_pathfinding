@@ -1,5 +1,5 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_rapier3d::plugin::{RapierContext, ReadDefaultRapierContext};
+use bevy_rapier3d::plugin::{DefaultRapierContext, RapierContext};
 
 use crate::{
     debug::draw::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase,
@@ -35,27 +35,29 @@ impl GridController {
 fn initialize_flowfield(
     _trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
-    mut q_grid_controller: Query<&mut GridController>,
+    mut q_grid: Query<&mut GridController>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
-    rapier_ctx: ReadDefaultRapierContext,
+    q_rapier: Query<&RapierContext, With<DefaultRapierContext>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
 ) {
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
     };
 
-    let cam = match q_cam.get_single() {
-        Ok(value) => value,
-        Err(_) => return,
+    let Ok(cam) = q_cam.get_single() else {
+        return;
     };
 
-    let map_base = match q_map_base.get_single() {
-        Ok(value) => value,
-        Err(_) => return,
+    let Ok(map_base) = q_map_base.get_single() else {
+        return;
     };
 
-    for mut grid_controller in q_grid_controller.iter_mut() {
+    let Ok(rapier_ctx) = q_rapier.get_single() else {
+        return;
+    };
+
+    for mut grid_controller in q_grid.iter_mut() {
         grid_controller.initialize_flowfield();
         grid_controller.cur_flowfield.create_costfield(&rapier_ctx);
 

@@ -166,29 +166,22 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
         return;
     }
 
-    let grid = grid_controller.get_single().unwrap();
+    let Ok(grid) = grid_controller.get_single() else {
+        return;
+    };
 
     gizmos.grid(
-        Isometry3d::default(),
+        Isometry3d::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
         UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
         Vec2::new(grid.cell_radius * 2.0, grid.cell_radius * 2.0),
         COLOR_GRID,
     );
-
-    // TODO: remove
-    // gizmos.grid(
-    //     Vec3::ZERO,
-    //     Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-    //     UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
-    //     Vec2::new(grid.cell_radius * 2., grid.cell_radius * 2.),
-    //     COLOR_GRID,
-    // );
 }
 
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<RtsPfDebug>,
-    q_grid_controller: Query<&GridController>,
+    q_grid: Query<&GridController>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -199,7 +192,9 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let grid = q_grid_controller.get_single().unwrap();
+    let Ok(grid) = q_grid.get_single() else {
+        return;
+    };
 
     let mut marker_scale = 0.7;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
@@ -208,9 +203,8 @@ fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let offset = match calculate_offset(&grid, dbg, DrawMode::FlowField) {
-        Some(offset) => offset,
-        None => return,
+    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::FlowField) else {
+        return;
     };
 
     let arrow_length = grid.cell_diameter() * 0.6 * marker_scale;
@@ -277,6 +271,7 @@ fn draw_flowfield(
             let mut draw = cmds.spawn(marker);
 
             if !is_destination_cell {
+                println!("Spawning arrow head");
                 draw.with_children(|parent| {
                     parent.spawn(arrow_head);
                 });
