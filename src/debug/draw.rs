@@ -247,7 +247,6 @@ fn draw_flowfield(
                 false => arrow_mesh.clone(),
             };
 
-            // Use the shared mesh and material
             let marker = (
                 Mesh3d(mesh),
                 MeshMaterial3d(material.clone()),
@@ -260,18 +259,20 @@ fn draw_flowfield(
                 Name::new("Flowfield Arrow"),
             );
 
-            // Use the shared arrowhead mesh and material
             let arrow_head = (
                 Mesh3d(arrow_head_mesh.clone()),
                 MeshMaterial3d(material.clone()),
-                Transform::from_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+                Transform {
+                    translation: Vec3::ZERO,
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                    ..default()
+                },
                 Name::new("Arrowhead"),
             );
 
             let mut draw = cmds.spawn(marker);
 
             if !is_destination_cell {
-                println!("Spawning arrow head");
                 draw.with_children(|parent| {
                     parent.spawn(arrow_head);
                 });
@@ -298,9 +299,8 @@ fn draw_integration_field(
 
     let grid = q_grid.get_single().unwrap();
 
-    let offset = match calculate_offset(&grid, dbg, DrawMode::IntegrationField) {
-        Some(offset) => offset,
-        None => return,
+    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::IntegrationField) else {
+        return;
     };
 
     let str = |cell: &Cell| format!("{}", cell.best_cost);
