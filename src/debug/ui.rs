@@ -1,3 +1,4 @@
+use super::components::*;
 use super::draw::{DrawMode, RtsPfDebug};
 use bevy::{prelude::*, window::PrimaryWindow};
 
@@ -26,73 +27,6 @@ impl Plugin for UiPlugin {
             .add_observer(update_active_dropdown_option);
     }
 }
-
-#[derive(Component)]
-struct DebugUI;
-
-#[derive(Component)]
-#[require(Text)]
-struct DrawModeTxt;
-
-#[derive(Component)]
-#[require(Text)]
-struct Title;
-
-#[derive(Component)]
-#[require(Text)]
-struct OptionTxt;
-
-#[derive(Component)]
-#[require(Button, Node)]
-struct TitleBar;
-
-#[derive(Component)]
-#[require(Node)]
-struct ActiveOptionCtr;
-
-#[derive(Event)]
-struct UpdateDropdownOptionEv;
-
-#[derive(Event)]
-struct ToggleModeEv(pub OptionsSet);
-
-#[derive(Component)]
-#[require(Text)]
-struct OptionBox(pub OptionsSet);
-
-#[derive(Component)]
-#[require(Node)]
-struct DropdownOptions(pub OptionsSet);
-
-#[derive(Component)]
-#[require(Node)]
-struct RootCtr;
-
-#[derive(Component)]
-#[require(Button)]
-struct SetActiveOption {
-    set: OptionsSet,
-    txt: String,
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum OptionsSet {
-    One,
-    Two,
-}
-
-impl OptionsSet {
-    fn to_num(&self) -> i32 {
-        match self {
-            OptionsSet::One => 1,
-            OptionsSet::Two => 2,
-        }
-    }
-}
-
-#[derive(Component)]
-#[require(Button)]
-struct DropdownBtn(pub OptionsSet);
 
 fn handle_drawmode_option_interaction(
     mut cmds: Commands,

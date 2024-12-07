@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use draw::DrawPlugin;
 use ui::UiPlugin;
 
+mod components;
 pub mod draw;
 mod ui;
 
