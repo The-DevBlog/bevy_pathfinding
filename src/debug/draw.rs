@@ -112,9 +112,6 @@ struct BestCost;
 #[derive(Component, Copy, Clone)]
 struct Index;
 
-#[derive(Component, Clone, Copy)]
-struct FlowFieldArrow;
-
 fn setup(mut cmds: Commands) {
     cmds.trigger(DrawDebugEv);
 }
@@ -178,6 +175,9 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
         COLOR_GRID,
     );
 }
+
+#[derive(Component, Clone, Copy)]
+struct FlowFieldArrow;
 
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
@@ -257,7 +257,7 @@ fn draw_flowfield(
                     ..default()
                 },
                 FlowFieldArrow,
-                Name::new("Flowfield Arrow"),
+                Name::new("Flowfield Marker Arrow"),
             );
 
             let arrow_head = (
@@ -283,9 +283,9 @@ fn draw_flowfield(
                 let cross = (
                     Transform::default(),
                     Mesh3d(mesh),
-                    MeshMaterial3d(material.clone()),
+                    MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
                     FlowFieldArrow,
-                    Name::new("Flowfield Marker"),
+                    Name::new("Flowfield Marker 'X'"),
                 );
 
                 let mut cross_1 = cross.clone();
