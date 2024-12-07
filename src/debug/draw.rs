@@ -7,7 +7,6 @@ use bevy::{
 };
 use cell::Cell;
 use grid_controller::GridController;
-use grid_direction::GridDirection;
 use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
@@ -112,6 +111,9 @@ struct BestCost;
 #[derive(Component, Copy, Clone)]
 struct Index;
 
+#[derive(Component, Clone, Copy)]
+struct FlowFieldArrow;
+
 fn setup(mut cmds: Commands) {
     cmds.trigger(DrawDebugEv);
 }
@@ -176,9 +178,7 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
     );
 }
 
-#[derive(Component, Clone, Copy)]
-struct FlowFieldArrow;
-
+// TODO: Cleanup this method
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<RtsPfDebug>,
