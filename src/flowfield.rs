@@ -135,39 +135,67 @@ impl FlowField {
                 self.grid[y][x].best_direction = best_direction;
             }
         }
+
+        // TODO: This was from the original tutorial. Do I need to do it this way?
+        // for y in 0..grid_size_y {
+        //     for x in 0..grid_size_x {
+        //         let cur_cell = &mut self.grid[y][x].clone();
+
+        //         let cur_neighbors =
+        //             self.get_neighbor_cells(cur_cell.grid_idx, GridDirection::all_directions());
+
+        //         let mut best_cost = cur_cell.best_cost;
+
+        //         for cur_neighbor in cur_neighbors.iter() {
+        //             if cur_neighbor.best_cost < best_cost {
+        //                 best_cost = cur_neighbor.best_cost;
+        //                 let best_direction =
+        //                     GridDirection::from_vector2(cur_neighbor.grid_idx - cur_cell.grid_idx);
+
+        //                 if let Some(best_direction) = best_direction {
+        //                     cur_cell.best_direction = best_direction;
+        //                 }
+
+        //                 self.grid[y][x] = *cur_cell;
+        //             }
+        //         }
+        //     }
+        // }
     }
 
+    // TODO: This was from the original tutorial. Do I need to do it this way?
     // TODO: use this in create_integration field above
-    fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
-        let mut neighbor_cells = Vec::new();
+    // fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
+    //     let mut neighbor_cells = Vec::new();
 
-        for direction in directions {
-            if let Some(new_neighbor) = self.get_cell_at_relative_pos(node_index, direction) {
-                neighbor_cells.push(new_neighbor);
-            }
-        }
-        neighbor_cells
-    }
+    //     for direction in directions {
+    //         if let Some(new_neighbor) = self.get_cell_at_relative_pos(node_index, direction) {
+    //             neighbor_cells.push(new_neighbor);
+    //         }
+    //     }
+    //     neighbor_cells
+    // }
 
+    // TODO: This was from the original tutorial. Do I need to do it this way?
     // TODO: use this in create_integration field above
-    fn get_cell_at_relative_pos(
-        &self,
-        origin_pos: IVec2,
-        direction: GridDirection,
-    ) -> Option<Cell> {
-        let relative_pos = direction.vector();
-        let final_pos = origin_pos + relative_pos;
+    // fn get_cell_at_relative_pos(
+    //     &self,
+    //     origin_pos: IVec2,
+    //     direction: GridDirection,
+    // ) -> Option<Cell> {
+    //     let relative_pos = direction.vector();
+    //     let final_pos = origin_pos + relative_pos;
 
-        if final_pos.x < 0
-            || final_pos.x >= self.grid_size.x
-            || final_pos.y < 0
-            || final_pos.y >= self.grid_size.y
-        {
-            None
-        } else {
-            Some(self.grid[final_pos.y as usize][final_pos.x as usize]) // Note the swap of y and x
-        }
-    }
+    //     if final_pos.x < 0
+    //         || final_pos.x >= self.grid_size.x
+    //         || final_pos.y < 0
+    //         || final_pos.y >= self.grid_size.y
+    //     {
+    //         None
+    //     } else {
+    //         Some(self.grid[final_pos.y as usize][final_pos.x as usize]) // Note the swap of y and x
+    //     }
+    // }
 
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
         // Adjust world position relative to the grid's top-left corner

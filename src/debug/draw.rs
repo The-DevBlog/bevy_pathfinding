@@ -7,8 +7,9 @@ use bevy::{
 };
 use cell::Cell;
 use grid_controller::GridController;
+use grid_direction::GridDirection;
 use image::ImageFormat;
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
 
@@ -111,7 +112,7 @@ struct BestCost;
 #[derive(Component, Copy, Clone)]
 struct Index;
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 struct FlowFieldArrow;
 
 fn setup(mut cmds: Commands) {
@@ -219,7 +220,7 @@ fn draw_flowfield(
     let b = Vec2::new(d1, d2);
     let c = Vec2::new(d1, -arrow_width - grid.cell_diameter() * 0.0125);
 
-    // Create shared meshes and materials
+    // Mesh for arrow
     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
@@ -248,7 +249,7 @@ fn draw_flowfield(
             };
 
             let marker = (
-                Mesh3d(mesh),
+                Mesh3d(mesh.clone()),
                 MeshMaterial3d(material.clone()),
                 Transform {
                     translation: cell.world_position + offset,
@@ -270,12 +271,39 @@ fn draw_flowfield(
                 Name::new("Arrowhead"),
             );
 
-            let mut draw = cmds.spawn(marker);
+            if cell.cost < u8::MAX {
+                let mut draw = cmds.spawn(marker);
 
-            if !is_destination_cell {
-                draw.with_children(|parent| {
-                    parent.spawn(arrow_head);
-                });
+                if !is_destination_cell {
+                    draw.with_children(|parent| {
+                        parent.spawn(arrow_head);
+                    });
+                }
+            } else {
+                let cross = (
+                    Transform::default(),
+                    Mesh3d(mesh),
+                    MeshMaterial3d(material.clone()),
+                    FlowFieldArrow,
+                    Name::new("Flowfield Marker"),
+                );
+
+                let mut cross_1 = cross.clone();
+                cross_1.0 = Transform {
+                    translation: cell.world_position + offset,
+                    rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
+                    ..default()
+                };
+
+                let mut cross_2 = cross.clone();
+                cross_2.0 = Transform {
+                    translation: cell.world_position + offset,
+                    rotation: Quat::from_rotation_y(FRAC_PI_4),
+                    ..default()
+                };
+
+                cmds.spawn(cross_1);
+                cmds.spawn(cross_2);
             }
         }
         // println!();
