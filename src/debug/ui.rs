@@ -150,6 +150,7 @@ fn handle_dropdown_click(
 }
 
 fn handle_drag(
+    mut local_offset: Local<Option<Vec2>>,
     q_title_bar: Query<&Interaction, With<TitleBar>>,
     mut q_ui: Query<&mut Node, With<DebugUI>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
@@ -162,13 +163,34 @@ fn handle_drag(
         return;
     };
 
+    // Get the current UI position
+    let current_left = match ui_style.left {
+        Val::Px(val) => val,
+        _ => 0.0,
+    };
+    let current_top = match ui_style.top {
+        Val::Px(val) => val,
+        _ => 0.0,
+    };
+
     for interaction in q_title_bar.iter() {
         match interaction {
             Interaction::Pressed => {
-                ui_style.left = Val::Px(cursor_pos.x);
-                ui_style.top = Val::Px(cursor_pos.y)
+                // store offset on initial press
+                if local_offset.is_none() {
+                    *local_offset = Some(Vec2::new(
+                        cursor_pos.x - current_left,
+                        cursor_pos.y - current_top,
+                    ));
+                }
+
+                // Use the stored offset to position the UI precisely
+                if let Some(offset) = *local_offset {
+                    ui_style.left = Val::Px(cursor_pos.x - offset.x);
+                    ui_style.top = Val::Px(cursor_pos.y - offset.y);
+                }
             }
-            _ => (),
+            _ => *local_offset = None,
         }
     }
 }
