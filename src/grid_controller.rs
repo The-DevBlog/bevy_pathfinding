@@ -15,7 +15,6 @@ impl Plugin for GridControllerPlugin {
 
 #[derive(Component)]
 pub struct GridController {
-    pub map_size: Vec2,
     pub grid_size: IVec2,
     pub cell_radius: f32,
     pub cur_flowfield: FlowField,
