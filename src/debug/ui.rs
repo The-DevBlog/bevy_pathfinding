@@ -1,5 +1,5 @@
 use super::draw::{DrawMode, RtsPfDebug};
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::{prelude::*, window::PrimaryWindow, winit::cursor::CursorIcon};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
 const CLR_TITLE: Color = Color::srgb(0.6, 0.6, 0.6);
@@ -154,12 +154,19 @@ fn handle_drag(
     q_title_bar: Query<&Interaction, With<TitleBar>>,
     mut q_ui: Query<&mut Node, With<DebugUI>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
+    mut q_cursor: Query<&mut CursorIcon>,
 ) {
+    // println!("INTERACT: {}", q_title_bar.iter().len());
+
     let Ok(mut ui_style) = q_ui.get_single_mut() else {
         return;
     };
 
     let Some(cursor_pos) = window_q.single().cursor_position() else {
+        return;
+    };
+
+    let Ok(mut cursor) = q_cursor.get_single_mut() else {
         return;
     };
 
@@ -176,6 +183,8 @@ fn handle_drag(
     for interaction in q_title_bar.iter() {
         match interaction {
             Interaction::Pressed => {
+                *cursor = CursorIcon::System(bevy::window::SystemCursorIcon::Grab);
+
                 // store offset on initial press
                 if local_offset.is_none() {
                     *local_offset = Some(Vec2::new(
@@ -189,6 +198,10 @@ fn handle_drag(
                     ui_style.left = Val::Px(cursor_pos.x - offset.x);
                     ui_style.top = Val::Px(cursor_pos.y - offset.y);
                 }
+            }
+            Interaction::Hovered => {
+                *cursor = CursorIcon::System(bevy::window::SystemCursorIcon::Grab);
+                *local_offset = None;
             }
             _ => *local_offset = None,
         }
