@@ -214,7 +214,6 @@ impl FlowField {
         let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
         let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
 
-        println!("x: {}, grid size x: {}", x, self.grid_size.x);
         let x = min(x, self.grid_size.x as usize - 1);
         let y = min(y, self.grid_size.y as usize - 1);
 
