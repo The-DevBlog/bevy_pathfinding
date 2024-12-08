@@ -3,6 +3,7 @@ use bevy_rapier3d::plugin::{DefaultRapierContext, RapierContext};
 
 use crate::{
     debug::draw::DrawDebugEv, flowfield::*, utils, GameCamera, InitializeFlowFieldEv, MapBase,
+    Selected,
 };
 
 pub struct GridControllerPlugin;
@@ -39,6 +40,7 @@ fn initialize_flowfield(
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_rapier: Query<&RapierContext, With<DefaultRapierContext>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
+    q_selected: Query<Entity, With<Selected>>,
 ) {
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
@@ -56,9 +58,13 @@ fn initialize_flowfield(
         return;
     };
 
+    let selected_units: Vec<Entity> = q_selected.iter().collect();
+
     for mut grid_controller in q_grid.iter_mut() {
         grid_controller.initialize_flowfield();
-        grid_controller.cur_flowfield.create_costfield(&rapier_ctx);
+        grid_controller
+            .cur_flowfield
+            .create_costfield(&rapier_ctx, selected_units.clone());
 
         let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
         let destination_cell = grid_controller

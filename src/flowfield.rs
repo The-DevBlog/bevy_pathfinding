@@ -42,7 +42,7 @@ impl FlowField {
             .collect();
     }
 
-    pub fn create_costfield(&mut self, rapier_ctx: &RapierContext) {
+    pub fn create_costfield(&mut self, rapier_ctx: &RapierContext, selected_units: Vec<Entity>) {
         for cell_row in self.grid.iter_mut() {
             for cell in cell_row.iter_mut() {
                 let hit = rapier_ctx.intersection_with_shape(
@@ -52,8 +52,11 @@ impl FlowField {
                     QueryFilter::default().exclude_sensors(),
                 );
 
-                if let Some(_) = hit {
-                    cell.increase_cost(255);
+                if let Some(entity) = hit {
+                    // only increase cost if the entity is not a selected unit
+                    if !selected_units.contains(&entity) {
+                        cell.increase_cost(255);
+                    }
                 }
             }
         }
