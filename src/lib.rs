@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use debug::BevyRtsPathFindingDebugPlugin;
-use grid_controller::GridControllerPlugin;
+use flowfield::FlowfieldPlugin;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 
@@ -15,7 +15,7 @@ pub mod components;
 pub mod debug;
 pub mod events;
 pub mod flowfield;
-pub mod grid_controller;
+pub mod grid;
 mod grid_direction;
 pub mod resources;
 pub mod utils;
@@ -40,7 +40,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(GridControllerPlugin);
+        app.add_plugins(FlowfieldPlugin);
         // app.init_resource::<TargetCell>()
         //     .add_systems(Update, remove_flowfield)
         //     .observe(set_target_cell)

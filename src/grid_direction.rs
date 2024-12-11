@@ -14,7 +14,7 @@ const DIRECTIONS: [GridDirection; 9] = [
     GridDirection::NorthWest,
 ];
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, Reflect)]
 pub enum GridDirection {
     #[default]
     None,

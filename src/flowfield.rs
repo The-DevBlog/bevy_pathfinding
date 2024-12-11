@@ -1,70 +1,51 @@
-use crate::{cell::*, grid_direction::GridDirection};
-use bevy::prelude::*;
+use crate::{
+    cell::*,
+    debug::draw::{ActiveFlowfield, DrawDebugEv, SetActiveFlowfieldEv},
+    grid::Grid,
+    grid_direction::GridDirection,
+    utils, GameCamera, InitializeFlowFieldEv, MapBase, Selected,
+};
+use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use std::{cmp::min, collections::VecDeque};
 
-#[derive(Clone, Default, PartialEq)]
+pub struct FlowfieldPlugin;
+
+impl Plugin for FlowfieldPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_observer(initialize_flowfield);
+    }
+}
+
+#[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
-    pub grid_size: IVec2,
+    pub size: IVec2,
+    pub units: Vec<Entity>,
 }
 
 impl FlowField {
-    pub fn new(cell_radius: f32, grid_size: IVec2) -> Self {
+    pub fn new(cell_radius: f32, grid_size: IVec2, selected_units: Vec<Entity>) -> Self {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.,
             destination_cell: Cell::default(),
             grid: Vec::default(),
-            grid_size,
+            size: grid_size,
+            units: selected_units,
         }
     }
 
-    pub fn create_grid(&mut self) {
-        // Calculate offsets for top-left alignment
-        let offset_x = -(self.grid_size.x as f32 * self.cell_diameter) / 2.;
-        let offset_y = -(self.grid_size.y as f32 * self.cell_diameter) / 2.;
+    pub fn create_integration_field(&mut self, grid: Res<Grid>, destination_cell: Cell) {
+        println!("Start Integration Field Create");
 
-        self.grid = (0..self.grid_size.y)
-            .map(|y| {
-                (0..self.grid_size.x)
-                    .map(|x| {
-                        let x_pos = self.cell_diameter * x as f32 + self.cell_radius + offset_x;
-                        let y_pos = self.cell_diameter * y as f32 + self.cell_radius + offset_y;
-                        let world_pos = Vec3::new(x_pos, 0.0, y_pos);
-                        Cell::new(world_pos, IVec2::new(x, y))
-                    })
-                    .collect()
-            })
-            .collect();
-    }
+        self.grid = grid.grid.clone();
 
-    pub fn create_costfield(&mut self, rapier_ctx: &RapierContext, selected_units: Vec<Entity>) {
-        for cell_row in self.grid.iter_mut() {
-            for cell in cell_row.iter_mut() {
-                let hit = rapier_ctx.intersection_with_shape(
-                    cell.world_position,
-                    Quat::IDENTITY,
-                    &Collider::cuboid(self.cell_radius, self.cell_radius, self.cell_radius),
-                    QueryFilter::default().exclude_sensors(),
-                );
-
-                if let Some(entity) = hit {
-                    // only increase cost if the entity is not a selected unit
-                    if !selected_units.contains(&entity) {
-                        cell.increase_cost(255);
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn create_integration_field(&mut self, destination_cell: Cell) {
         // Initialize the destination cell in the grid
-        let dest_idx = destination_cell.grid_idx;
+        let dest_idx = destination_cell.idx;
         let dest_cell = &mut self.grid[dest_idx.y as usize][dest_idx.x as usize];
         dest_cell.cost = 0;
         dest_cell.best_cost = 0;
@@ -85,9 +66,9 @@ impl FlowField {
                 let neighbor_idx = cur_idx + delta;
 
                 if neighbor_idx.x >= 0
-                    && neighbor_idx.x < self.grid_size.x
+                    && neighbor_idx.x < self.size.x
                     && neighbor_idx.y >= 0
-                    && neighbor_idx.y < self.grid_size.y
+                    && neighbor_idx.y < self.size.y
                 {
                     let neighbor_x = neighbor_idx.x as usize;
                     let neighbor_y = neighbor_idx.y as usize;
@@ -106,11 +87,15 @@ impl FlowField {
                 }
             }
         }
+
+        println!("End Integration Field Create");
     }
 
     pub fn create_flowfield(&mut self) {
-        let grid_size_y = self.grid_size.y as usize;
-        let grid_size_x = self.grid_size.x as usize;
+        println!("Start Flowfield Create");
+
+        let grid_size_y = self.size.y as usize;
+        let grid_size_x = self.size.x as usize;
 
         for y in 0..grid_size_y {
             for x in 0..grid_size_x {
@@ -164,6 +149,7 @@ impl FlowField {
         //         }
         //     }
         // }
+        println!("End Flowfield Create");
     }
 
     // TODO: This was from the original tutorial. Do I need to do it this way?
@@ -199,27 +185,46 @@ impl FlowField {
     //         Some(self.grid[final_pos.y as usize][final_pos.x as usize]) // Note the swap of y and x
     //     }
     // }
+}
 
-    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-        // Adjust world position relative to the grid's top-left corner
-        let adjusted_x = world_pos.x - (-self.grid_size.x as f32 * self.cell_diameter / 2.0);
-        let adjusted_y = world_pos.z - (-self.grid_size.y as f32 * self.cell_diameter / 2.0);
+fn initialize_flowfield(
+    _trigger: Trigger<InitializeFlowFieldEv>,
+    mut cmds: Commands,
+    mut active_flowfield: ResMut<ActiveFlowfield>,
+    grid: Res<Grid>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    q_map_base: Query<&GlobalTransform, With<MapBase>>,
+    q_selected: Query<Entity, With<Selected>>,
+    q_flowfield: Query<Entity, With<FlowField>>,
+) {
+    println!("Start Initialize Flowfield");
 
-        // Calculate percentages within the grid
-        let mut percent_x = adjusted_x / (self.grid_size.x as f32 * self.cell_diameter);
-        let mut percent_y = adjusted_y / (self.grid_size.y as f32 * self.cell_diameter);
+    let Some(mouse_pos) = q_windows.single().cursor_position() else {
+        return;
+    };
 
-        // Clamp percentages to ensure they're within [0.0, 1.0]
-        percent_x = percent_x.clamp(0.0, 1.0);
-        percent_y = percent_y.clamp(0.0, 1.0);
+    let Ok(cam) = q_cam.get_single() else {
+        return;
+    };
 
-        // Calculate grid indices
-        let x = ((self.grid_size.x as f32) * percent_x).floor() as usize;
-        let y = ((self.grid_size.y as f32) * percent_y).floor() as usize;
+    let Ok(map_base) = q_map_base.get_single() else {
+        return;
+    };
 
-        let x = min(x, self.grid_size.x as usize - 1);
-        let y = min(y, self.grid_size.y as usize - 1);
+    let selected_units: Vec<Entity> = q_selected.iter().collect();
+    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
+    let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
-        self.grid[y][x] // Swap x and y
-    }
+    let mut flowfield = FlowField::new(grid.cell_radius, grid.size, selected_units);
+    flowfield.create_integration_field(grid, destination_cell);
+    flowfield.create_flowfield();
+
+    active_flowfield.0 = Some(flowfield.clone());
+    // cmds.trigger(SetActiveFlowfieldEv);
+
+    cmds.spawn(flowfield);
+    cmds.trigger(DrawDebugEv);
+
+    println!("End Initialize Flowfield");
 }
