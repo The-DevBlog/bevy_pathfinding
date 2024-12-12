@@ -1,4 +1,17 @@
-// use bevy::prelude::*;
+use bevy::prelude::*;
+
+use crate::flowfield::FlowField;
+
+pub struct ResourcesPlugin;
+
+impl Plugin for ResourcesPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ActiveFlowfield>();
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct ActiveFlowfield(pub Option<FlowField>);
 
 // use crate::*;
 

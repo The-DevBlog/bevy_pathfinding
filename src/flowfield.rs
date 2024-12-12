@@ -1,13 +1,9 @@
 use crate::{
-    cell::*,
-    debug::draw::{ActiveFlowfield, DrawDebugEv, SetActiveFlowfieldEv},
-    grid::Grid,
-    grid_direction::GridDirection,
-    utils, GameCamera, InitializeFlowFieldEv, MapBase, Selected,
+    cell::*, grid::Grid, grid_direction::GridDirection, utils, ActiveFlowfield, GameCamera,
+    InitializeFlowFieldEv, MapBase, Selected,
 };
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_rapier3d::{plugin::RapierContext, prelude::*};
-use std::{cmp::min, collections::VecDeque};
+use std::collections::VecDeque;
 
 pub struct FlowfieldPlugin;
 
@@ -224,7 +220,7 @@ fn initialize_flowfield(
     // cmds.trigger(SetActiveFlowfieldEv);
 
     cmds.spawn(flowfield);
-    cmds.trigger(DrawDebugEv);
+    // cmds.trigger(DrawDebugEv);
 
     println!("End Initialize Flowfield");
 }

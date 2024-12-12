@@ -1,3 +1,6 @@
+use super::components::*;
+use super::events::*;
+use super::resources::*;
 use crate::*;
 use bevy::{
     image::{ImageSampler, ImageSamplerDescriptor},
@@ -17,12 +20,9 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ActiveFlowfield>()
-            .init_resource::<RtsPfDebug>()
-            .init_resource::<Digits>()
-            .register_type::<RtsPfDebug>()
-            .add_systems(Startup, (setup, load_texture_atlas))
+        app.add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (count_flowfields, draw_grid, detect_debug_change))
+            .add_observer(trigger_draw)
             .add_observer(set_active_flowfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
@@ -31,99 +31,11 @@ impl Plugin for DrawPlugin {
     }
 }
 
-#[derive(Resource, Default)]
-pub struct ActiveFlowfield(pub Option<FlowField>);
-
-#[derive(Resource, Default)]
-struct Digits([Handle<Image>; 10]);
-
-#[derive(Reflect, Resource)]
-#[reflect(Resource)]
-pub struct RtsPfDebug {
-    pub draw_grid: bool,
-    pub draw_mode_1: DrawMode,
-    pub draw_mode_2: DrawMode,
-}
-
-impl Default for RtsPfDebug {
-    fn default() -> Self {
-        RtsPfDebug {
-            draw_grid: true,
-            draw_mode_1: DrawMode::FlowField,
-            draw_mode_2: DrawMode::Index,
-        }
-    }
-}
-
-impl RtsPfDebug {
-    pub fn draw_mode_to_string(mode: DrawMode) -> String {
-        match mode {
-            DrawMode::None => String::from("None"),
-            DrawMode::CostField => String::from("CostField"),
-            DrawMode::FlowField => String::from("FlowField"),
-            DrawMode::IntegrationField => String::from("IntegrationField"),
-            DrawMode::Index => String::from("Index"),
-        }
-    }
-
-    pub fn mode_string(&self, mode: i32) -> String {
-        if mode == 1 {
-            return Self::draw_mode_to_string(self.draw_mode_1);
-        }
-
-        return Self::draw_mode_to_string(self.draw_mode_2);
-    }
-
-    pub fn mode1_string(&self) -> String {
-        Self::draw_mode_to_string(self.draw_mode_1)
-    }
-
-    pub fn mode2_string(&self) -> String {
-        Self::draw_mode_to_string(self.draw_mode_2)
-    }
-}
-
-#[derive(Reflect, PartialEq, Clone, Copy)]
-pub enum DrawMode {
-    None,
-    CostField,
-    FlowField,
-    IntegrationField,
-    Index,
-}
-
-impl DrawMode {
-    pub fn cast(mode: String) -> Self {
-        match mode.as_str() {
-            "None" => DrawMode::None,
-            "CostField" => DrawMode::CostField,
-            "FlowField" => DrawMode::FlowField,
-            "IntegrationField" => DrawMode::IntegrationField,
-            "Index" => DrawMode::Index,
-            _ => DrawMode::None,
-        }
-    }
-}
-
-#[derive(Event)]
-pub struct DrawDebugEv;
-
-#[derive(Event)]
-pub struct SetActiveFlowfieldEv;
-
-#[derive(Component, Copy, Clone)]
-struct Cost;
-
-#[derive(Component, Copy, Clone)]
-struct BestCost;
-
-#[derive(Component, Copy, Clone)]
-struct Index;
-
-#[derive(Component, Clone, Copy)]
-struct FlowFieldArrow;
-
 fn setup(mut cmds: Commands) {
+    cmds.trigger(DrawDebugEv);
+}
+
+fn trigger_draw(_trigger: Trigger<InitializeFlowFieldEv>, mut cmds: Commands) {
     cmds.trigger(DrawDebugEv);
 }
 
@@ -209,7 +121,7 @@ fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digi
     }
 }
 
-fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
+fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
     if !debug.draw_grid {
         return;
     }
@@ -225,7 +137,7 @@ fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
 // TODO: Cleanup this method
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     grid: Res<Grid>,
     active_flowfield: Res<ActiveFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
@@ -275,7 +187,6 @@ fn draw_flowfield(
     });
 
     println!("Drawing flowfield");
-    println!("Grid: {}", active_flowfield.grid.len());
     for cell_row in active_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             // for cell in cell_row.iter() {
@@ -360,7 +271,7 @@ fn draw_flowfield(
 
 fn draw_integration_field(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     digits: Res<Digits>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
@@ -383,7 +294,7 @@ fn draw_integration_field(
 
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     digits: Res<Digits>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
@@ -406,7 +317,7 @@ fn draw_costfield(
 
 fn draw_index(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     digits: Res<Digits>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
@@ -428,7 +339,7 @@ fn draw_index(
     draw(meshes, materials, grid, digits, Index, cmds, str, offset);
 }
 
-fn calculate_offset(grid: &Grid, dbg: Res<RtsPfDebug>, draw_mode: DrawMode) -> Option<Vec3> {
+fn calculate_offset(grid: &Grid, dbg: Res<DebugOptions>, draw_mode: DrawMode) -> Option<Vec3> {
     let mode = if dbg.draw_mode_1 == draw_mode {
         Some(1)
     } else if dbg.draw_mode_2 == draw_mode {
@@ -530,7 +441,7 @@ fn draw<T: Component + Copy>(
     }
 }
 
-fn detect_debug_change(mut cmds: Commands, debug: Res<RtsPfDebug>) {
+fn detect_debug_change(mut cmds: Commands, debug: Res<DebugOptions>) {
     if debug.is_changed() {
         cmds.trigger(DrawDebugEv);
     }

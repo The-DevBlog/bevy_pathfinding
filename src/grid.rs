@@ -1,8 +1,7 @@
+use crate::cell::Cell;
 use bevy::prelude::*;
 use bevy_rapier3d::{plugin::*, prelude::*};
 use std::cmp::min;
-
-use crate::cell::Cell;
 
 pub struct GridPlugin;
 
@@ -25,9 +24,6 @@ impl Grid {
     // creates the grid and the costfield
     // all flowfields will share the same costfield
     pub fn new(size: IVec2, cell_diameter: f32, rapier_ctx: &RapierContext) -> Self {
-        println!("Start Grid Create");
-        println!("Grid Size: {}, {}", size.x, size.y);
-
         let mut grid = Grid {
             size,
             cell_diameter,
@@ -70,8 +66,6 @@ impl Grid {
                 }
             }
         }
-
-        println!("End Grid Create");
 
         grid
     }

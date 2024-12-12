@@ -66,3 +66,15 @@ impl OptionsSet {
         }
     }
 }
+
+#[derive(Component, Copy, Clone)]
+pub struct Cost;
+
+#[derive(Component, Copy, Clone)]
+pub struct BestCost;
+
+#[derive(Component, Copy, Clone)]
+pub struct Index;
+
+#[derive(Component, Clone, Copy)]
+pub struct FlowFieldArrow;

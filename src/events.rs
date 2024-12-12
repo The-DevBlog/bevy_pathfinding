@@ -22,3 +22,6 @@ pub struct CalculateFlowVectorsEv;
 
 #[derive(Event)]
 pub struct InitializeFlowFieldEv;
+
+#[derive(Event)]
+pub struct SetActiveFlowfieldEv;

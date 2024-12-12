@@ -1,5 +1,5 @@
 use super::components::*;
-use super::draw::{DrawMode, RtsPfDebug};
+use super::resources::*;
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -34,7 +34,7 @@ fn handle_drawmode_option_interaction(
         (&Interaction, &SetActiveOption, &mut BackgroundColor),
         (Changed<Interaction>,),
     >,
-    mut dbg: ResMut<RtsPfDebug>,
+    mut dbg: ResMut<DebugOptions>,
 ) {
     for (interaction, option, mut background) in q_option.iter_mut() {
         match interaction {
@@ -54,7 +54,7 @@ fn handle_drawmode_option_interaction(
 
 fn update_active_dropdown_option(
     _trigger: Trigger<UpdateDropdownOptionEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     mut q_txt: Query<(&mut Text, &OptionBox)>,
 ) {
     for (mut txt, options) in q_txt.iter_mut() {
@@ -205,7 +205,7 @@ struct OptionTxtCtr {
     txt_clr: TextColor,
 }
 
-fn draw_ui_box(mut cmds: Commands, dbg: Res<RtsPfDebug>) {
+fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
     let root_ctr = (
         RootCtr,
         Node {

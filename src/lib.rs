@@ -7,6 +7,7 @@ use bevy::window::PrimaryWindow;
 use bevy_rapier3d::{plugin::RapierContext, prelude::*};
 use debug::BevyRtsPathFindingDebugPlugin;
 use flowfield::FlowfieldPlugin;
+use resources::ResourcesPlugin;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 
@@ -40,7 +41,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(FlowfieldPlugin);
+        app.add_plugins((FlowfieldPlugin, ResourcesPlugin));
         // app.init_resource::<TargetCell>()
         //     .add_systems(Update, remove_flowfield)
         //     .observe(set_target_cell)
