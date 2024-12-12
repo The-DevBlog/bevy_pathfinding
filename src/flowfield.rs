@@ -1,16 +1,20 @@
 use crate::{
     cell::*, grid::Grid, grid_direction::GridDirection, utils, ActiveDebugFlowfield, GameCamera,
-    InitializeFlowFieldEv, MapBase, Selected,
+    InitializeFlowFieldEv, MapBase, Selected, SetActiveFlowfieldEv,
 };
 use bevy::{prelude::*, window::PrimaryWindow};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// Global atomic counter
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, set_active_dbg_flowfield)
-            .add_observer(initialize_flowfield);
+        // app.add_systems(Update, set_active_dbg_flowfield)
+        app.add_observer(initialize_flowfield);
     }
 }
 
@@ -20,6 +24,7 @@ pub struct FlowField {
     pub cell_diameter: f32,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
+    pub idx: usize,
     pub size: IVec2,
     pub units: Vec<Entity>,
 }
@@ -31,13 +36,14 @@ impl FlowField {
             cell_diameter: cell_radius * 2.,
             destination_cell: Cell::default(),
             grid: Vec::default(),
+            idx: create_idx(),
             size: grid_size,
             units: selected_units,
         }
     }
 
     pub fn create_integration_field(&mut self, grid: Res<Grid>, destination_cell: Cell) {
-        println!("Start Integration Field Create");
+        // println!("Start Integration Field Create");
 
         self.grid = grid.grid.clone();
 
@@ -85,11 +91,11 @@ impl FlowField {
             }
         }
 
-        println!("End Integration Field Create");
+        // println!("End Integration Field Create");
     }
 
     pub fn create_flowfield(&mut self) {
-        println!("Start Flowfield Create");
+        // println!("Start Flowfield Create");
 
         let grid_size_y = self.size.y as usize;
         let grid_size_x = self.size.x as usize;
@@ -146,7 +152,7 @@ impl FlowField {
         //         }
         //     }
         // }
-        println!("End Flowfield Create");
+        // println!("End Flowfield Create");
     }
 
     // TODO: This was from the original tutorial. Do I need to do it this way?
@@ -195,7 +201,7 @@ fn initialize_flowfield(
     q_selected: Query<Entity, With<Selected>>,
     // q_flowfield: Query<Entity, With<FlowField>>,
 ) {
-    println!("Start Initialize Flowfield");
+    // println!("Start Initialize Flowfield");
 
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
@@ -219,25 +225,12 @@ fn initialize_flowfield(
 
     // active_dbg_flowfield.0 = Some(flowfield.clone());
 
+    cmds.trigger(SetActiveFlowfieldEv(Some(flowfield.clone())));
     cmds.spawn(flowfield);
 
-    println!("End Initialize Flowfield");
+    // println!("End Initialize Flowfield");
 }
 
-fn set_active_dbg_flowfield(
-    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
-    // mut cmds: Commands,
-    q_selected: Query<Entity, With<Selected>>,
-    q_flowfield: Query<(Entity, &FlowField)>,
-) {
-    let Some(unit) = q_selected.iter().next() else {
-        active_dbg_flowfield.0 = None;
-        return;
-    };
-
-    if let Ok((flowfield_entity, flowfield)) = q_flowfield.get(unit) {
-        active_dbg_flowfield.0 = Some(flowfield.clone());
-    } else {
-        active_dbg_flowfield.0 = None;
-    }
+fn create_idx() -> usize {
+    COUNTER.fetch_add(1, Ordering::SeqCst)
 }

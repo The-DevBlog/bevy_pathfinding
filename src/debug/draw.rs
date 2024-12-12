@@ -23,7 +23,7 @@ impl Plugin for DrawPlugin {
         app.add_systems(Startup, (setup, load_texture_atlas))
             .add_systems(Update, (count_flowfields, draw_grid, detect_debug_change))
             .add_observer(trigger_draw)
-            .add_observer(set_active_flowfield)
+            .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
             .add_observer(draw_costfield)
@@ -36,7 +36,7 @@ fn setup(mut cmds: Commands) {
 }
 
 fn trigger_draw(_trigger: Trigger<InitializeFlowFieldEv>, mut cmds: Commands) {
-    cmds.trigger(DrawDebugEv);
+    // cmds.trigger(DrawDebugEv);
 }
 
 fn count_flowfields(q: Query<&FlowField>) {
@@ -48,34 +48,67 @@ fn count_flowfields(q: Query<&FlowField>) {
     // println!("FLOWFIELD COUNT: {}", count);
 }
 
-fn set_active_flowfield(
-    _trigger: Trigger<SetActiveFlowfieldEv>,
+fn set_active_dbg_flowfield(
+    trigger: Trigger<SetActiveFlowfieldEv>,
     mut cmds: Commands,
-    mut active_flowfield: ResMut<ActiveDebugFlowfield>,
+    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
     q_selected: Query<Entity, With<Selected>>,
     q_flowfield: Query<(Entity, &FlowField), With<FlowField>>,
 ) {
-    let mut unit = None;
-    for u in q_selected.iter() {
-        unit = Some(u);
-    }
+    let Some(new_flowfield) = &trigger.event().0 else {
+        if active_dbg_flowfield.0.is_none() {
+            return;
+        }
 
-    let Some(unit) = unit else {
+        active_dbg_flowfield.0 = None;
+        cmds.trigger(DrawDebugEv);
         return;
     };
 
-    for (e, flowfield) in q_flowfield.iter() {
+    // let Some(new_flowfield) = &trigger.event().0 else {
+    //     if active_dbg_flowfield.0.is_none() {
+    //         return;
+    //     }
+    // };
+
+    // let new_flowfield = trigger.event().0.clone();
+
+    println!("setting active flowfield");
+
+    println!("Getting selected unit");
+    let unit = q_selected.iter().next();
+    let Some(unit) = unit else {
+        return;
+    };
+    println!("Acquired selected unit");
+
+    for (flowfield_entity, flowfield) in q_flowfield.iter() {
         if flowfield.units.contains(&unit) {
-            active_flowfield.0 = Some(flowfield.clone());
-            cmds.trigger(DrawDebugEv);
-            // println!("Active Flowfield: {}", e.index());
+            let Some(active_dbg_flowfield_ent) = active_dbg_flowfield.0 else {
+                println!("Setting Flowfield");
+                active_dbg_flowfield.0 = Some(flowfield_entity);
+                cmds.trigger(DrawDebugEv);
+                return;
+            };
+
+            println!(
+                "Checking active FF idx with selected FF idx: {} - {}",
+                active_dbg_flowfield_ent.index(),
+                flowfield_entity.index()
+            );
+            if active_dbg_flowfield_ent.index() != flowfield_entity.index() {
+                println!("Setting Flowfield");
+                active_dbg_flowfield.0 = Some(flowfield_entity);
+                cmds.trigger(DrawDebugEv);
+            }
+
             return;
         }
     }
 
-    // println!("Active Flowfield: None");
+    println!("Setting flowfield none");
     cmds.trigger(DrawDebugEv);
-    active_flowfield.0 = None;
+    active_dbg_flowfield.0 = None;
 }
 
 fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
@@ -139,8 +172,9 @@ fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
-    active_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
+    q_flowfield: Query<&FlowField>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -150,7 +184,11 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let Some(active_flowfield) = &active_flowfield.0 else {
+    let Some(active_dbg_flowfield) = active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let Ok(active_dbg_flowfield) = q_flowfield.get(active_dbg_flowfield) else {
         return;
     };
 
@@ -187,7 +225,7 @@ fn draw_flowfield(
     });
 
     println!("Drawing flowfield");
-    for cell_row in active_flowfield.grid.iter() {
+    for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             // for cell in cell_row.iter() {
             // print!(
@@ -195,7 +233,7 @@ fn draw_flowfield(
             //     cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
             // );
 
-            let is_destination_cell = active_flowfield.destination_cell.idx == cell.idx;
+            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
             let rotation = match is_destination_cell {
                 true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),

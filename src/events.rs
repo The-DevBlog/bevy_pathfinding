@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::flowfield::FlowField;
+
 // Phase 1
 #[derive(Event)]
 pub struct SetTargetCellEv;
@@ -24,4 +26,4 @@ pub struct CalculateFlowVectorsEv;
 pub struct InitializeFlowFieldEv;
 
 #[derive(Event)]
-pub struct SetActiveFlowfieldEv;
+pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
