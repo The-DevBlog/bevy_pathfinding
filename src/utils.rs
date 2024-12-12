@@ -21,20 +21,3 @@ pub fn to_viewport_coords(
     let viewport_position = cam.world_to_viewport(cam_transform, world_position);
     return viewport_position.unwrap();
 }
-
-// retrieves the cell row/column given a set a world coordinates
-// pub fn get_cell(grid: &Grid, coords: &Vec3) -> (u32, u32) {
-//     // Adjust mouse coordinates to the grid's coordinate system
-//     let grid_origin_x = -grid.width / 2.0;
-//     let grid_origin_z = -grid.depth / 2.0;
-//     let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
-//     let adjusted_z = coords.z - grid_origin_z;
-
-//     // Calculate the column and row indices
-//     let cell_width = grid.width / grid.rows as f32;
-//     let cell_depth = grid.depth / grid.columns as f32;
-//     let row = (adjusted_x / cell_width).floor() as u32;
-//     let column = (adjusted_z / cell_depth).floor() as u32;
-
-//     (row, column)
-// }

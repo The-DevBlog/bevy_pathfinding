@@ -1,5 +1,5 @@
 use crate::{
-    cell::*, grid::Grid, grid_direction::GridDirection, utils, ActiveFlowfield, GameCamera,
+    cell::*, grid::Grid, grid_direction::GridDirection, utils, ActiveDebugFlowfield, GameCamera,
     InitializeFlowFieldEv, MapBase, Selected,
 };
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -9,7 +9,8 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(initialize_flowfield);
+        app.add_systems(Update, set_active_dbg_flowfield)
+            .add_observer(initialize_flowfield);
     }
 }
 
@@ -186,13 +187,13 @@ impl FlowField {
 fn initialize_flowfield(
     _trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
-    mut active_flowfield: ResMut<ActiveFlowfield>,
+    // mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
     grid: Res<Grid>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
     q_selected: Query<Entity, With<Selected>>,
-    q_flowfield: Query<Entity, With<FlowField>>,
+    // q_flowfield: Query<Entity, With<FlowField>>,
 ) {
     println!("Start Initialize Flowfield");
 
@@ -216,11 +217,27 @@ fn initialize_flowfield(
     flowfield.create_integration_field(grid, destination_cell);
     flowfield.create_flowfield();
 
-    active_flowfield.0 = Some(flowfield.clone());
-    // cmds.trigger(SetActiveFlowfieldEv);
+    // active_dbg_flowfield.0 = Some(flowfield.clone());
 
     cmds.spawn(flowfield);
-    // cmds.trigger(DrawDebugEv);
 
     println!("End Initialize Flowfield");
+}
+
+fn set_active_dbg_flowfield(
+    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
+    // mut cmds: Commands,
+    q_selected: Query<Entity, With<Selected>>,
+    q_flowfield: Query<(Entity, &FlowField)>,
+) {
+    let Some(unit) = q_selected.iter().next() else {
+        active_dbg_flowfield.0 = None;
+        return;
+    };
+
+    if let Ok((flowfield_entity, flowfield)) = q_flowfield.get(unit) {
+        active_dbg_flowfield.0 = Some(flowfield.clone());
+    } else {
+        active_dbg_flowfield.0 = None;
+    }
 }

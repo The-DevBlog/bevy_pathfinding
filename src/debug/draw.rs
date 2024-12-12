@@ -51,7 +51,7 @@ fn count_flowfields(q: Query<&FlowField>) {
 fn set_active_flowfield(
     _trigger: Trigger<SetActiveFlowfieldEv>,
     mut cmds: Commands,
-    mut active_flowfield: ResMut<ActiveFlowfield>,
+    mut active_flowfield: ResMut<ActiveDebugFlowfield>,
     q_selected: Query<Entity, With<Selected>>,
     q_flowfield: Query<(Entity, &FlowField), With<FlowField>>,
 ) {
@@ -139,7 +139,7 @@ fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
-    active_flowfield: Res<ActiveFlowfield>,
+    active_flowfield: Res<ActiveDebugFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
