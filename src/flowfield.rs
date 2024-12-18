@@ -1,19 +1,14 @@
 use crate::{
-    cell::*, grid::Grid, grid_direction::GridDirection, utils, ActiveDebugFlowfield, GameCamera,
-    InitializeFlowFieldEv, MapBase, Selected, SetActiveFlowfieldEv,
+    cell::*, grid::Grid, grid_direction::GridDirection, utils, GameCamera, InitializeFlowFieldEv,
+    MapBase, Selected, SetActiveFlowfieldEv,
 };
 use bevy::{prelude::*, window::PrimaryWindow};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-// Global atomic counter
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        // app.add_systems(Update, set_active_dbg_flowfield)
         app.add_observer(initialize_flowfield);
     }
 }
@@ -24,7 +19,6 @@ pub struct FlowField {
     pub cell_diameter: f32,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
-    pub idx: usize,
     pub size: IVec2,
     pub units: Vec<Entity>,
 }
@@ -36,7 +30,6 @@ impl FlowField {
             cell_diameter: cell_radius * 2.,
             destination_cell: Cell::default(),
             grid: Vec::default(),
-            idx: create_idx(),
             size: grid_size,
             units: selected_units,
         }
@@ -126,80 +119,17 @@ impl FlowField {
                 self.grid[y][x].best_direction = best_direction;
             }
         }
-
-        // TODO: This was from the original tutorial. Do I need to do it this way?
-        // for y in 0..grid_size_y {
-        //     for x in 0..grid_size_x {
-        //         let cur_cell = &mut self.grid[y][x].clone();
-
-        //         let cur_neighbors =
-        //             self.get_neighbor_cells(cur_cell.grid_idx, GridDirection::all_directions());
-
-        //         let mut best_cost = cur_cell.best_cost;
-
-        //         for cur_neighbor in cur_neighbors.iter() {
-        //             if cur_neighbor.best_cost < best_cost {
-        //                 best_cost = cur_neighbor.best_cost;
-        //                 let best_direction =
-        //                     GridDirection::from_vector2(cur_neighbor.grid_idx - cur_cell.grid_idx);
-
-        //                 if let Some(best_direction) = best_direction {
-        //                     cur_cell.best_direction = best_direction;
-        //                 }
-
-        //                 self.grid[y][x] = *cur_cell;
-        //             }
-        //         }
-        //     }
-        // }
-        // println!("End Flowfield Create");
     }
-
-    // TODO: This was from the original tutorial. Do I need to do it this way?
-    // TODO: use this in create_integration field above
-    // fn get_neighbor_cells(&self, node_index: IVec2, directions: Vec<GridDirection>) -> Vec<Cell> {
-    //     let mut neighbor_cells = Vec::new();
-
-    //     for direction in directions {
-    //         if let Some(new_neighbor) = self.get_cell_at_relative_pos(node_index, direction) {
-    //             neighbor_cells.push(new_neighbor);
-    //         }
-    //     }
-    //     neighbor_cells
-    // }
-
-    // TODO: This was from the original tutorial. Do I need to do it this way?
-    // TODO: use this in create_integration field above
-    // fn get_cell_at_relative_pos(
-    //     &self,
-    //     origin_pos: IVec2,
-    //     direction: GridDirection,
-    // ) -> Option<Cell> {
-    //     let relative_pos = direction.vector();
-    //     let final_pos = origin_pos + relative_pos;
-
-    //     if final_pos.x < 0
-    //         || final_pos.x >= self.grid_size.x
-    //         || final_pos.y < 0
-    //         || final_pos.y >= self.grid_size.y
-    //     {
-    //         None
-    //     } else {
-    //         Some(self.grid[final_pos.y as usize][final_pos.x as usize]) // Note the swap of y and x
-    //     }
-    // }
 }
 
 fn initialize_flowfield(
     _trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
-    // mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
     grid: Res<Grid>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_selected: Query<Entity, With<Selected>>,
-    // q_flowfield: Query<Entity, With<FlowField>>,
+    q_selected: Query<(&Transform, Entity), With<Selected>>,
 ) {
     // println!("Start Initialize Flowfield");
 
@@ -215,7 +145,15 @@ fn initialize_flowfield(
         return;
     };
 
-    let selected_units: Vec<Entity> = q_selected.iter().collect();
+    // let selected_units: Vec<Entity> = q_selected.iter().collect();
+    let mut selected_units = Vec::new();
+    for (unit_transform, unit_entity) in q_selected.iter() {
+        selected_units.push(unit_entity);
+        let cell = grid.get_cell_from_world_position(unit_transform.translation);
+        grid.grid[cell.idx.x as usize][cell.idx.y as usize].cost = 1;
+        // cell.cost = 1;
+    }
+
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
@@ -223,14 +161,8 @@ fn initialize_flowfield(
     flowfield.create_integration_field(grid, destination_cell);
     flowfield.create_flowfield();
 
-    // active_dbg_flowfield.0 = Some(flowfield.clone());
-
     cmds.trigger(SetActiveFlowfieldEv(Some(flowfield.clone())));
     cmds.spawn(flowfield);
 
     // println!("End Initialize Flowfield");
-}
-
-fn create_idx() -> usize {
-    COUNTER.fetch_add(1, Ordering::SeqCst)
 }

@@ -11,5 +11,5 @@ impl Plugin for ResourcesPlugin {
 }
 
 #[derive(Resource, Default)]
-pub struct ActiveDebugFlowfield(pub Option<Entity>);
-// pub struct ActiveDebugFlowfield(pub Option<FlowField>);
+// pub struct ActiveDebugFlowfield(pub Option<Entity>);
+pub struct ActiveDebugFlowfield(pub Option<FlowField>);

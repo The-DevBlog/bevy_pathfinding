@@ -9,7 +9,6 @@ use bevy::{
     },
 };
 use cell::Cell;
-use flowfield::FlowField;
 use grid::Grid;
 use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
@@ -21,8 +20,7 @@ pub struct DrawPlugin;
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (setup, load_texture_atlas))
-            .add_systems(Update, (count_flowfields, draw_grid, detect_debug_change))
-            .add_observer(trigger_draw)
+            .add_systems(Update, (draw_grid, detect_debug_change))
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
@@ -35,80 +33,28 @@ fn setup(mut cmds: Commands) {
     cmds.trigger(DrawDebugEv);
 }
 
-fn trigger_draw(_trigger: Trigger<InitializeFlowFieldEv>, mut cmds: Commands) {
-    // cmds.trigger(DrawDebugEv);
-}
-
-fn count_flowfields(q: Query<&FlowField>) {
-    // let mut count = 0;
-    // for f in q.iter() {
-    //     count += 1;
-    // }
-
-    // println!("FLOWFIELD COUNT: {}", count);
-}
-
 fn set_active_dbg_flowfield(
     trigger: Trigger<SetActiveFlowfieldEv>,
     mut cmds: Commands,
     mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
-    q_selected: Query<Entity, With<Selected>>,
-    q_flowfield: Query<(Entity, &FlowField), With<FlowField>>,
 ) {
-    let Some(new_flowfield) = &trigger.event().0 else {
-        if active_dbg_flowfield.0.is_none() {
-            return;
-        }
-
-        active_dbg_flowfield.0 = None;
-        cmds.trigger(DrawDebugEv);
-        return;
-    };
-
-    // let Some(new_flowfield) = &trigger.event().0 else {
-    //     if active_dbg_flowfield.0.is_none() {
-    //         return;
-    //     }
-    // };
-
-    // let new_flowfield = trigger.event().0.clone();
-
-    println!("setting active flowfield");
-
-    println!("Getting selected unit");
-    let unit = q_selected.iter().next();
-    let Some(unit) = unit else {
-        return;
-    };
-    println!("Acquired selected unit");
-
-    for (flowfield_entity, flowfield) in q_flowfield.iter() {
-        if flowfield.units.contains(&unit) {
-            let Some(active_dbg_flowfield_ent) = active_dbg_flowfield.0 else {
-                println!("Setting Flowfield");
-                active_dbg_flowfield.0 = Some(flowfield_entity);
-                cmds.trigger(DrawDebugEv);
+    if let Some(new_flowfield) = &trigger.event().0 {
+        if let Some(current_flowfield) = &active_dbg_flowfield.0 {
+            // Skip if the grid is the same
+            if current_flowfield.grid == new_flowfield.grid {
                 return;
-            };
-
-            println!(
-                "Checking active FF idx with selected FF idx: {} - {}",
-                active_dbg_flowfield_ent.index(),
-                flowfield_entity.index()
-            );
-            if active_dbg_flowfield_ent.index() != flowfield_entity.index() {
-                println!("Setting Flowfield");
-                active_dbg_flowfield.0 = Some(flowfield_entity);
-                cmds.trigger(DrawDebugEv);
             }
-
-            return;
+        }
+        // Set the new flowfield and trigger debug draw
+        active_dbg_flowfield.0 = Some(new_flowfield.clone());
+        cmds.trigger(DrawDebugEv);
+    } else {
+        // Deactivate if there’s no new flowfield
+        if active_dbg_flowfield.0.is_some() {
+            active_dbg_flowfield.0 = None;
+            cmds.trigger(DrawDebugEv);
         }
     }
-
-    println!("Setting flowfield none");
-    cmds.trigger(DrawDebugEv);
-    active_dbg_flowfield.0 = None;
 }
 
 fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
@@ -174,7 +120,6 @@ fn draw_flowfield(
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
-    q_flowfield: Query<&FlowField>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -184,11 +129,7 @@ fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let Some(active_dbg_flowfield) = active_dbg_flowfield.0 else {
-        return;
-    };
-
-    let Ok(active_dbg_flowfield) = q_flowfield.get(active_dbg_flowfield) else {
+    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
         return;
     };
 
@@ -224,7 +165,7 @@ fn draw_flowfield(
         ..default()
     });
 
-    println!("Drawing flowfield");
+    // println!("Drawing flowfield");
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             // for cell in cell_row.iter() {
