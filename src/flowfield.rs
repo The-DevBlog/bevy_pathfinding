@@ -10,8 +10,13 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(initialize_flowfield);
+        app.add_systems(Update, count_flowfields)
+            .add_observer(initialize_flowfield);
     }
+}
+
+fn count_flowfields(q: Query<&FlowField>) {
+    println!("Flowfields: {}", q.iter().len());
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
@@ -157,7 +162,6 @@ fn initialize_flowfield(
         return;
     };
 
-    // let selected_units: Vec<Entity> = q_selected.iter().collect();
     let mut selected_units = Vec::new();
     let mut unit_positions = Vec::new();
     for (unit_transform, collider, unit_entity) in q_selected.iter() {
