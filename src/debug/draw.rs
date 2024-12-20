@@ -1,6 +1,7 @@
 use super::components::*;
 use super::events::*;
 use super::resources::*;
+use crate::flowfield::FlowField;
 use crate::*;
 use bevy::{
     image::{ImageSampler, ImageSamplerDescriptor},
@@ -140,7 +141,8 @@ fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::FlowField) else {
+    let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+    let Some(offset) = offset else {
         return;
     };
 
@@ -252,9 +254,9 @@ fn draw_integration_field(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     digits: Res<Digits>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
-    grid: Res<Grid>,
     q_cost: Query<Entity, With<BestCost>>,
     mut cmds: Commands,
 ) {
@@ -263,12 +265,19 @@ fn draw_integration_field(
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::IntegrationField) else {
+    let Some(flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::IntegrationField);
+    let Some(offset) = offset else {
         return;
     };
 
     let str = |cell: &Cell| format!("{}", cell.best_cost);
-    draw::<BestCost>(meshes, materials, grid, digits, BestCost, cmds, str, offset);
+    draw::<BestCost>(
+        meshes, materials, &flowfield, digits, BestCost, cmds, str, offset,
+    );
 }
 
 fn draw_costfield(
@@ -276,8 +285,8 @@ fn draw_costfield(
     dbg: Res<DebugOptions>,
     digits: Res<Digits>,
     meshes: ResMut<Assets<Mesh>>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     materials: ResMut<Assets<StandardMaterial>>,
-    grid: Res<Grid>,
     q_cost: Query<Entity, With<Cost>>,
     mut cmds: Commands,
 ) {
@@ -286,21 +295,28 @@ fn draw_costfield(
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::CostField) else {
+    let Some(flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::CostField);
+    let Some(offset) = offset else {
         return;
     };
 
     let str = |cell: &Cell| format!("{}", cell.cost);
-    draw::<Cost>(meshes, materials, grid, digits, Cost, cmds, str, offset);
+    draw::<Cost>(
+        meshes, materials, &flowfield, digits, Cost, cmds, str, offset,
+    );
 }
 
 fn draw_index(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     digits: Res<Digits>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
-    grid: Res<Grid>,
     q_idx: Query<Entity, With<Index>>,
     mut cmds: Commands,
 ) {
@@ -309,16 +325,26 @@ fn draw_index(
         cmds.entity(idx_entity).despawn_recursive();
     }
 
-    let offset = match calculate_offset(&grid, dbg, DrawMode::Index) {
-        Some(offset) => offset,
-        None => return,
+    let Some(flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::Index);
+    let Some(offset) = offset else {
+        return;
     };
 
     let str = |cell: &Cell| format!("{}{}", cell.idx.y, cell.idx.x);
-    draw(meshes, materials, grid, digits, Index, cmds, str, offset);
+    draw(
+        meshes, materials, &flowfield, digits, Index, cmds, str, offset,
+    );
 }
 
-fn calculate_offset(grid: &Grid, dbg: Res<DebugOptions>, draw_mode: DrawMode) -> Option<Vec3> {
+fn calculate_offset(
+    cell_diameter: f32,
+    dbg: Res<DebugOptions>,
+    draw_mode: DrawMode,
+) -> Option<Vec3> {
     let mode = if dbg.draw_mode_1 == draw_mode {
         Some(1)
     } else if dbg.draw_mode_2 == draw_mode {
@@ -339,8 +365,8 @@ fn calculate_offset(grid: &Grid, dbg: Res<DebugOptions>, draw_mode: DrawMode) ->
         offset.z = 0.0;
     } else {
         match mode {
-            Some(1) => offset.z = -grid.cell_diameter * 0.25,
-            Some(2) => offset.z = grid.cell_diameter * 0.25,
+            Some(1) => offset.z = -cell_diameter * 0.25,
+            Some(2) => offset.z = cell_diameter * 0.25,
             _ => (),
         };
     }
@@ -351,19 +377,22 @@ fn calculate_offset(grid: &Grid, dbg: Res<DebugOptions>, draw_mode: DrawMode) ->
 fn draw<T: Component + Copy>(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    grid: Res<Grid>,
+    flowfield: &FlowField,
     digits: Res<Digits>,
     comp: T,
     mut cmds: Commands,
     get_str: impl Fn(&Cell) -> String,
     base_offset: Vec3,
 ) {
-    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let base_digit_spacing = flowfield.cell_diameter * 0.275;
     let base_scale = 0.25;
+    let cell_diameter = flowfield.cell_diameter;
 
-    let mesh = meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter));
+    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
 
-    for cell_row in grid.grid.iter() {
+    // for cell_row in grid.grid.iter() {
+    //     for cell in cell_row.iter() {
+    for cell_row in flowfield.grid.iter() {
         for cell in cell_row.iter() {
             // Generate the string using the closure
             let value_str = get_str(cell);
@@ -376,14 +405,14 @@ fn draw<T: Component + Copy>(
             let mut scale = Vec3::splat(base_scale);
             let mut digit_spacing = base_digit_spacing;
 
-            let digit_width = grid.cell_diameter * scale.x;
+            let digit_width = cell_diameter * scale.x;
             let total_digit_width = digit_count * digit_width;
             let total_spacing_width = (digit_count - 1.0) * digit_spacing;
             let total_width = total_digit_width + total_spacing_width;
 
             // If total width exceeds cell diameter, adjust scale and spacing
-            if total_width > grid.cell_diameter {
-                let scale_factor = grid.cell_diameter / total_width;
+            if total_width > cell_diameter {
+                let scale_factor = cell_diameter / total_width;
                 scale *= scale_factor;
                 digit_spacing *= scale_factor;
             }
