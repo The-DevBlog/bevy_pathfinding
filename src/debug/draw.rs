@@ -170,12 +170,6 @@ fn draw_flowfield(
     // println!("Drawing flowfield");
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
-            // for cell in cell_row.iter() {
-            // print!(
-            //     "({},{}) {:?},  ",
-            //     cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
-            // );
-
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
             let rotation = match is_destination_cell {
@@ -390,8 +384,6 @@ fn draw<T: Component + Copy>(
 
     let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
 
-    // for cell_row in grid.grid.iter() {
-    //     for cell in cell_row.iter() {
     for cell_row in flowfield.grid.iter() {
         for cell in cell_row.iter() {
             // Generate the string using the closure
