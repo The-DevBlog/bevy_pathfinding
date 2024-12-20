@@ -1,10 +1,10 @@
-use crate::{
-    cell::*, grid::Grid, grid_direction::GridDirection, utils, GameCamera, InitializeFlowFieldEv,
-    MapBase, Selected, SetActiveFlowfieldEv,
-};
-use bevy::{prelude::*, render::primitives::Aabb, window::PrimaryWindow};
+use crate::components::*;
+use crate::events::*;
+use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
+
+use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_rapier3d::prelude::Collider;
-use std::{cmp::min, collections::VecDeque};
+use std::collections::VecDeque;
 
 pub struct FlowfieldPlugin;
 
@@ -36,7 +36,7 @@ impl FlowField {
         }
     }
 
-    pub fn create_integration_field(&mut self, mut grid: ResMut<Grid>, destination_cell: Cell) {
+    pub fn create_integration_field(&mut self, grid: ResMut<Grid>, destination_cell: Cell) {
         // println!("Start Integration Field Create");
 
         self.grid = grid.grid.clone();
@@ -123,26 +123,14 @@ impl FlowField {
     }
 
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-        // Adjust world position relative to the grid's top-left corner
-        let adjusted_x = world_pos.x - (-self.size.x as f32 * self.cell_diameter / 2.0);
-        let adjusted_y = world_pos.z - (-self.size.y as f32 * self.cell_diameter / 2.0);
+        let cell = utils::get_cell_from_world_position_helper(
+            world_pos,
+            self.size,
+            self.cell_diameter,
+            &self.grid,
+        );
 
-        // Calculate percentages within the grid
-        let mut percent_x = adjusted_x / (self.size.x as f32 * self.cell_diameter);
-        let mut percent_y = adjusted_y / (self.size.y as f32 * self.cell_diameter);
-
-        // Clamp percentages to ensure they're within [0.0, 1.0]
-        percent_x = percent_x.clamp(0.0, 1.0);
-        percent_y = percent_y.clamp(0.0, 1.0);
-
-        // Calculate grid indices
-        let x = ((self.size.x as f32) * percent_x).floor() as usize;
-        let y = ((self.size.y as f32) * percent_y).floor() as usize;
-
-        let x = min(x, self.size.x as usize - 1);
-        let y = min(y, self.size.y as usize - 1);
-
-        self.grid[y][x] // Swap x and y
+        return cell;
     }
 }
 
