@@ -60,7 +60,7 @@ impl Grid {
                     QueryFilter::default().exclude_sensors(),
                 );
 
-                if let Some(entity) = hit {
+                if let Some(_entity) = hit {
                     // increase cost now that cell exists
                     grid.grid[y as usize][x as usize].increase_cost(255);
                 }
@@ -70,6 +70,7 @@ impl Grid {
         grid
     }
 
+    // TODO: Consolidate this and flowfield method into one
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
         // Adjust world position relative to the grid's top-left corner
         let adjusted_x = world_pos.x - (-self.size.x as f32 * self.cell_diameter / 2.0);
@@ -91,5 +92,29 @@ impl Grid {
         let y = min(y, self.size.y as usize - 1);
 
         self.grid[y][x] // Swap x and y
+    }
+
+    pub fn reset_selected_unit_costs(&mut self, selected_units: Vec<(Vec3, (f32, f32))>) {
+        for (unit_pos, unit_size) in selected_units.iter() {
+            let hw = unit_size.0;
+            let hh = unit_size.1;
+
+            let min_world = Vec3::new(unit_pos.x - hw, 0.0, unit_pos.y - hh);
+            let max_world = Vec3::new(unit_pos.x + hw, 0.0, unit_pos.y + hh);
+
+            let min_cell = self.get_cell_from_world_position(min_world);
+            let max_cell = self.get_cell_from_world_position(max_world);
+
+            let min_x = min_cell.idx.x.clamp(0, self.size.x as i32 - 1);
+            let max_x = max_cell.idx.x.clamp(0, self.size.x as i32 - 1);
+            let min_y = min_cell.idx.y.clamp(0, self.size.y as i32 - 1);
+            let max_y = max_cell.idx.y.clamp(0, self.size.y as i32 - 1);
+
+            for y in min_y..=max_y {
+                for x in min_x..=max_x {
+                    self.grid[y as usize][x as usize].cost = 1;
+                }
+            }
+        }
     }
 }

@@ -2,8 +2,9 @@ use crate::{
     cell::*, grid::Grid, grid_direction::GridDirection, utils, GameCamera, InitializeFlowFieldEv,
     MapBase, Selected, SetActiveFlowfieldEv,
 };
-use bevy::{prelude::*, window::PrimaryWindow};
-use std::collections::VecDeque;
+use bevy::{prelude::*, render::primitives::Aabb, window::PrimaryWindow};
+use bevy_rapier3d::prelude::Collider;
+use std::{cmp::min, collections::VecDeque};
 
 pub struct FlowfieldPlugin;
 
@@ -35,7 +36,7 @@ impl FlowField {
         }
     }
 
-    pub fn create_integration_field(&mut self, grid: Res<Grid>, destination_cell: Cell) {
+    pub fn create_integration_field(&mut self, mut grid: ResMut<Grid>, destination_cell: Cell) {
         // println!("Start Integration Field Create");
 
         self.grid = grid.grid.clone();
@@ -120,16 +121,39 @@ impl FlowField {
             }
         }
     }
+
+    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+        // Adjust world position relative to the grid's top-left corner
+        let adjusted_x = world_pos.x - (-self.size.x as f32 * self.cell_diameter / 2.0);
+        let adjusted_y = world_pos.z - (-self.size.y as f32 * self.cell_diameter / 2.0);
+
+        // Calculate percentages within the grid
+        let mut percent_x = adjusted_x / (self.size.x as f32 * self.cell_diameter);
+        let mut percent_y = adjusted_y / (self.size.y as f32 * self.cell_diameter);
+
+        // Clamp percentages to ensure they're within [0.0, 1.0]
+        percent_x = percent_x.clamp(0.0, 1.0);
+        percent_y = percent_y.clamp(0.0, 1.0);
+
+        // Calculate grid indices
+        let x = ((self.size.x as f32) * percent_x).floor() as usize;
+        let y = ((self.size.y as f32) * percent_y).floor() as usize;
+
+        let x = min(x, self.size.x as usize - 1);
+        let y = min(y, self.size.y as usize - 1);
+
+        self.grid[y][x] // Swap x and y
+    }
 }
 
 fn initialize_flowfield(
     _trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
-    grid: Res<Grid>,
+    mut grid: ResMut<Grid>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_selected: Query<(&Transform, Entity), With<Selected>>,
+    q_selected: Query<(&Transform, &Collider, Entity), With<Selected>>,
 ) {
     // println!("Start Initialize Flowfield");
 
@@ -147,12 +171,14 @@ fn initialize_flowfield(
 
     // let selected_units: Vec<Entity> = q_selected.iter().collect();
     let mut selected_units = Vec::new();
-    for (unit_transform, unit_entity) in q_selected.iter() {
+    let mut unit_positions = Vec::new();
+    for (unit_transform, collider, unit_entity) in q_selected.iter() {
+        let size = collider.as_cuboid().unwrap().half_extents() * 0.5;
         selected_units.push(unit_entity);
-        let cell = grid.get_cell_from_world_position(unit_transform.translation);
-        grid.grid[cell.idx.x as usize][cell.idx.y as usize].cost = 1;
-        // cell.cost = 1;
+        unit_positions.push((unit_transform.translation, (size.x, size.z)));
     }
+
+    grid.reset_selected_unit_costs(unit_positions);
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
