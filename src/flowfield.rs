@@ -10,13 +10,19 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, count_flowfields)
+        app.add_systems(Update, count)
             .add_observer(initialize_flowfield);
     }
 }
 
-fn count_flowfields(q: Query<&FlowField>) {
+fn count(q: Query<&FlowField>, q2: Query<&Destination>) {
+    // println!("Destinations: {}", q2.iter().len());
     // println!("Flowfields: {}", q.iter().len());
+    println!(
+        "Destinations: {}, Flowfields: {}",
+        q2.iter().len(),
+        q.iter().len()
+    );
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
