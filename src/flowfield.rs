@@ -2,8 +2,8 @@ use crate::components::*;
 use crate::events::*;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
+use bevy::utils::HashSet;
 use bevy::{prelude::*, window::PrimaryWindow};
-use bevy_rapier3d::prelude::Collider;
 use std::collections::VecDeque;
 
 pub struct FlowfieldPlugin;
@@ -16,7 +16,7 @@ impl Plugin for FlowfieldPlugin {
 }
 
 fn count_flowfields(q: Query<&FlowField>) {
-    println!("Flowfields: {}", q.iter().len());
+    // println!("Flowfields: {}", q.iter().len());
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
@@ -30,14 +30,14 @@ pub struct FlowField {
 }
 
 impl FlowField {
-    pub fn new(cell_radius: f32, grid_size: IVec2, selected_units: Vec<Entity>) -> Self {
+    pub fn new(cell_radius: f32, grid_size: IVec2, units: Vec<Entity>) -> Self {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.,
             destination_cell: Cell::default(),
             grid: Vec::default(),
             size: grid_size,
-            units: selected_units,
+            units,
         }
     }
 
@@ -140,13 +140,14 @@ impl FlowField {
 }
 
 fn initialize_flowfield(
-    _trigger: Trigger<InitializeFlowFieldEv>,
+    trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_selected: Query<(&Transform, &Collider, Entity), With<Selected>>,
+    q_unit_info: Query<(&Transform, &UnitSize)>,
+    q_flowfield_entity: Query<&FlowFieldEntity>,
 ) {
     // println!("Start Initialize Flowfield");
 
@@ -162,25 +163,48 @@ fn initialize_flowfield(
         return;
     };
 
-    let mut selected_units = Vec::new();
-    let mut unit_positions = Vec::new();
-    for (unit_transform, collider, unit_entity) in q_selected.iter() {
-        let size = collider.as_cuboid().unwrap().half_extents() * 0.5;
-        selected_units.push(unit_entity);
-        unit_positions.push((unit_transform.translation, (size.x, size.z)));
+    let units = trigger.event().0.clone();
+    if units.is_empty() {
+        return;
     }
 
-    grid.reset_selected_unit_costs(unit_positions);
+    let mut unit_positions = Vec::new();
+    let mut flowfields_to_despawn = HashSet::new();
+    for unit in &units {
+        // despawn any existing flowfields associated with the current units
+        if let Ok(flowfield) = q_flowfield_entity.get(*unit) {
+            cmds.entity(*unit).remove::<FlowFieldEntity>();
+
+            if flowfields_to_despawn.insert(flowfield.0.index()) {
+                cmds.entity(flowfield.0).despawn_recursive();
+            }
+        }
+
+        if let Ok((transform, size)) = q_unit_info.get(*unit) {
+            unit_positions.push((transform.translation, size.0));
+        }
+    }
+
+    // reset the cell costs of the units in this new flowfield
+    grid.reset_costs(unit_positions);
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
-    let mut flowfield = FlowField::new(grid.cell_radius, grid.size, selected_units);
+    let mut flowfield = FlowField::new(grid.cell_radius, grid.size, units.clone());
     flowfield.create_integration_field(grid, destination_cell);
     flowfield.create_flowfield();
 
     cmds.trigger(SetActiveFlowfieldEv(Some(flowfield.clone())));
-    cmds.spawn(flowfield);
+
+    // Spawn the new flowfield entity
+    let flowfield_entity = cmds.spawn(flowfield).id();
+
+    // Then, for each unit...
+    for &unit in units.iter() {
+        // Insert a FlowFieldEntity component that points to the new flowfield
+        cmds.entity(unit).insert(FlowFieldEntity(flowfield_entity));
+    }
 
     // println!("End Initialize Flowfield");
 }

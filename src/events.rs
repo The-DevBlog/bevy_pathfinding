@@ -23,7 +23,7 @@ pub struct CalculateFlowFieldEv;
 pub struct CalculateFlowVectorsEv;
 
 #[derive(Event)]
-pub struct InitializeFlowFieldEv;
+pub struct InitializeFlowFieldEv(pub Vec<Entity>);
 
 #[derive(Event)]
 pub struct SetActiveFlowfieldEv(pub Option<FlowField>);

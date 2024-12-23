@@ -107,7 +107,7 @@ fn handle_drag(
         _ => 0.0,
     };
 
-    for interaction in q_title_bar.iter() {
+    for interaction in &q_title_bar {
         match interaction {
             Interaction::Pressed => {
                 // store offset on initial press

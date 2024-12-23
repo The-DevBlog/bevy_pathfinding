@@ -81,10 +81,10 @@ impl Grid {
         return cell;
     }
 
-    pub fn reset_selected_unit_costs(&mut self, selected_units: Vec<(Vec3, (f32, f32))>) {
-        for (unit_pos, unit_size) in selected_units.iter() {
-            let hw = unit_size.0;
-            let hh = unit_size.1;
+    pub fn reset_costs(&mut self, units: Vec<(Vec3, Vec2)>) {
+        for (unit_pos, unit_size) in units.iter() {
+            let hw = unit_size.x;
+            let hh = unit_size.y;
 
             let min_world = Vec3::new(unit_pos.x - hw, 0.0, unit_pos.y - hh);
             let max_world = Vec3::new(unit_pos.x + hw, 0.0, unit_pos.y + hh);

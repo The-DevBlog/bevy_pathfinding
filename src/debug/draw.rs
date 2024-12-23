@@ -126,7 +126,7 @@ fn draw_flowfield(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Remove current arrows before rendering new ones
-    for arrow_entity in q_flowfield_arrow.iter() {
+    for arrow_entity in &q_flowfield_arrow {
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
@@ -168,7 +168,7 @@ fn draw_flowfield(
     });
 
     // println!("Drawing flowfield");
-    for cell_row in active_dbg_flowfield.grid.iter() {
+    for cell_row in &active_dbg_flowfield.grid {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
@@ -255,7 +255,7 @@ fn draw_integration_field(
     mut cmds: Commands,
 ) {
     // Remove current cost field before rendering new one
-    for cost_entity in q_cost.iter() {
+    for cost_entity in &q_cost {
         cmds.entity(cost_entity).despawn_recursive();
     }
 
@@ -285,7 +285,7 @@ fn draw_costfield(
     mut cmds: Commands,
 ) {
     // Remove current cost field before rendering new one
-    for cost_entity in q_cost.iter() {
+    for cost_entity in &q_cost {
         cmds.entity(cost_entity).despawn_recursive();
     }
 
@@ -315,7 +315,7 @@ fn draw_index(
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
-    for idx_entity in q_idx.iter() {
+    for idx_entity in &q_idx {
         cmds.entity(idx_entity).despawn_recursive();
     }
 
@@ -384,7 +384,7 @@ fn draw<T: Component + Copy>(
 
     let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
 
-    for cell_row in flowfield.grid.iter() {
+    for cell_row in &flowfield.grid {
         for cell in cell_row.iter() {
             // Generate the string using the closure
             let value_str = get_str(cell);
