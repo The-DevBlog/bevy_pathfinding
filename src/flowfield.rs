@@ -10,7 +10,7 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, count)
+        app.add_systems(Update, (count, remove_flowfield))
             .add_observer(initialize_flowfield);
     }
 }
@@ -18,11 +18,11 @@ impl Plugin for FlowfieldPlugin {
 fn count(q: Query<&FlowField>, q2: Query<&Destination>) {
     // println!("Destinations: {}", q2.iter().len());
     // println!("Flowfields: {}", q.iter().len());
-    println!(
-        "Destinations: {}, Flowfields: {}",
-        q2.iter().len(),
-        q.iter().len()
-    );
+    // println!(
+    //     "Destinations: {}, Flowfields: {}",
+    //     q2.iter().len(),
+    //     q.iter().len()
+    // );
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
@@ -142,6 +142,31 @@ impl FlowField {
         );
 
         return cell;
+    }
+
+    pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
+        // Remove the unit from the units list
+        self.units.retain(|&u| u != unit);
+
+        cmds.entity(unit).remove::<Destination>();
+    }
+}
+
+fn remove_flowfield(
+    mut cmds: Commands,
+    q_flowfield: Query<(Entity, &FlowField)>,
+    // q_flowfield_entity: Query<Entity, With<FlowFieldEntity>>,
+) {
+    for (entity, flowfield) in q_flowfield.iter() {
+        if flowfield.units.is_empty() {
+            // if let Ok(flowfield_entity) = q_flowfield_entity.get(entity) {
+            //     println!("Despawning Flowfield Entity");
+            //     cmds.entity(flowfield_entity).despawn_recursive();
+            // }
+
+            println!("Despawning Flowfield");
+            cmds.entity(entity).despawn_recursive();
+        }
     }
 }
 
