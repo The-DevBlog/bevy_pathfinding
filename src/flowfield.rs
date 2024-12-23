@@ -200,9 +200,8 @@ fn initialize_flowfield(
     // Spawn the new flowfield entity
     let flowfield_entity = cmds.spawn(flowfield).id();
 
-    // Then, for each unit...
+    // Insert a FlowFieldEntity component that points to the new flowfield
     for &unit in units.iter() {
-        // Insert a FlowFieldEntity component that points to the new flowfield
         cmds.entity(unit).insert(FlowFieldEntity(flowfield_entity));
     }
 
