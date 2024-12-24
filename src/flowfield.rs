@@ -2,33 +2,24 @@ use crate::components::*;
 use crate::events::*;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
-use bevy::utils::HashSet;
 use bevy::{prelude::*, window::PrimaryWindow};
+use ops::FloatPow;
 use std::collections::VecDeque;
 
 pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (count, remove_flowfield))
+        app.add_systems(Update, update_flowfields)
             .add_observer(initialize_flowfield);
     }
-}
-
-fn count(q: Query<&FlowField>, q2: Query<&Destination>) {
-    // println!("Destinations: {}", q2.iter().len());
-    // println!("Flowfields: {}", q.iter().len());
-    // println!(
-    //     "Destinations: {}, Flowfields: {}",
-    //     q2.iter().len(),
-    //     q.iter().len()
-    // );
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
+    pub cell_diameter_squared: f32,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
     pub size: IVec2,
@@ -39,7 +30,8 @@ impl FlowField {
     pub fn new(cell_radius: f32, grid_size: IVec2, units: Vec<Entity>) -> Self {
         FlowField {
             cell_radius,
-            cell_diameter: cell_radius * 2.,
+            cell_diameter: cell_radius * 2.0,
+            cell_diameter_squared: (cell_radius * 2.0).squared(),
             destination_cell: Cell::default(),
             grid: Vec::default(),
             size: grid_size,
@@ -145,27 +137,41 @@ impl FlowField {
     }
 
     pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
-        // Remove the unit from the units list
         self.units.retain(|&u| u != unit);
-
         cmds.entity(unit).remove::<Destination>();
     }
 }
 
-fn remove_flowfield(
+fn update_flowfields(
     mut cmds: Commands,
-    q_flowfield: Query<(Entity, &FlowField)>,
-    // q_flowfield_entity: Query<Entity, With<FlowFieldEntity>>,
+    mut q_flowfields: Query<(Entity, &mut FlowField)>,
+    q_transform: Query<&Transform>,
 ) {
-    for (entity, flowfield) in q_flowfield.iter() {
-        if flowfield.units.is_empty() {
-            // if let Ok(flowfield_entity) = q_flowfield_entity.get(entity) {
-            //     println!("Despawning Flowfield Entity");
-            //     cmds.entity(flowfield_entity).despawn_recursive();
-            // }
+    for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
+        let destination_pos = flowfield.destination_cell.world_pos;
+        let mut units_to_remove = Vec::new();
 
-            println!("Despawning Flowfield");
-            cmds.entity(entity).despawn_recursive();
+        // Identify units that need to be removed
+        for &unit_entity in flowfield.units.iter() {
+            if let Ok(transform) = q_transform.get(unit_entity) {
+                let unit_pos = transform.translation;
+
+                // Use squared distance for efficiency
+                let distance_squared = (destination_pos - unit_pos).length_squared();
+
+                if distance_squared < flowfield.cell_diameter_squared {
+                    units_to_remove.push(unit_entity);
+                }
+            }
+        }
+
+        // Remove units from the flowfield
+        for unit in units_to_remove {
+            flowfield.remove_unit(unit, &mut cmds);
+        }
+
+        if flowfield.units.len() == 0 {
+            cmds.entity(flowfield_entity).despawn_recursive();
         }
     }
 }
@@ -178,10 +184,8 @@ fn initialize_flowfield(
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
     q_unit_info: Query<(&Transform, &UnitSize)>,
-    q_flowfield_entity: Query<&FlowFieldEntity>,
+    q_flowfields: Query<(Entity, &FlowField)>, // Query all existing flowfields
 ) {
-    // println!("Start Initialize Flowfield");
-
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
     };
@@ -199,42 +203,35 @@ fn initialize_flowfield(
         return;
     }
 
-    let mut unit_positions = Vec::new();
-    let mut flowfields_to_despawn = HashSet::new();
-    for unit in &units {
-        // despawn any existing flowfields associated with the current units
-        if let Ok(flowfield) = q_flowfield_entity.get(*unit) {
-            cmds.entity(*unit).remove::<FlowFieldEntity>();
-
-            if flowfields_to_despawn.insert(flowfield.0.index()) {
-                cmds.entity(flowfield.0).despawn_recursive();
-            }
+    // Remove existing flowfields that contain any of the units
+    for (flowfield_entity, flowfield) in q_flowfields.iter() {
+        if flowfield.units.iter().any(|unit| units.contains(unit)) {
+            cmds.entity(flowfield_entity).despawn_recursive();
         }
+    }
 
-        if let Ok((transform, size)) = q_unit_info.get(*unit) {
+    let mut unit_positions = Vec::new();
+
+    // Gather unit positions and sizes
+    for &unit in &units {
+        if let Ok((transform, size)) = q_unit_info.get(unit) {
             unit_positions.push((transform.translation, size.0));
         }
     }
 
-    // reset the cell costs of the units in this new flowfield
+    // Reset the grid's cell costs
     grid.reset_costs(unit_positions);
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
+    // Create a new flowfield
     let mut flowfield = FlowField::new(grid.cell_radius, grid.size, units.clone());
     flowfield.create_integration_field(grid, destination_cell);
     flowfield.create_flowfield();
 
-    cmds.trigger(SetActiveFlowfieldEv(Some(flowfield.clone())));
+    // Spawn the new flowfield
+    cmds.spawn(flowfield.clone());
 
-    // Spawn the new flowfield entity
-    let flowfield_entity = cmds.spawn(flowfield).id();
-
-    // Insert a FlowFieldEntity component that points to the new flowfield
-    for &unit in units.iter() {
-        cmds.entity(unit).insert(FlowFieldEntity(flowfield_entity));
-    }
-
-    // println!("End Initialize Flowfield");
+    cmds.trigger(SetActiveFlowfieldEv(Some(flowfield)));
 }

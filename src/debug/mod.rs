@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{color::palettes::css::GRAY, prelude::*};
 use draw::DrawPlugin;
 use resources::ResourcesPlugin;
 use ui::UiPlugin;
@@ -8,6 +8,8 @@ pub mod draw;
 mod events;
 mod resources;
 mod ui;
+
+const COLOR_GRID: Srgba = GRAY;
 
 pub struct BevyRtsPathFindingDebugPlugin;
 

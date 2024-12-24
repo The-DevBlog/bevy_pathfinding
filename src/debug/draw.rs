@@ -3,6 +3,7 @@ use super::events::*;
 use super::resources::*;
 use crate::flowfield::FlowField;
 use crate::*;
+
 use bevy::{
     image::{ImageSampler, ImageSamplerDescriptor},
     render::render_resource::{
@@ -10,6 +11,7 @@ use bevy::{
     },
 };
 use cell::Cell;
+use debug::COLOR_GRID;
 use grid::Grid;
 use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};

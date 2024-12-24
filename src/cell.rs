@@ -1,6 +1,5 @@
-use std::u16;
-
 use bevy::prelude::*;
+use std::u16;
 
 use crate::grid_direction::GridDirection;
 
