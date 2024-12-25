@@ -12,6 +12,7 @@ use bevy::{
 };
 use cell::Cell;
 use debug::COLOR_GRID;
+use events::UpdateCellEv;
 use grid::Grid;
 use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
@@ -23,7 +24,14 @@ pub struct DrawPlugin;
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (setup, load_texture_atlas))
-            .add_systems(Update, (draw_grid, detect_debug_change))
+            .add_systems(
+                Update,
+                (
+                    draw_grid,
+                    detect_debug_change,
+                    update_cell_cost.after(grid::update_costs),
+                ),
+            )
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
@@ -276,6 +284,171 @@ fn draw_integration_field(
     );
 }
 
+// fn update_cell_cost(
+//     mut cmds: Commands,
+//     mut events: EventReader<UpdateCellEv>,
+//     mut materials: ResMut<Assets<StandardMaterial>>,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     dbg: Res<DebugOptions>,
+//     digits: Res<Digits>,
+//     grid: Res<Grid>,
+//     q_cost: Query<Entity, With<Cost>>,
+// ) {
+//     // TODO: Extract this out to its own logic
+//     let base_digit_spacing = grid.cell_diameter * 0.275;
+//     let base_scale = 0.25;
+//     let cell_diameter = grid.cell_diameter;
+
+//     let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
+//     let Some(base_offset) = base_offset else {
+//         return;
+//     };
+
+//     let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
+
+//     for ev in events.read() {
+//         let cell = ev.cell;
+//         let str = cell.cost.to_string();
+
+//         // Convert the string into individual digits
+//         let digits_vec: Vec<u32> = str.chars().filter_map(|c| c.to_digit(10)).collect();
+//         let digit_count = digits_vec.len() as f32;
+
+//         // Set initial scale and digit spacing
+//         let mut scale = Vec3::splat(base_scale);
+//         let mut digit_spacing = base_digit_spacing;
+
+//         let digit_width = cell_diameter * scale.x;
+//         let total_digit_width = digit_count * digit_width;
+//         let total_spacing_width = (digit_count - 1.0) * digit_spacing;
+//         let total_width = total_digit_width + total_spacing_width;
+
+//         // If total width exceeds cell diameter, adjust scale and spacing
+//         if total_width > cell_diameter {
+//             let scale_factor = cell_diameter / total_width;
+//             scale *= scale_factor;
+//             digit_spacing *= scale_factor;
+//         }
+
+//         let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+//         for (i, &digit) in digits_vec.iter().enumerate() {
+//             // Calculate the offset for each digit
+//             let mut offset = base_offset;
+//             offset.x += x_offset + i as f32 * digit_spacing;
+
+//             let material = materials.add(StandardMaterial {
+//                 base_color_texture: Some(digits.0[digit as usize].clone()),
+//                 alpha_mode: AlphaMode::Blend,
+//                 unlit: true,
+//                 ..default()
+//             });
+
+//             let dig = (
+//                 Cost,
+//                 Mesh3d(mesh.clone()),
+//                 MeshMaterial3d(material),
+//                 Transform {
+//                     translation: cell.world_pos + offset,
+//                     rotation: Quat::from_rotation_x(-FRAC_PI_2),
+//                     scale,
+//                 },
+//             );
+
+//             cmds.entity(ev.entity).despawn(); // BUG: This is the unit entity, not the Cost entity
+//             cmds.spawn(dig);
+//         }
+//     }
+// }
+
+fn update_cell_cost(
+    mut cmds: Commands,
+    mut events: EventReader<UpdateCellEv>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    dbg: Res<DebugOptions>,
+    digits: Res<Digits>,
+    mut grid: ResMut<Grid>, // Mutable reference to modify the grid
+    q_cost: Query<Entity, With<Cost>>,
+) {
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let base_scale = 0.25;
+    let cell_diameter = grid.cell_diameter;
+
+    let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
+    };
+
+    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
+
+    for ev in events.read() {
+        let cell = ev.cell;
+
+        // Find the existing Cost entity for this cell
+        let cell_idx = cell.idx;
+        if let Some(cost_entity) = grid.get_cost_entity(cell_idx) {
+            // Update the cost entity
+            cmds.entity(cost_entity).despawn();
+        }
+
+        let str = cell.cost.to_string();
+
+        // Convert the string into individual digits
+        let digits_vec: Vec<u32> = str.chars().filter_map(|c| c.to_digit(10)).collect();
+        let digit_count = digits_vec.len() as f32;
+
+        // Set initial scale and digit spacing
+        let mut scale = Vec3::splat(base_scale);
+        let mut digit_spacing = base_digit_spacing;
+
+        let digit_width = cell_diameter * scale.x;
+        let total_digit_width = digit_count * digit_width;
+        let total_spacing_width = (digit_count - 1.0) * digit_spacing;
+        let total_width = total_digit_width + total_spacing_width;
+
+        // If total width exceeds cell diameter, adjust scale and spacing
+        if total_width > cell_diameter {
+            let scale_factor = cell_diameter / total_width;
+            scale *= scale_factor;
+            digit_spacing *= scale_factor;
+        }
+
+        let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+        // Spawn new Cost entities and associate them with the cell
+        for (i, &digit) in digits_vec.iter().enumerate() {
+            let mut offset = base_offset;
+            offset.x += x_offset + i as f32 * digit_spacing;
+
+            let material = materials.add(StandardMaterial {
+                base_color_texture: Some(digits.0[digit as usize].clone()),
+                alpha_mode: AlphaMode::Blend,
+                unlit: true,
+                ..default()
+            });
+
+            let new_cost_entity = cmds
+                .spawn((
+                    Cost,
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform {
+                        translation: cell.world_pos + offset,
+                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
+                        scale,
+                    },
+                ))
+                .id();
+
+            // Associate the new Cost entity with the cell
+            grid.set_cost_entity(cell_idx, new_cost_entity);
+        }
+    }
+}
+
+// TODO: This is getting triggered every time the 'DrawDebugEv' fires, but is this required?
+// I dont believe every cell's cost needs to get re done each time.
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,

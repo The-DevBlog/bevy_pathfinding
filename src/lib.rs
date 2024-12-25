@@ -1,10 +1,7 @@
 use crate::events::*;
 use crate::resources::*;
-
 use bevy::color::palettes::css::*;
 use bevy::prelude::*;
-use flowfield::FlowfieldPlugin;
-use resources::ResourcesPlugin;
 
 mod cell;
 pub mod components;
@@ -16,10 +13,14 @@ mod grid_direction;
 pub mod resources;
 pub mod utils;
 
+use flowfield::FlowfieldPlugin;
+use grid::GridPlugin;
+use resources::ResourcesPlugin;
+
 pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((FlowfieldPlugin, ResourcesPlugin));
+        app.add_plugins((FlowfieldPlugin, ResourcesPlugin, GridPlugin));
     }
 }

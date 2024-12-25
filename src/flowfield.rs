@@ -219,8 +219,9 @@ fn initialize_flowfield(
         }
     }
 
+    // TODO: Remove?
     // Reset the grid's cell costs
-    grid.reset_costs(unit_positions);
+    // grid.reset_costs(unit_positions);
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);

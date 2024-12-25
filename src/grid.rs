@@ -1,13 +1,16 @@
-use crate::{cell::Cell, utils};
+use crate::{cell::Cell, components::Destination, utils, UpdateCellEv};
 
 use bevy::prelude::*;
 use bevy_rapier3d::{plugin::*, prelude::*};
+use std::collections::HashMap;
 
 pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<Grid>();
+        app.register_type::<Grid>()
+            .add_event::<UpdateCellEv>()
+            .add_systems(Update, update_costs);
     }
 }
 
@@ -18,6 +21,7 @@ pub struct Grid {
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
+    pub cost_entities: HashMap<IVec2, Entity>,
 }
 
 impl Grid {
@@ -29,6 +33,7 @@ impl Grid {
             cell_diameter,
             cell_radius: cell_diameter / 2.0,
             grid: Vec::default(),
+            cost_entities: HashMap::new(),
         };
 
         // Calculate offsets for top-left alignment
@@ -60,9 +65,13 @@ impl Grid {
                     QueryFilter::default().exclude_sensors(),
                 );
 
-                if let Some(_entity) = hit {
+                if let Some(entity) = hit {
                     // increase cost now that cell exists
                     grid.grid[y as usize][x as usize].increase_cost(255);
+
+                    // Associate the cell index with the entity
+                    let cell_idx = IVec2::new(x, y);
+                    grid.cost_entities.insert(cell_idx, entity);
                 }
             }
         }
@@ -103,5 +112,40 @@ impl Grid {
                 }
             }
         }
+    }
+
+    pub fn update_unit_cell_costs(&mut self, unit_pos: Vec3) -> Cell {
+        // Determine which cell the unit occupies
+        let cell = self.get_cell_from_world_position(unit_pos);
+
+        // Set the cost of the cell to 255
+        if cell.idx.y < self.grid.len() as i32
+            && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
+        {
+            self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
+        }
+
+        return cell;
+    }
+
+    // Example helper to associate a cell with a Cost entity
+    pub fn set_cost_entity(&mut self, cell_idx: IVec2, entity: Entity) {
+        self.cost_entities.insert(cell_idx, entity);
+    }
+
+    // Example helper to get the Cost entity at a cell
+    pub fn get_cost_entity(&self, cell_idx: IVec2) -> Option<Entity> {
+        self.cost_entities.get(&cell_idx).copied()
+    }
+}
+
+pub fn update_costs(
+    mut grid: ResMut<Grid>,
+    mut events: EventWriter<UpdateCellEv>,
+    q_units: Query<(Entity, &Transform), With<Destination>>,
+) {
+    for (entity, transform) in q_units.iter() {
+        let cell = grid.update_unit_cell_costs(transform.translation);
+        events.send(UpdateCellEv::new(cell, entity));
     }
 }
