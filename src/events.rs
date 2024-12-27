@@ -9,13 +9,12 @@ pub struct InitializeFlowFieldEv(pub Vec<Entity>);
 pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
 
 #[derive(Event)]
-pub struct UpdateCellEv {
+pub struct UpdateCostEv {
     pub cell: Cell,
-    pub entity: Entity,
 }
 
-impl UpdateCellEv {
-    pub fn new(cell: Cell, entity: Entity) -> Self {
-        Self { cell, entity }
+impl UpdateCostEv {
+    pub fn new(cell: Cell) -> Self {
+        Self { cell }
     }
 }

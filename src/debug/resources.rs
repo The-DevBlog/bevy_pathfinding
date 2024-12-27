@@ -25,8 +25,8 @@ impl Default for DebugOptions {
     fn default() -> Self {
         DebugOptions {
             draw_grid: true,
-            draw_mode_1: DrawMode::FlowField,
-            draw_mode_2: DrawMode::Index,
+            draw_mode_1: DrawMode::CostField,
+            draw_mode_2: DrawMode::None,
         }
     }
 }
