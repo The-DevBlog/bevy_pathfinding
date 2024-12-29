@@ -1,14 +1,20 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 
 pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DebugOptions>()
+        app.init_resource::<CostMap>()
+            .init_resource::<DebugOptions>()
             .init_resource::<Digits>()
             .register_type::<DebugOptions>();
     }
 }
+
+#[derive(Resource, Default)]
+pub struct CostMap(pub HashMap<IVec2, Vec<Entity>>);
 
 #[derive(Resource, Default)]
 pub struct Digits(pub [Handle<Image>; 10]);
@@ -25,8 +31,8 @@ impl Default for DebugOptions {
     fn default() -> Self {
         DebugOptions {
             draw_grid: true,
-            draw_mode_1: DrawMode::CostField,
-            draw_mode_2: DrawMode::None,
+            draw_mode_1: DrawMode::Index,
+            draw_mode_2: DrawMode::FlowField,
         }
     }
 }

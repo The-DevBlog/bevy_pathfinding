@@ -71,10 +71,10 @@ impl OptionsSet {
 pub struct Cost;
 
 #[derive(Component, Copy, Clone)]
-pub struct BestCost(pub IVec2);
+pub struct BestCost;
 
 #[derive(Component, Copy, Clone)]
-pub struct Index(pub IVec2);
+pub struct Index;
 
 #[derive(Component, Clone, Copy)]
 pub struct FlowFieldArrow;

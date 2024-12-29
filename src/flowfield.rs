@@ -179,7 +179,7 @@ fn update_flowfields(
 fn initialize_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
-    mut grid: ResMut<Grid>,
+    grid: ResMut<Grid>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
@@ -218,10 +218,6 @@ fn initialize_flowfield(
             unit_positions.push((transform.translation, size.0));
         }
     }
-
-    // TODO: Remove?
-    // Reset the grid's cell costs
-    // grid.reset_costs(unit_positions);
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{cell::Cell, components::Destination, utils, UpdateCostEv};
 
 use bevy::prelude::*;
@@ -8,10 +10,14 @@ pub struct GridPlugin;
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
+            .init_resource::<OccupiedCells>()
             .add_event::<UpdateCostEv>()
             .add_systems(Update, update_costs);
     }
 }
+
+#[derive(Resource, Default)]
+pub struct OccupiedCells(HashSet<IVec2>);
 
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
@@ -107,9 +113,9 @@ impl Grid {
         }
     }
 
-    pub fn update_unit_cell_costs(&mut self, unit_pos: Vec3) -> Cell {
+    pub fn update_unit_cell_costs(&mut self, position: Vec3) -> Cell {
         // Determine which cell the unit occupies
-        let cell = self.get_cell_from_world_position(unit_pos);
+        let cell = self.get_cell_from_world_position(position);
 
         // Set the cost of the cell to 255
         if cell.idx.y < self.grid.len() as i32
@@ -125,10 +131,34 @@ impl Grid {
 pub fn update_costs(
     mut grid: ResMut<Grid>,
     mut events: EventWriter<UpdateCostEv>,
+    mut occupied_cells: ResMut<OccupiedCells>,
     q_units: Query<&Transform, With<Destination>>,
 ) {
+    if q_units.is_empty() {
+        return;
+    }
+
+    println!("updating costs");
+    let mut current_occupied = HashSet::new();
+
+    // Mark cells occupied by units
     for transform in q_units.iter() {
         let cell = grid.update_unit_cell_costs(transform.translation);
-        events.send(UpdateCostEv::new(cell));
+        current_occupied.insert(cell.idx);
+        events.send(UpdateCostEv::new(cell)); // Send event for occupied cell
     }
+
+    // Reset previously occupied cells that are no longer occupied
+    for idx in occupied_cells.0.difference(&current_occupied) {
+        if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
+            let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
+            cell.cost = 1;
+
+            // Send event for cell reset to cost 1
+            events.send(UpdateCostEv::new(*cell));
+        }
+    }
+
+    // Update the occupied cells set
+    occupied_cells.0 = current_occupied;
 }

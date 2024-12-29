@@ -3,13 +3,7 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 
-use bevy::utils::HashMap;
-use bevy::{
-    image::{ImageSampler, ImageSamplerDescriptor},
-    render::render_resource::{
-        Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-    },
-};
+use bevy::{image::*, render::render_resource::*};
 use cell::Cell;
 use debug::COLOR_GRID;
 use events::UpdateCostEv;
@@ -24,17 +18,7 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<SpawnInitialCostFieldTimer>()
-            .init_resource::<CostMap>()
-            .init_resource::<SpawnCostMap>()
-            .add_systems(Startup, load_texture_atlas)
-            .add_systems(
-                Update,
-                // setup.run_if(resource_exists::<Grid>).run_if(run_once),
-                setup
-                    .run_if(resource_exists::<Grid>)
-                    .run_if(resource_exists::<CostMap>),
-            )
+        app.add_systems(Startup, load_texture_atlas)
             .add_systems(
                 Update,
                 (
@@ -43,60 +27,12 @@ impl Plugin for DrawPlugin {
                     update_cell_cost.after(grid::update_costs),
                 ),
             )
-            .add_systems(Update, draw_initial_costfield)
             .add_observer(set_active_dbg_flowfield)
+            .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
-            // .add_observer(draw_costfield)
             .add_observer(draw_index);
     }
-}
-
-// TODO: Move to resources file
-#[derive(Resource)]
-struct SpawnInitialCostFieldTimer(Timer);
-
-impl Default for SpawnInitialCostFieldTimer {
-    fn default() -> Self {
-        SpawnInitialCostFieldTimer(Timer::from_seconds(0.5, TimerMode::Once))
-    }
-}
-
-// TODO: Move to resources file
-#[derive(Resource, Default)]
-struct CostMap(HashMap<IVec2, Entity>);
-
-#[derive(Resource)]
-pub struct SpawnCostMap(pub bool);
-
-impl Default for SpawnCostMap {
-    fn default() -> Self {
-        Self(true)
-    }
-}
-
-fn setup(
-    mut cmds: Commands,
-    mut cost_map: ResMut<CostMap>,
-    grid: Res<Grid>,
-    mut spawn_costmap: ResMut<SpawnCostMap>,
-) {
-    if !spawn_costmap.0 {
-        return;
-    }
-
-    println!("Spawning CostMap");
-    for cell_row in &grid.grid {
-        for cell in cell_row {
-            println!("Spawning cell/cost");
-            let cost = cmds.spawn(Cost).id();
-            cost_map.0.insert(cell.idx, cost);
-        }
-    }
-
-    spawn_costmap.0 = false;
-    println!("costmap length: {}", cost_map.0.iter().len());
-    // cmds.trigger(DrawDebugEv);
 }
 
 fn set_active_dbg_flowfield(
@@ -124,10 +60,8 @@ fn set_active_dbg_flowfield(
 }
 
 fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
-    let digit_bytes = DIGIT_ATLAS;
-
     // Decode the image
-    let image = image::load_from_memory_with_format(digit_bytes, ImageFormat::Png)
+    let image = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
         .expect("Failed to load digit image");
     let rgba_image = image.to_rgba8();
     let (width, height) = rgba_image.dimensions();
@@ -210,6 +144,8 @@ fn draw_flowfield(
     let Some(offset) = offset else {
         return;
     };
+
+    println!("Drawing Flowfield");
 
     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
@@ -333,6 +269,8 @@ fn draw_integration_field(
         return;
     };
 
+    println!("Drawing Integration Field");
+
     let str = |cell: &Cell| format!("{}", cell.best_cost);
     draw(
         meshes,
@@ -340,301 +278,12 @@ fn draw_integration_field(
         &flowfield.grid,
         flowfield.cell_diameter,
         digits,
-        |cell| BestCost(cell.idx),
+        BestCost,
         cmds,
         str,
         offset,
     );
 }
-
-fn update_cell_cost(
-    mut cmds: Commands,
-    mut events: EventReader<UpdateCostEv>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut cost_map: ResMut<CostMap>,
-    dbg: Res<DebugOptions>,
-    digits: Res<Digits>,
-    grid: Res<Grid>,
-    q_cost: Query<Entity, With<Cost>>,
-) {
-    // TODO: Extract this out to its own logic
-    let base_digit_spacing = grid.cell_diameter * 0.275;
-    let base_scale = 0.25;
-    let cell_diameter = grid.cell_diameter;
-
-    let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
-    let Some(base_offset) = base_offset else {
-        return;
-    };
-
-    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
-
-    for ev in events.read() {
-        let cell = ev.cell;
-        let str = cell.cost.to_string();
-
-        // Convert the string into individual digits
-        let digits_vec: Vec<u32> = str.chars().filter_map(|c| c.to_digit(10)).collect();
-        let digit_count = digits_vec.len() as f32;
-
-        // Set initial scale and digit spacing
-        let mut scale = Vec3::splat(base_scale);
-        let mut digit_spacing = base_digit_spacing;
-
-        let digit_width = cell_diameter * scale.x;
-        let total_digit_width = digit_count * digit_width;
-        let total_spacing_width = (digit_count - 1.0) * digit_spacing;
-        let total_width = total_digit_width + total_spacing_width;
-
-        // If total width exceeds cell diameter, adjust scale and spacing
-        if total_width > cell_diameter {
-            let scale_factor = cell_diameter / total_width;
-            scale *= scale_factor;
-            digit_spacing *= scale_factor;
-        }
-
-        let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
-
-        for (i, &digit) in digits_vec.iter().enumerate() {
-            // Calculate the offset for each digit
-            let mut offset = base_offset;
-            offset.x += x_offset + i as f32 * digit_spacing;
-
-            let material = materials.add(StandardMaterial {
-                base_color_texture: Some(digits.0[digit as usize].clone()),
-                alpha_mode: AlphaMode::Blend,
-                unlit: true,
-                ..default()
-            });
-
-            let dig = (
-                Cost,
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(material),
-                Transform {
-                    translation: cell.world_pos + offset,
-                    rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                    scale,
-                },
-            );
-
-            // cmds.entity(ev.entity).despawn(); // BUG: This is the unit entity, not the Cost entity
-            let new_cost = cmds.spawn(dig).id();
-
-            let previous_cost = cost_map.0.get(&cell.idx);
-            if let Some(previous_cost) = previous_cost {
-                cmds.entity(*previous_cost).despawn();
-            };
-
-            cost_map.0.insert(cell.idx, new_cost);
-        }
-    }
-}
-
-// TODO: This is getting triggered every time the 'DrawDebugEv' fires, but is this required?
-// I dont believe every cell's cost needs to get re done each time.
-fn draw_initial_costfield(
-    mut my_timer: ResMut<SpawnInitialCostFieldTimer>,
-    dbg: Res<DebugOptions>,
-    digits: Res<Digits>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    grid: Res<Grid>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    q_cost: Query<Entity, With<Cost>>,
-    mut cmds: Commands,
-    time: Res<Time>,
-) {
-    my_timer.0.tick(time.delta());
-    if !my_timer.0.just_finished() {
-        return;
-    }
-
-    println!("Drawing Initial CostField");
-
-    // Remove current cost field before rendering new one
-    for cost_entity in &q_cost {
-        cmds.entity(cost_entity).despawn_recursive();
-    }
-
-    let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
-    let Some(base_offset) = base_offset else {
-        return;
-    };
-
-    let cell_diameter = grid.cell_diameter;
-
-    let base_digit_spacing = cell_diameter * 0.275;
-
-    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
-
-    for cell_row in &grid.grid {
-        for cell in cell_row.iter() {
-            // Generate the string using the closure
-            let str = format!("{}", cell.cost);
-            let value_str = str;
-
-            // Convert the string into individual digits
-            let digits_vec: Vec<u32> = value_str.chars().filter_map(|c| c.to_digit(10)).collect();
-            let digit_count = digits_vec.len() as f32;
-
-            // Set initial scale and digit spacing
-            let mut scale = Vec3::splat(BASE_SCALE);
-            let mut digit_spacing = base_digit_spacing;
-
-            let digit_width = cell_diameter * scale.x;
-            let total_digit_width = digit_count * digit_width;
-            let total_spacing_width = (digit_count - 1.0) * digit_spacing;
-            let total_width = total_digit_width + total_spacing_width;
-
-            // If total width exceeds cell diameter, adjust scale and spacing
-            if total_width > cell_diameter {
-                let scale_factor = cell_diameter / total_width;
-                scale *= scale_factor;
-                digit_spacing *= scale_factor;
-            }
-
-            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
-
-            for (i, &digit) in digits_vec.iter().enumerate() {
-                // Calculate the offset for each digit
-                let mut offset = base_offset;
-                offset.x += x_offset + i as f32 * digit_spacing;
-
-                let material = materials.add(StandardMaterial {
-                    base_color_texture: Some(digits.0[digit as usize].clone()),
-                    alpha_mode: AlphaMode::Blend,
-                    unlit: true,
-                    ..default()
-                });
-
-                // Spawn each digit as a separate PBR entity
-                let dig = (
-                    // get_component(cell),
-                    Mesh3d(mesh.clone()),
-                    MeshMaterial3d(material),
-                    Transform {
-                        translation: cell.world_pos + offset,
-                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                        scale,
-                    },
-                );
-
-                cmds.spawn(dig);
-            }
-        }
-    }
-
-    // draw(
-    //     meshes,
-    //     materials,
-    //     &grid.grid,
-    //     grid.cell_diameter,
-    //     digits,
-    //     |cell| Cost(cell.idx),
-    //     cmds,
-    //     str,
-    //     offset,
-    // );
-}
-
-// // TODO: This is getting triggered every time the 'DrawDebugEv' fires, but is this required?
-// // I dont believe every cell's cost needs to get re done each time.
-// fn draw_costfield(
-//     _trigger: Trigger<DrawDebugEv>,
-//     dbg: Res<DebugOptions>,
-//     digits: Res<Digits>,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     grid: Res<Grid>,
-//     mut materials: ResMut<Assets<StandardMaterial>>,
-//     q_cost: Query<Entity, With<Cost>>,
-//     mut cmds: Commands,
-// ) {
-//     // Remove current cost field before rendering new one
-//     for cost_entity in &q_cost {
-//         cmds.entity(cost_entity).despawn_recursive();
-//     }
-
-//     let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
-//     let Some(base_offset) = base_offset else {
-//         return;
-//     };
-
-//     let cell_diameter = grid.cell_diameter;
-
-//     let base_digit_spacing = cell_diameter * 0.275;
-
-//     let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
-
-//     for cell_row in &grid.grid {
-//         for cell in cell_row.iter() {
-//             // Generate the string using the closure
-//             let str = format!("{}", cell.cost);
-//             let value_str = str;
-
-//             // // Convert the string into individual digits
-//             let digits_vec: Vec<u32> = value_str.chars().filter_map(|c| c.to_digit(10)).collect();
-//             let digit_count = digits_vec.len() as f32;
-
-//             // // Set initial scale and digit spacing
-//             let mut scale = Vec3::splat(BASE_SCALE);
-//             let mut digit_spacing = base_digit_spacing;
-
-//             let digit_width = cell_diameter * scale.x;
-//             let total_digit_width = digit_count * digit_width;
-//             let total_spacing_width = (digit_count - 1.0) * digit_spacing;
-//             let total_width = total_digit_width + total_spacing_width;
-
-//             // If total width exceeds cell diameter, adjust scale and spacing
-//             if total_width > cell_diameter {
-//                 let scale_factor = cell_diameter / total_width;
-//                 scale *= scale_factor;
-//                 digit_spacing *= scale_factor;
-//             }
-
-//             let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
-
-//             for (i, &digit) in digits_vec.iter().enumerate() {
-//                 // Calculate the offset for each digit
-//                 let mut offset = base_offset;
-//                 offset.x += x_offset + i as f32 * digit_spacing;
-
-//                 let material = materials.add(StandardMaterial {
-//                     base_color_texture: Some(digits.0[digit as usize].clone()),
-//                     alpha_mode: AlphaMode::Blend,
-//                     unlit: true,
-//                     ..default()
-//                 });
-
-//                 // Spawn each digit as a separate PBR entity
-//                 let dig = (
-//                     // get_component(cell),
-//                     Mesh3d(mesh.clone()),
-//                     MeshMaterial3d(material),
-//                     Transform {
-//                         translation: cell.world_pos + offset,
-//                         rotation: Quat::from_rotation_x(-FRAC_PI_2),
-//                         scale,
-//                     },
-//                 );
-
-//                 cmds.spawn(dig);
-//             }
-//         }
-//     }
-
-//     // draw(
-//     //     meshes,
-//     //     materials,
-//     //     &grid.grid,
-//     //     grid.cell_diameter,
-//     //     digits,
-//     //     |cell| Cost(cell.idx),
-//     //     cmds,
-//     //     str,
-//     //     offset,
-//     // );
-// }
 
 fn draw_index(
     _trigger: Trigger<DrawDebugEv>,
@@ -660,6 +309,8 @@ fn draw_index(
         return;
     };
 
+    println!("Drawing Index");
+
     let str = |cell: &Cell| format!("{}{}", cell.idx.y, cell.idx.x);
     draw(
         meshes,
@@ -667,11 +318,125 @@ fn draw_index(
         &flowfield.grid,
         flowfield.cell_diameter,
         digits,
-        |cell| Index(cell.idx),
+        Index,
         cmds,
         str,
         offset,
     );
+}
+
+fn draw_costfield(
+    _trigger: Trigger<DrawDebugEv>,
+    mut costmap: ResMut<CostMap>,
+    dbg: Res<DebugOptions>,
+    digits: Res<Digits>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    grid: Res<Grid>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cmds: Commands,
+    q_cost: Query<Entity, With<Cost>>,
+) {
+    // Remove current cost field before rendering new one
+    for cost_entity in &q_cost {
+        cmds.entity(cost_entity).despawn_recursive();
+    }
+
+    let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
+    };
+
+    println!("Drawing Costfield");
+
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let mesh = meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter));
+
+    for cell_row in &grid.grid {
+        for cell in cell_row.iter() {
+            let digits_vec: Vec<u32> = cell
+                .cost
+                .to_string()
+                .chars()
+                .filter_map(|c| c.to_digit(10))
+                .collect();
+
+            let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
+                grid.cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
+
+            let cost_entities = spawn_digit_entities(
+                &mut cmds,
+                &digits_vec,
+                base_offset,
+                scale,
+                digit_spacing,
+                cell.world_pos,
+                &mut materials,
+                &digits,
+                mesh.clone(),
+                Cost,
+            );
+
+            costmap.0.insert(cell.idx, cost_entities);
+        }
+    }
+}
+
+fn update_cell_cost(
+    mut cmds: Commands,
+    mut events: EventReader<UpdateCostEv>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cost_map: ResMut<CostMap>,
+    dbg: Res<DebugOptions>,
+    digits: Res<Digits>,
+    grid: Res<Grid>,
+) {
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let cell_diameter = grid.cell_diameter;
+
+    let base_offset = calculate_offset(cell_diameter, dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
+    };
+
+    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
+
+    for ev in events.read() {
+        let cell = ev.cell;
+        let digits_vec: Vec<u32> = cell
+            .cost
+            .to_string()
+            .chars()
+            .filter_map(|c| c.to_digit(10))
+            .collect();
+
+        let (scale, digit_spacing) =
+            calculate_digit_spacing_and_scale(cell_diameter, digits_vec.len(), base_digit_spacing);
+
+        let new_cost_entities = spawn_digit_entities(
+            &mut cmds,
+            &digits_vec,
+            base_offset,
+            scale,
+            digit_spacing,
+            cell.world_pos,
+            &mut materials,
+            &digits,
+            mesh.clone(),
+            Cost,
+        );
+
+        if let Some(previous_cost) = cost_map.0.remove(&cell.idx) {
+            for entity in previous_cost {
+                cmds.entity(entity).despawn();
+            }
+        }
+
+        cost_map.0.insert(cell.idx, new_cost_entities);
+    }
 }
 
 fn calculate_offset(
@@ -714,7 +479,7 @@ fn draw<T: Component + Copy>(
     cells: &Vec<Vec<Cell>>,
     cell_diameter: f32,
     digits: Res<Digits>,
-    get_component: impl Fn(&Cell) -> T,
+    comp: T,
     mut cmds: Commands,
     get_str: impl Fn(&Cell) -> String,
     base_offset: Vec3,
@@ -728,56 +493,93 @@ fn draw<T: Component + Copy>(
             // Generate the string using the closure
             let value_str = get_str(cell);
 
-            // // Convert the string into individual digits
+            // Convert the string into individual digits
             let digits_vec: Vec<u32> = value_str.chars().filter_map(|c| c.to_digit(10)).collect();
-            let digit_count = digits_vec.len() as f32;
+            let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
+                cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
 
-            // // Set initial scale and digit spacing
-            let mut scale = Vec3::splat(BASE_SCALE);
-            let mut digit_spacing = base_digit_spacing;
-
-            let digit_width = cell_diameter * scale.x;
-            let total_digit_width = digit_count * digit_width;
-            let total_spacing_width = (digit_count - 1.0) * digit_spacing;
-            let total_width = total_digit_width + total_spacing_width;
-
-            // If total width exceeds cell diameter, adjust scale and spacing
-            if total_width > cell_diameter {
-                let scale_factor = cell_diameter / total_width;
-                scale *= scale_factor;
-                digit_spacing *= scale_factor;
-            }
-
-            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
-
-            for (i, &digit) in digits_vec.iter().enumerate() {
-                // Calculate the offset for each digit
-                let mut offset = base_offset;
-                offset.x += x_offset + i as f32 * digit_spacing;
-
-                let material = materials.add(StandardMaterial {
-                    base_color_texture: Some(digits.0[digit as usize].clone()),
-                    alpha_mode: AlphaMode::Blend,
-                    unlit: true,
-                    ..default()
-                });
-
-                // Spawn each digit as a separate PBR entity
-                let dig = (
-                    get_component(cell),
-                    Mesh3d(mesh.clone()),
-                    MeshMaterial3d(material),
-                    Transform {
-                        translation: cell.world_pos + offset,
-                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                        scale,
-                    },
-                );
-
-                cmds.spawn(dig);
-            }
+            spawn_digit_entities(
+                &mut cmds,
+                &digits_vec,
+                base_offset,
+                scale,
+                digit_spacing,
+                cell.world_pos,
+                &mut materials,
+                &digits,
+                mesh.clone(),
+                comp,
+            );
         }
     }
+}
+
+fn calculate_digit_spacing_and_scale(
+    cell_diameter: f32,
+    digit_count: usize,
+    base_digit_spacing: f32,
+) -> (Vec3, f32) {
+    let digit_width = cell_diameter * BASE_SCALE;
+    let total_digit_width = digit_count as f32 * digit_width;
+    let total_spacing_width = (digit_count as f32 - 1.0) * base_digit_spacing;
+    let total_width = total_digit_width + total_spacing_width;
+
+    if total_width > cell_diameter {
+        let scale_factor = cell_diameter / total_width;
+        (
+            Vec3::splat(BASE_SCALE * scale_factor),
+            base_digit_spacing * scale_factor,
+        )
+    } else {
+        (Vec3::splat(BASE_SCALE), base_digit_spacing)
+    }
+}
+
+fn spawn_digit_entities<T: Component + Copy>(
+    cmds: &mut Commands,
+    digits_vec: &[u32],
+    base_offset: Vec3,
+    scale: Vec3,
+    digit_spacing: f32,
+    cell_world_pos: Vec3,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    digits: &Res<Digits>,
+    mesh: Handle<Mesh>,
+    comp: T,
+) -> Vec<Entity> {
+    let mut entities = Vec::new();
+    let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+    for (i, &digit) in digits_vec.iter().enumerate() {
+        let mut offset = base_offset;
+        offset.x += x_offset + i as f32 * digit_spacing;
+
+        let material = materials.add(StandardMaterial {
+            base_color_texture: Some(digits.0[digit as usize].clone()),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        });
+
+        let dig = (
+            comp,
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform {
+                translation: cell_world_pos + offset,
+                rotation: Quat::from_rotation_x(-FRAC_PI_2),
+                scale,
+            },
+        );
+
+        let entity = cmds.spawn(dig).id();
+        entities.push(entity);
+    }
+
+    entities
 }
 
 fn detect_debug_change(mut cmds: Commands, debug: Res<DebugOptions>) {
