@@ -1,4 +1,7 @@
+use crate::cell::Cell;
+
 use bevy::prelude::*;
+use std::cmp::min;
 
 pub fn get_world_pos(
     map_base_trans: &GlobalTransform,
@@ -22,19 +25,30 @@ pub fn to_viewport_coords(
     return viewport_position.unwrap();
 }
 
-// retrieves the cell row/column given a set a world coordinates
-// pub fn get_cell(grid: &Grid, coords: &Vec3) -> (u32, u32) {
-//     // Adjust mouse coordinates to the grid's coordinate system
-//     let grid_origin_x = -grid.width / 2.0;
-//     let grid_origin_z = -grid.depth / 2.0;
-//     let adjusted_x = coords.x - grid_origin_x; // Shift origin to (0, 0)
-//     let adjusted_z = coords.z - grid_origin_z;
+pub fn get_cell_from_world_position_helper(
+    world_pos: Vec3,
+    grid_size: IVec2,
+    cell_diameter: f32,
+    grid: &Vec<Vec<Cell>>,
+) -> Cell {
+    // Adjust world position relative to the grid's top-left corner
+    let adjusted_x = world_pos.x - (-grid_size.x as f32 * cell_diameter / 2.0);
+    let adjusted_y = world_pos.z - (-grid_size.y as f32 * cell_diameter / 2.0);
 
-//     // Calculate the column and row indices
-//     let cell_width = grid.width / grid.rows as f32;
-//     let cell_depth = grid.depth / grid.columns as f32;
-//     let row = (adjusted_x / cell_width).floor() as u32;
-//     let column = (adjusted_z / cell_depth).floor() as u32;
+    // Calculate percentages within the grid
+    let mut percent_x = adjusted_x / (grid_size.x as f32 * cell_diameter);
+    let mut percent_y = adjusted_y / (grid_size.y as f32 * cell_diameter);
 
-//     (row, column)
-// }
+    // Clamp percentages to ensure they're within [0.0, 1.0]
+    percent_x = percent_x.clamp(0.0, 1.0);
+    percent_y = percent_y.clamp(0.0, 1.0);
+
+    // Calculate grid indices
+    let x = ((grid_size.x as f32) * percent_x).floor() as usize;
+    let y = ((grid_size.y as f32) * percent_y).floor() as usize;
+
+    let x = min(x, grid_size.x as usize - 1);
+    let y = min(y, grid_size.y as usize - 1);
+
+    grid[y][x].clone() // Swap x and y
+}

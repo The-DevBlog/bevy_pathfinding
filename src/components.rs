@@ -10,4 +10,4 @@ pub struct GameCamera;
 pub struct Destination;
 
 #[derive(Component)]
-pub struct Selected;
+pub struct UnitSize(pub Vec2);

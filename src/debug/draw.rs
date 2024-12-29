@@ -1,128 +1,67 @@
+use super::components::*;
+use super::events::*;
+use super::resources::*;
 use crate::*;
-use bevy::{
-    image::{ImageSampler, ImageSamplerDescriptor},
-    render::render_resource::{
-        Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-    },
-};
+
+use bevy::{image::*, render::render_resource::*};
 use cell::Cell;
-use grid_controller::GridController;
+use debug::COLOR_GRID;
+use events::UpdateCostEv;
+use grid::Grid;
 use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
+const BASE_SCALE: f32 = 0.25;
 
 pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<RtsPfDebug>()
-            .init_resource::<Digits>()
-            .register_type::<RtsPfDebug>()
-            .add_systems(Startup, (setup, load_texture_atlas))
-            .add_systems(Update, (draw_grid, detect_debug_change))
+        app.add_systems(Startup, load_texture_atlas)
+            .add_systems(
+                Update,
+                (
+                    draw_grid,
+                    detect_debug_change,
+                    update_cell_cost.after(grid::update_costs),
+                ),
+            )
+            .add_observer(set_active_dbg_flowfield)
+            .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
             .add_observer(draw_integration_field)
-            .add_observer(draw_costfield)
             .add_observer(draw_index);
     }
 }
 
-#[derive(Resource, Default)]
-struct Digits([Handle<Image>; 10]);
-
-#[derive(Reflect, Resource)]
-#[reflect(Resource)]
-pub struct RtsPfDebug {
-    pub draw_grid: bool,
-    pub draw_mode_1: DrawMode,
-    pub draw_mode_2: DrawMode,
-}
-
-impl Default for RtsPfDebug {
-    fn default() -> Self {
-        RtsPfDebug {
-            draw_grid: true,
-            draw_mode_1: DrawMode::FlowField,
-            draw_mode_2: DrawMode::Index,
+fn set_active_dbg_flowfield(
+    trigger: Trigger<SetActiveFlowfieldEv>,
+    mut cmds: Commands,
+    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
+) {
+    if let Some(new_flowfield) = &trigger.event().0 {
+        if let Some(current_flowfield) = &active_dbg_flowfield.0 {
+            // Skip if the grid is the same
+            if current_flowfield.grid == new_flowfield.grid {
+                return;
+            }
+        }
+        // Set the new flowfield and trigger debug draw
+        active_dbg_flowfield.0 = Some(new_flowfield.clone());
+        cmds.trigger(DrawDebugEv);
+    } else {
+        // Deactivate if there’s no new flowfield
+        if active_dbg_flowfield.0.is_some() {
+            active_dbg_flowfield.0 = None;
+            cmds.trigger(DrawDebugEv);
         }
     }
-}
-
-impl RtsPfDebug {
-    pub fn draw_mode_to_string(mode: DrawMode) -> String {
-        match mode {
-            DrawMode::None => String::from("None"),
-            DrawMode::CostField => String::from("CostField"),
-            DrawMode::FlowField => String::from("FlowField"),
-            DrawMode::IntegrationField => String::from("IntegrationField"),
-            DrawMode::Index => String::from("Index"),
-        }
-    }
-
-    pub fn mode_string(&self, mode: i32) -> String {
-        if mode == 1 {
-            return Self::draw_mode_to_string(self.draw_mode_1);
-        }
-
-        return Self::draw_mode_to_string(self.draw_mode_2);
-    }
-
-    pub fn mode1_string(&self) -> String {
-        Self::draw_mode_to_string(self.draw_mode_1)
-    }
-
-    pub fn mode2_string(&self) -> String {
-        Self::draw_mode_to_string(self.draw_mode_2)
-    }
-}
-
-#[derive(Reflect, PartialEq, Clone, Copy)]
-pub enum DrawMode {
-    None,
-    CostField,
-    FlowField,
-    IntegrationField,
-    Index,
-}
-
-impl DrawMode {
-    pub fn cast(mode: String) -> Self {
-        match mode.as_str() {
-            "None" => DrawMode::None,
-            "CostField" => DrawMode::CostField,
-            "FlowField" => DrawMode::FlowField,
-            "IntegrationField" => DrawMode::IntegrationField,
-            "Index" => DrawMode::Index,
-            _ => DrawMode::None,
-        }
-    }
-}
-
-#[derive(Event)]
-pub struct DrawDebugEv;
-
-#[derive(Component, Copy, Clone)]
-struct Cost;
-
-#[derive(Component, Copy, Clone)]
-struct BestCost;
-
-#[derive(Component, Copy, Clone)]
-struct Index;
-
-#[derive(Component, Clone, Copy)]
-struct FlowFieldArrow;
-
-fn setup(mut cmds: Commands) {
-    cmds.trigger(DrawDebugEv);
 }
 
 fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
-    let digit_bytes = DIGIT_ATLAS;
-
     // Decode the image
-    let image = image::load_from_memory_with_format(digit_bytes, ImageFormat::Png)
+    let image = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
         .expect("Failed to load digit image");
     let rgba_image = image.to_rgba8();
     let (width, height) = rgba_image.dimensions();
@@ -161,18 +100,14 @@ fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digi
     }
 }
 
-fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug: Res<RtsPfDebug>) {
+fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
     if !debug.draw_grid {
         return;
     }
 
-    let Ok(grid) = grid_controller.get_single() else {
-        return;
-    };
-
     gizmos.grid(
         Isometry3d::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-        UVec2::new(grid.grid_size.x as u32, grid.grid_size.y as u32),
+        UVec2::new(grid.size.x as u32, grid.size.y as u32),
         Vec2::new(grid.cell_radius * 2.0, grid.cell_radius * 2.0),
         COLOR_GRID,
     );
@@ -181,19 +116,20 @@ fn draw_grid(grid_controller: Query<&GridController>, mut gizmos: Gizmos, debug:
 // TODO: Cleanup this method
 fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
-    q_grid: Query<&GridController>,
+    dbg: Res<DebugOptions>,
+    grid: Res<Grid>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Remove current arrows before rendering new ones
-    for arrow_entity in q_flowfield_arrow.iter() {
+    for arrow_entity in &q_flowfield_arrow {
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let Ok(grid) = q_grid.get_single() else {
+    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
         return;
     };
 
@@ -204,21 +140,24 @@ fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::FlowField) else {
+    let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+    let Some(offset) = offset else {
         return;
     };
 
-    let arrow_length = grid.cell_diameter() * 0.6 * marker_scale;
-    let arrow_width = grid.cell_diameter() * 0.1 * marker_scale;
+    println!("Drawing Flowfield");
+
+    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
+    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
     let arrow_clr = Color::WHITE;
 
     // Create the arrowhead mesh
     let half_arrow_size = arrow_length / 2.0;
-    let d1 = half_arrow_size - grid.cell_diameter() * 0.09;
-    let d2 = arrow_width + grid.cell_diameter() * 0.0125;
-    let a = Vec2::new(half_arrow_size + grid.cell_diameter() * 0.05, 0.0); // Tip of the arrowhead
+    let d1 = half_arrow_size - grid.cell_diameter * 0.09;
+    let d2 = arrow_width + grid.cell_diameter * 0.0125;
+    let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
     let b = Vec2::new(d1, d2);
-    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter() * 0.0125);
+    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
 
     // Mesh for arrow
     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
@@ -229,14 +168,10 @@ fn draw_flowfield(
         ..default()
     });
 
-    for cell_row in grid.cur_flowfield.grid.iter() {
+    // println!("Drawing flowfield");
+    for cell_row in &active_dbg_flowfield.grid {
         for cell in cell_row.iter() {
-            // print!(
-            //     "({},{}) {:?},  ",
-            //     cell.grid_idx.y, cell.grid_idx.x, cell.best_direction
-            // );
-
-            let is_destination_cell = grid.cur_flowfield.destination_cell.grid_idx == cell.grid_idx;
+            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
             let rotation = match is_destination_cell {
                 true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
@@ -252,7 +187,7 @@ fn draw_flowfield(
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material.clone()),
                 Transform {
-                    translation: cell.world_position + offset,
+                    translation: cell.world_pos + offset,
                     rotation,
                     ..default()
                 },
@@ -290,14 +225,14 @@ fn draw_flowfield(
 
                 let mut cross_1 = cross.clone();
                 cross_1.0 = Transform {
-                    translation: cell.world_position + offset,
+                    translation: cell.world_pos + offset,
                     rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
                     ..default()
                 };
 
                 let mut cross_2 = cross.clone();
                 cross_2.0 = Transform {
-                    translation: cell.world_position + offset,
+                    translation: cell.world_pos + offset,
                     rotation: Quat::from_rotation_y(FRAC_PI_4),
                     ..default()
                 };
@@ -312,86 +247,201 @@ fn draw_flowfield(
 
 fn draw_integration_field(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    dbg: Res<DebugOptions>,
     digits: Res<Digits>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
-    q_grid: Query<&GridController>,
     q_cost: Query<Entity, With<BestCost>>,
     mut cmds: Commands,
 ) {
     // Remove current cost field before rendering new one
-    for cost_entity in q_cost.iter() {
+    for cost_entity in &q_cost {
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let grid = q_grid.get_single().unwrap();
-
-    let Some(offset) = calculate_offset(&grid, dbg, DrawMode::IntegrationField) else {
+    let Some(flowfield) = &active_dbg_flowfield.0 else {
         return;
     };
 
+    let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::IntegrationField);
+    let Some(offset) = offset else {
+        return;
+    };
+
+    println!("Drawing Integration Field");
+
     let str = |cell: &Cell| format!("{}", cell.best_cost);
-    draw::<BestCost>(
-        meshes, materials, &grid, digits, BestCost, cmds, str, offset,
+    draw(
+        meshes,
+        materials,
+        &flowfield.grid,
+        flowfield.cell_diameter,
+        digits,
+        BestCost,
+        cmds,
+        str,
+        offset,
+    );
+}
+
+fn draw_index(
+    _trigger: Trigger<DrawDebugEv>,
+    dbg: Res<DebugOptions>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    digits: Res<Digits>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<StandardMaterial>>,
+    q_idx: Query<Entity, With<Index>>,
+    mut cmds: Commands,
+) {
+    // Remove current index entities before rendering new ones
+    for idx_entity in &q_idx {
+        cmds.entity(idx_entity).despawn_recursive();
+    }
+
+    let Some(flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::Index);
+    let Some(offset) = offset else {
+        return;
+    };
+
+    println!("Drawing Index");
+
+    let str = |cell: &Cell| format!("{}{}", cell.idx.y, cell.idx.x);
+    draw(
+        meshes,
+        materials,
+        &flowfield.grid,
+        flowfield.cell_diameter,
+        digits,
+        Index,
+        cmds,
+        str,
+        offset,
     );
 }
 
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
+    mut costmap: ResMut<CostMap>,
+    dbg: Res<DebugOptions>,
     digits: Res<Digits>,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
-    q_grid: Query<&GridController>,
-    q_cost: Query<Entity, With<Cost>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    grid: Res<Grid>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut cmds: Commands,
+    q_cost: Query<Entity, With<Cost>>,
 ) {
     // Remove current cost field before rendering new one
-    for cost_entity in q_cost.iter() {
+    for cost_entity in &q_cost {
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let grid = q_grid.get_single().unwrap();
-
-    let offset = match calculate_offset(&grid, dbg, DrawMode::CostField) {
-        Some(offset) => offset,
-        None => return,
+    let base_offset = calculate_offset(grid.cell_diameter, dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
     };
 
-    let str = |cell: &Cell| format!("{}", cell.cost);
-    draw::<Cost>(meshes, materials, &grid, digits, Cost, cmds, str, offset);
+    println!("Drawing Costfield");
+
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let mesh = meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter));
+
+    for cell_row in &grid.grid {
+        for cell in cell_row.iter() {
+            let digits_vec: Vec<u32> = cell
+                .cost
+                .to_string()
+                .chars()
+                .filter_map(|c| c.to_digit(10))
+                .collect();
+
+            let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
+                grid.cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
+
+            let cost_entities = spawn_digit_entities(
+                &mut cmds,
+                &digits_vec,
+                base_offset,
+                scale,
+                digit_spacing,
+                cell.world_pos,
+                &mut materials,
+                &digits,
+                mesh.clone(),
+                Cost,
+            );
+
+            costmap.0.insert(cell.idx, cost_entities);
+        }
+    }
 }
 
-fn draw_index(
-    _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<RtsPfDebug>,
-    digits: Res<Digits>,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
-    q_grid_controller: Query<&GridController>,
-    q_idx: Query<Entity, With<Index>>,
+fn update_cell_cost(
     mut cmds: Commands,
+    mut events: EventReader<UpdateCostEv>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cost_map: ResMut<CostMap>,
+    dbg: Res<DebugOptions>,
+    digits: Res<Digits>,
+    grid: Res<Grid>,
 ) {
-    // Remove current index entities before rendering new ones
-    for idx_entity in q_idx.iter() {
-        cmds.entity(idx_entity).despawn_recursive();
-    }
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let cell_diameter = grid.cell_diameter;
 
-    let grid = q_grid_controller.get_single().unwrap();
-
-    let offset = match calculate_offset(&grid, dbg, DrawMode::Index) {
-        Some(offset) => offset,
-        None => return,
+    let base_offset = calculate_offset(cell_diameter, dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
     };
 
-    let str = |cell: &Cell| format!("{}{}", cell.grid_idx.y, cell.grid_idx.x);
-    draw(meshes, materials, &grid, digits, Index, cmds, str, offset);
+    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
+
+    for ev in events.read() {
+        let cell = ev.cell;
+        let digits_vec: Vec<u32> = cell
+            .cost
+            .to_string()
+            .chars()
+            .filter_map(|c| c.to_digit(10))
+            .collect();
+
+        let (scale, digit_spacing) =
+            calculate_digit_spacing_and_scale(cell_diameter, digits_vec.len(), base_digit_spacing);
+
+        let new_cost_entities = spawn_digit_entities(
+            &mut cmds,
+            &digits_vec,
+            base_offset,
+            scale,
+            digit_spacing,
+            cell.world_pos,
+            &mut materials,
+            &digits,
+            mesh.clone(),
+            Cost,
+        );
+
+        if let Some(previous_cost) = cost_map.0.remove(&cell.idx) {
+            for entity in previous_cost {
+                cmds.entity(entity).despawn();
+            }
+        }
+
+        cost_map.0.insert(cell.idx, new_cost_entities);
+    }
 }
 
 fn calculate_offset(
-    grid: &GridController,
-    dbg: Res<RtsPfDebug>,
+    cell_diameter: f32,
+    dbg: Res<DebugOptions>,
     draw_mode: DrawMode,
 ) -> Option<Vec3> {
     let mode = if dbg.draw_mode_1 == draw_mode {
@@ -414,8 +464,8 @@ fn calculate_offset(
         offset.z = 0.0;
     } else {
         match mode {
-            Some(1) => offset.z = -grid.cell_diameter() * 0.25,
-            Some(2) => offset.z = grid.cell_diameter() * 0.25,
+            Some(1) => offset.z = -cell_diameter * 0.25,
+            Some(2) => offset.z = cell_diameter * 0.25,
             _ => (),
         };
     }
@@ -426,76 +476,113 @@ fn calculate_offset(
 fn draw<T: Component + Copy>(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    grid: &GridController,
+    cells: &Vec<Vec<Cell>>,
+    cell_diameter: f32,
     digits: Res<Digits>,
     comp: T,
     mut cmds: Commands,
     get_str: impl Fn(&Cell) -> String,
     base_offset: Vec3,
 ) {
-    let base_digit_spacing = grid.cell_diameter() * 0.275;
-    let base_scale = 0.25;
+    let base_digit_spacing = cell_diameter * 0.275;
 
-    let mesh = meshes.add(Rectangle::new(grid.cell_diameter(), grid.cell_diameter()));
+    let mesh = meshes.add(Rectangle::new(cell_diameter, cell_diameter));
 
-    for cell_row in grid.cur_flowfield.grid.iter() {
+    for cell_row in cells {
         for cell in cell_row.iter() {
             // Generate the string using the closure
             let value_str = get_str(cell);
 
             // Convert the string into individual digits
             let digits_vec: Vec<u32> = value_str.chars().filter_map(|c| c.to_digit(10)).collect();
-            let digit_count = digits_vec.len() as f32;
+            let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
+                cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
 
-            // Set initial scale and digit spacing
-            let mut scale = Vec3::splat(base_scale);
-            let mut digit_spacing = base_digit_spacing;
-
-            let digit_width = grid.cell_diameter() * scale.x;
-            let total_digit_width = digit_count * digit_width;
-            let total_spacing_width = (digit_count - 1.0) * digit_spacing;
-            let total_width = total_digit_width + total_spacing_width;
-
-            // If total width exceeds cell diameter, adjust scale and spacing
-            if total_width > grid.cell_diameter() {
-                let scale_factor = grid.cell_diameter() / total_width;
-                scale *= scale_factor;
-                digit_spacing *= scale_factor;
-            }
-
-            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
-
-            for (i, &digit) in digits_vec.iter().enumerate() {
-                // Calculate the offset for each digit
-                let mut offset = base_offset;
-                offset.x += x_offset + i as f32 * digit_spacing;
-
-                let material = materials.add(StandardMaterial {
-                    base_color_texture: Some(digits.0[digit as usize].clone()),
-                    alpha_mode: AlphaMode::Blend,
-                    unlit: true,
-                    ..default()
-                });
-
-                // Spawn each digit as a separate PBR entity
-                let dig = (
-                    comp,
-                    Mesh3d(mesh.clone()),
-                    MeshMaterial3d(material),
-                    Transform {
-                        translation: cell.world_position + offset,
-                        rotation: Quat::from_rotation_x(-FRAC_PI_2),
-                        scale,
-                    },
-                );
-
-                cmds.spawn(dig);
-            }
+            spawn_digit_entities(
+                &mut cmds,
+                &digits_vec,
+                base_offset,
+                scale,
+                digit_spacing,
+                cell.world_pos,
+                &mut materials,
+                &digits,
+                mesh.clone(),
+                comp,
+            );
         }
     }
 }
 
-fn detect_debug_change(mut cmds: Commands, debug: Res<RtsPfDebug>) {
+fn calculate_digit_spacing_and_scale(
+    cell_diameter: f32,
+    digit_count: usize,
+    base_digit_spacing: f32,
+) -> (Vec3, f32) {
+    let digit_width = cell_diameter * BASE_SCALE;
+    let total_digit_width = digit_count as f32 * digit_width;
+    let total_spacing_width = (digit_count as f32 - 1.0) * base_digit_spacing;
+    let total_width = total_digit_width + total_spacing_width;
+
+    if total_width > cell_diameter {
+        let scale_factor = cell_diameter / total_width;
+        (
+            Vec3::splat(BASE_SCALE * scale_factor),
+            base_digit_spacing * scale_factor,
+        )
+    } else {
+        (Vec3::splat(BASE_SCALE), base_digit_spacing)
+    }
+}
+
+fn spawn_digit_entities<T: Component + Copy>(
+    cmds: &mut Commands,
+    digits_vec: &[u32],
+    base_offset: Vec3,
+    scale: Vec3,
+    digit_spacing: f32,
+    cell_world_pos: Vec3,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    digits: &Res<Digits>,
+    mesh: Handle<Mesh>,
+    comp: T,
+) -> Vec<Entity> {
+    let mut entities = Vec::new();
+    let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+    for (i, &digit) in digits_vec.iter().enumerate() {
+        let mut offset = base_offset;
+        offset.x += x_offset + i as f32 * digit_spacing;
+
+        let material = materials.add(StandardMaterial {
+            base_color_texture: Some(digits.0[digit as usize].clone()),
+            alpha_mode: AlphaMode::Blend,
+            unlit: true,
+            ..default()
+        });
+
+        let dig = (
+            comp,
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform {
+                translation: cell_world_pos + offset,
+                rotation: Quat::from_rotation_x(-FRAC_PI_2),
+                scale,
+            },
+        );
+
+        let entity = cmds.spawn(dig).id();
+        entities.push(entity);
+    }
+
+    entities
+}
+
+fn detect_debug_change(mut cmds: Commands, debug: Res<DebugOptions>) {
     if debug.is_changed() {
         cmds.trigger(DrawDebugEv);
     }

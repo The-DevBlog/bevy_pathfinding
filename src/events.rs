@@ -1,24 +1,20 @@
 use bevy::prelude::*;
 
-// Phase 1
-#[derive(Event)]
-pub struct SetTargetCellEv;
-
-// Phase 2
-#[derive(Event)]
-pub struct SetFlowFieldEv;
-
-// Phase 3
-#[derive(Event)]
-pub struct DetectCollidersEv;
-
-// Phase 4
-#[derive(Event)]
-pub struct CalculateFlowFieldEv;
-
-// Phase 5
-#[derive(Event)]
-pub struct CalculateFlowVectorsEv;
+use crate::{cell::Cell, flowfield::FlowField};
 
 #[derive(Event)]
-pub struct InitializeFlowFieldEv;
+pub struct InitializeFlowFieldEv(pub Vec<Entity>);
+
+#[derive(Event)]
+pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
+
+#[derive(Event)]
+pub struct UpdateCostEv {
+    pub cell: Cell,
+}
+
+impl UpdateCostEv {
+    pub fn new(cell: Cell) -> Self {
+        Self { cell }
+    }
+}

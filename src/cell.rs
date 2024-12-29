@@ -1,26 +1,25 @@
-use std::u16;
-
 use bevy::prelude::*;
+use std::u16;
 
 use crate::grid_direction::GridDirection;
 
-#[derive(Clone, Default, Copy, Debug, PartialEq)]
+#[derive(Clone, Default, Copy, Debug, PartialEq, Reflect)]
 pub struct Cell {
-    pub world_position: Vec3,
-    pub grid_idx: IVec2,
-    pub cost: u8,
     pub best_cost: u16,
     pub best_direction: GridDirection,
+    pub cost: u8,
+    pub idx: IVec2,
+    pub world_pos: Vec3,
 }
 
 impl Cell {
     pub fn new(world_position: Vec3, grid_idx: IVec2) -> Self {
         Cell {
-            world_position,
-            grid_idx,
-            cost: 1,
             best_cost: u16::MAX,
             best_direction: GridDirection::None,
+            cost: 1,
+            idx: grid_idx,
+            world_pos: world_position,
         }
     }
 
