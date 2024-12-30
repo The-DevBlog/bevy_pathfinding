@@ -1,5 +1,6 @@
 use super::components::*;
 use super::resources::*;
+
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -28,13 +29,6 @@ impl Plugin for UiPlugin {
             .add_observer(update_active_dropdown_option);
     }
 }
-
-#[derive(Component)]
-#[require(Button)]
-struct DrawGridBtn;
-
-#[derive(Component)]
-struct DrawGridTxt;
 
 #[derive(Bundle)]
 struct DropDownBtnBundle {

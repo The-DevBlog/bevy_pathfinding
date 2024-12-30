@@ -9,6 +9,13 @@ pub struct DebugUI;
 
 #[derive(Component)]
 #[require(Button)]
+pub struct DrawGridBtn;
+
+#[derive(Component)]
+pub struct DrawGridTxt;
+
+#[derive(Component)]
+#[require(Button)]
 pub struct DropdownBtn(pub OptionsSet);
 
 #[derive(Component)]
