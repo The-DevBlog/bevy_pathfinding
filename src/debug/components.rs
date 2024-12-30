@@ -5,6 +5,13 @@ use bevy::prelude::*;
 pub struct ActiveOptionCtr;
 
 #[derive(Component)]
+pub struct VisibleNode;
+
+#[derive(Component)]
+#[require(Button)]
+pub struct HideDbgBtn;
+
+#[derive(Component)]
 pub struct DebugUI;
 
 #[derive(Component)]

@@ -3,35 +3,31 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 
-use bevy::{image::*, render::render_resource::*};
 use cell::Cell;
 use debug::COLOR_GRID;
 use events::UpdateCostEv;
 use grid::Grid;
-use image::ImageFormat;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
-const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
 const BASE_SCALE: f32 = 0.25;
 
 pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_texture_atlas)
-            .add_systems(
-                Update,
-                (
-                    draw_grid,
-                    detect_debug_change,
-                    update_cell_cost.after(grid::update_costs),
-                ),
-            )
-            .add_observer(set_active_dbg_flowfield)
-            .add_observer(draw_costfield)
-            .add_observer(draw_flowfield)
-            .add_observer(draw_integration_field)
-            .add_observer(draw_index);
+        app.add_systems(
+            Update,
+            (
+                draw_grid,
+                detect_debug_change,
+                update_cell_cost.after(grid::update_costs),
+            ),
+        )
+        .add_observer(set_active_dbg_flowfield)
+        .add_observer(draw_costfield)
+        .add_observer(draw_flowfield)
+        .add_observer(draw_integration_field)
+        .add_observer(draw_index);
     }
 }
 
@@ -56,47 +52,6 @@ fn set_active_dbg_flowfield(
             active_dbg_flowfield.0 = None;
             cmds.trigger(DrawDebugEv);
         }
-    }
-}
-
-fn load_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>) {
-    // Decode the image
-    let image = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
-        .expect("Failed to load digit image");
-    let rgba_image = image.to_rgba8();
-    let (width, height) = rgba_image.dimensions();
-    let digit_width = width / 10;
-
-    // Extract each digit as a separate texture
-    for idx in 0..10 {
-        let x_start = idx * digit_width;
-        let cropped_digit_data =
-            image::imageops::crop_imm(&rgba_image, x_start, 0, digit_width, height)
-                .to_image()
-                .into_raw();
-
-        let cropped_digit = Image {
-            data: cropped_digit_data,
-            texture_descriptor: TextureDescriptor {
-                label: None,
-                size: Extent3d {
-                    width: digit_width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
-                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
-            texture_view_descriptor: None,
-            asset_usage: Default::default(),
-        };
-
-        digits.0[idx as usize] = images.add(cropped_digit);
     }
 }
 

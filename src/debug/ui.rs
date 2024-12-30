@@ -1,4 +1,5 @@
 use super::components::*;
+use super::resources;
 use super::resources::*;
 
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -15,23 +16,33 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, draw_ui_box)
+        app.add_systems(Startup, draw_ui_box.after(resources::load_dbg_icon))
             .add_systems(
                 Update,
                 (
                     handle_dropdown_click,
+                    handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
                     handle_drag,
                 ),
             )
+            .add_observer(hide_options)
+            .add_observer(toggle_dbg_visibility)
             .add_observer(toggle_dropdown_visibility)
             .add_observer(update_active_dropdown_option);
     }
 }
 
+#[derive(Event)]
+struct ToggleDbgVisibilityEv(bool);
+
+#[derive(Event)]
+struct HideOptionsEv;
+
 #[derive(Bundle)]
 struct DropDownBtnBundle {
+    visible_node: VisibleNode,
     comp: DropdownBtn,
     btn: Button,
     background_clr: BackgroundColor,
@@ -69,6 +80,7 @@ struct OptionBoxCtr {
 #[derive(Bundle)]
 struct DropdownOptionsCtr {
     comp: DropdownOptions,
+    visible_node: VisibleNode,
     background_clr: BackgroundColor,
     border_radius: BorderRadius,
     node: Node,
@@ -127,6 +139,58 @@ fn handle_draw_grid_interaction(
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
         }
+    }
+}
+
+fn handle_hide_dbg_interaction(
+    mut q_hide_dbg: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<HideDbgBtn>),
+    >,
+    mut dbg: ResMut<DebugOptions>,
+    mut cmds: Commands,
+) {
+    for (interaction, mut background) in q_hide_dbg.iter_mut() {
+        match interaction {
+            Interaction::Pressed => {
+                cmds.trigger(ToggleDbgVisibilityEv(dbg.hide));
+                dbg.hide = !dbg.hide;
+            }
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_1.into(),
+        }
+    }
+}
+
+fn toggle_dbg_visibility(
+    trigger: Trigger<ToggleDbgVisibilityEv>,
+    mut q_node: Query<&mut Node, With<VisibleNode>>,
+    mut q_title_bar: Query<&mut BorderRadius, With<TitleBar>>,
+    mut cmds: Commands,
+) {
+    let visible = trigger.event().0;
+    let Ok(mut title_bar) = q_title_bar.get_single_mut() else {
+        return;
+    };
+
+    for mut node in q_node.iter_mut() {
+        if visible {
+            node.display = Display::Flex;
+            *title_bar = BorderRadius::all(Val::Px(0.0));
+            cmds.trigger(HideOptionsEv);
+        } else {
+            node.display = Display::None;
+            *title_bar = BorderRadius::bottom(Val::Px(10.0));
+        }
+    }
+}
+
+fn hide_options(
+    _trigger: Trigger<HideOptionsEv>,
+    mut q_node: Query<&mut Node, With<DropdownOptions>>,
+) {
+    for mut node in q_node.iter_mut() {
+        node.display = Display::None;
     }
 }
 
@@ -230,7 +294,7 @@ fn toggle_dropdown_visibility(
     }
 }
 
-fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
+fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>, dbg_icon: Res<DbgIcon>) {
     let root_ctr = (
         RootCtr,
         Node {
@@ -256,11 +320,24 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
         Name::new("Title Bar"),
     );
 
+    let hide_dbg_btn = (
+        HideDbgBtn,
+        ImageNode::new(dbg_icon.0.clone()),
+        BorderRadius::all(Val::Px(10.0)),
+        Node {
+            width: Val::Px(25.0),
+            height: Val::Px(25.0),
+            ..default()
+        },
+        Name::new("Debug Icon"),
+    );
+
     let title_bar_txt = (
         Title,
-        Text::new("Pathfinding Debug".to_string()),
+        VisibleNode,
+        Text::new("Pathfinding Debug"),
         Node {
-            margin: UiRect::all(Val::Auto),
+            margin: UiRect::new(Val::Px(5.0), Val::Auto, Val::Auto, Val::Auto),
             ..default()
         },
         TextFont::from_font_size(FONT_SIZE + 2.0),
@@ -269,6 +346,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
 
     let draw_grid_btn = (
         DrawGridBtn,
+        VisibleNode,
         BackgroundColor::from(CLR_BACKGROUND_2),
         BorderColor::from(CLR_BORDER),
         Node {
@@ -294,6 +372,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
         };
         DropDownBtnBundle {
             comp: DropdownBtn(set),
+            visible_node: VisibleNode,
             btn: Button::default(),
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
             border_clr: BorderColor::from(CLR_BORDER),
@@ -345,6 +424,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
             };
             DropdownOptionsCtr {
                 comp: DropdownOptions(options_set),
+                visible_node: VisibleNode,
                 background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
                 border_radius: radius,
                 node: Node {
@@ -388,6 +468,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
         ctr.spawn(title_bar).with_children(|title_bar| {
+            title_bar.spawn(hide_dbg_btn);
             title_bar.spawn(title_bar_txt);
         });
 
