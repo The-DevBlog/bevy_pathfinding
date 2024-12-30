@@ -20,6 +20,7 @@ impl Plugin for UiPlugin {
                 (
                     handle_dropdown_click,
                     handle_drawmode_option_interaction,
+                    handle_draw_grid_interaction,
                     handle_drag,
                 ),
             )
@@ -28,11 +29,71 @@ impl Plugin for UiPlugin {
     }
 }
 
+#[derive(Component)]
+#[require(Button)]
+struct DrawGridBtn;
+
+#[derive(Component)]
+struct DrawGridTxt;
+
+#[derive(Bundle)]
+struct DropDownBtnBundle {
+    comp: DropdownBtn,
+    btn: Button,
+    background_clr: BackgroundColor,
+    border_clr: BorderColor,
+    border_radius: BorderRadius,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct ActiveOptionCtrBundle {
+    comp: ActiveOptionCtr,
+    border_clr: BorderColor,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct DrawModeTxtCtr {
+    comp: DrawModeTxt,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct OptionBoxCtr {
+    comp: OptionBox,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+}
+
+#[derive(Bundle)]
+struct DropdownOptionsCtr {
+    comp: DropdownOptions,
+    background_clr: BackgroundColor,
+    border_radius: BorderRadius,
+    node: Node,
+    name: Name,
+}
+
+#[derive(Bundle)]
+struct OptionTxtCtr {
+    comp: OptionTxt,
+    txt: Text,
+    txt_font: TextFont,
+    txt_clr: TextColor,
+}
+
 fn handle_drawmode_option_interaction(
     mut cmds: Commands,
     mut q_option: Query<
         (&Interaction, &SetActiveOption, &mut BackgroundColor),
-        (Changed<Interaction>,),
+        Changed<Interaction>,
     >,
     mut dbg: ResMut<DebugOptions>,
 ) {
@@ -45,6 +106,29 @@ fn handle_drawmode_option_interaction(
                 }
 
                 cmds.trigger(UpdateDropdownOptionEv);
+            }
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn handle_draw_grid_interaction(
+    mut q_draw_grid: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<DrawGridBtn>),
+    >,
+    mut q_txt: Query<&mut Text, With<DrawGridTxt>>,
+    mut dbg: ResMut<DebugOptions>,
+) {
+    for (interaction, mut background) in q_draw_grid.iter_mut() {
+        match interaction {
+            Interaction::Pressed => {
+                dbg.draw_grid = !dbg.draw_grid;
+
+                if let Ok(mut txt) = q_txt.get_single_mut() {
+                    txt.0 = format!("Grid: {}", dbg.draw_grid);
+                }
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
@@ -152,59 +236,6 @@ fn toggle_dropdown_visibility(
     }
 }
 
-#[derive(Bundle)]
-struct DropDownBtnBundle {
-    comp: DropdownBtn,
-    btn: Button,
-    background_clr: BackgroundColor,
-    border_clr: BorderColor,
-    border_radius: BorderRadius,
-    node: Node,
-    name: Name,
-}
-
-#[derive(Bundle)]
-struct ActiveOptionCtrBundle {
-    comp: ActiveOptionCtr,
-    border_clr: BorderColor,
-    node: Node,
-    name: Name,
-}
-
-#[derive(Bundle)]
-struct DrawModeTxtCtr {
-    comp: DrawModeTxt,
-    txt: Text,
-    txt_font: TextFont,
-    txt_clr: TextColor,
-    name: Name,
-}
-
-#[derive(Bundle)]
-struct OptionBoxCtr {
-    comp: OptionBox,
-    txt: Text,
-    txt_font: TextFont,
-    txt_clr: TextColor,
-}
-
-#[derive(Bundle)]
-struct DropdownOptionsCtr {
-    comp: DropdownOptions,
-    background_clr: BackgroundColor,
-    border_radius: BorderRadius,
-    node: Node,
-    name: Name,
-}
-
-#[derive(Bundle)]
-struct OptionTxtCtr {
-    comp: OptionTxt,
-    txt: Text,
-    txt_font: TextFont,
-    txt_clr: TextColor,
-}
-
 fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
     let root_ctr = (
         RootCtr,
@@ -231,7 +262,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
         Name::new("Title Bar"),
     );
 
-    let title = (
+    let title_bar_txt = (
         Title,
         Text::new("Pathfinding Debug".to_string()),
         Node {
@@ -240,6 +271,26 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
         },
         TextFont::from_font_size(FONT_SIZE + 2.0),
         TextColor::from(CLR_TITLE),
+    );
+
+    let draw_grid_btn = (
+        DrawGridBtn,
+        BackgroundColor::from(CLR_BACKGROUND_2),
+        BorderColor::from(CLR_BORDER),
+        Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            border: UiRect::bottom(Val::Px(1.0)),
+            ..default()
+        },
+        Name::new("Draw Grid Button"),
+    );
+
+    let draw_grid_txt = (
+        DrawGridTxt,
+        Text::new(format!("Grid: {}", dbg.draw_grid)),
+        TextFont::from_font_size(FONT_SIZE),
+        TextColor::from(CLR_TXT),
+        Name::new("Draw Grid Txt"),
     );
 
     let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropDownBtnBundle {
@@ -343,7 +394,12 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>) {
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
         ctr.spawn(title_bar).with_children(|title_bar| {
-            title_bar.spawn(title);
+            title_bar.spawn(title_bar_txt);
+        });
+
+        // Draw Grid
+        ctr.spawn(draw_grid_btn).with_children(|ctr| {
+            ctr.spawn(draw_grid_txt);
         });
 
         // Draw Mode 1 Container
