@@ -1,9 +1,7 @@
-use std::collections::HashSet;
-
 use crate::{cell::Cell, components::Destination, utils, UpdateCostEv};
 
 use bevy::prelude::*;
-use bevy_rapier3d::{plugin::*, prelude::*};
+use std::collections::HashSet;
 
 pub struct GridPlugin;
 
@@ -31,7 +29,10 @@ pub struct Grid {
 impl Grid {
     // creates the grid and the costfield
     // all flowfields will share the same costfield
-    pub fn new(size: IVec2, cell_diameter: f32, rapier_ctx: &RapierContext) -> Self {
+    pub fn new<F>(size: IVec2, cell_diameter: f32, mut collision_checker: F) -> Self
+    where
+        F: FnMut(Vec3) -> bool,
+    {
         let mut grid = Grid {
             size,
             cell_diameter,
@@ -61,15 +62,8 @@ impl Grid {
         for y in 0..grid.size.y {
             for x in 0..grid.size.x {
                 let world_pos = grid.grid[y as usize][x as usize].world_pos;
-                let hit = rapier_ctx.intersection_with_shape(
-                    world_pos,
-                    Quat::IDENTITY,
-                    &Collider::cuboid(grid.cell_radius, grid.cell_radius, grid.cell_radius),
-                    QueryFilter::default().exclude_sensors(),
-                );
 
-                if let Some(_entity) = hit {
-                    // increase cost now that cell exists
+                if collision_checker(world_pos) {
                     grid.grid[y as usize][x as usize].increase_cost(255);
                 }
             }
