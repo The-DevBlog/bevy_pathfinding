@@ -4,6 +4,8 @@ use super::resources::*;
 use crate::*;
 
 use cell::Cell;
+use debug::shader::InstanceData;
+use debug::shader::InstanceMaterialData;
 use debug::COLOR_GRID;
 use events::UpdateCostEv;
 use grid::Grid;
@@ -120,6 +122,7 @@ fn draw_flowfield(
 
     let material = materials.add(StandardMaterial {
         base_color: arrow_clr,
+        unlit: true,
         ..default()
     });
 
@@ -199,6 +202,117 @@ fn draw_flowfield(
         // println!();
     }
 }
+
+// fn draw_flowfield(
+//     _trigger: Trigger<DrawDebugEv>,
+//     dbg: Res<DebugOptions>,
+//     grid: Res<Grid>,
+//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+//     mut cmds: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<StandardMaterial>>,
+// ) {
+//     let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
+//         return;
+//     };
+
+//     let mut marker_scale = 0.7;
+//     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+//         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+//     {
+//         marker_scale = 1.0;
+//     }
+
+//     let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+//     let Some(offset) = offset else {
+//         return;
+//     };
+
+//     println!("Drawing Flowfield");
+
+//     // Arrow properties
+//     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
+//     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
+
+//     // Shared arrow mesh and material
+//     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+//     let material = materials.add(StandardMaterial {
+//         base_color: Color::WHITE,
+//         ..default()
+//     });
+
+//     // Instance data for all arrows
+//     let mut instance_data = Vec::new();
+
+//     // let offset = Vec3::new(22.0, 0.0, 22.0);
+
+//     for (row_idx, cell_row) in active_dbg_flowfield.grid.iter().enumerate() {
+//         for (col_idx, cell) in cell_row.iter().enumerate() {
+//             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
+
+//             let rotation = if is_destination_cell {
+//                 Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)
+//             } else {
+//                 Quat::from_rotation_y(cell.best_direction.to_angle())
+//             };
+
+//             let position = cell.world_pos + offset;
+//             let color = if cell.cost < u8::MAX {
+//                 [1.0, 1.0, 1.0, 1.0] // White for valid cells
+//             } else {
+//                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
+//             };
+
+//             instance_data.push(InstanceData {
+//                 position,
+//                 // position: Vec3::new(offset.x * row_idx as f32, 2., offset.z * col_idx as f32),
+//                 scale: marker_scale,
+//                 // rotation,
+//                 color,
+//             });
+//         }
+//     }
+
+//     println!("Instance Data Count: {}", instance_data.len());
+//     // Spawn a single entity with instance data
+//     cmds.spawn((
+//         Mesh3d(arrow_mesh),
+//         // MeshMaterial3d(material),
+//         InstanceMaterialData(instance_data), // Name::new("Flowfield Arrows"),
+//     ));
+
+//     // let offset = Vec3::new(1.0, 0.0, 1.0);
+//     // let grid_size = (100 as f32).sqrt().ceil() as usize;
+
+//     // let mut instance_data_vec = Vec::new();
+//     // let mut count = 0;
+
+//     // for row in 0..grid_size {
+//     //     for col in 0..grid_size {
+//     //         if count >= 100 {
+//     //             break;
+//     //         }
+
+//     //         let instance_data = InstanceData {
+//     //             position: Vec3::new(offset.x * row as f32, 2., offset.z * col as f32),
+//     //             scale: 1.,
+//     //             color: [0.64, 0.41, 0.23, 1.],
+//     //         };
+
+//     //         instance_data_vec.push(instance_data);
+//     //         count += 1;
+//     //     }
+//     // }
+
+//     // let arrow_mesh = meshes.add(Plane3d::default().mesh().size(10.0, 5.0));
+//     // println!("Spawning {} arrows", instance_data_vec.len());
+
+//     // cmds.spawn((
+//     //     Mesh3d(arrow_mesh),
+//     //     Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+//     //     InstanceMaterialData(instance_data_vec),
+//     // ));
+// }
 
 fn draw_integration_field(
     _trigger: Trigger<DrawDebugEv>,

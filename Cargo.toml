@@ -4,8 +4,19 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.15.0"
+bevy = "0.15.1"
+bevy_render = { version = "0.15.1", default_features = false }
+bytemuck = "1.21.0"
 image = "0.25.5"
+
+# [features]
+# default = ["bevy_core_pipeline"]
+
+# bevy_core_pipeline = [
+#     "bevy_internal/bevy_core_pipeline",
+#     "bevy_asset",
+#     "bevy_render",
+# ]
 
 [profile.dev]
 opt-level = 0

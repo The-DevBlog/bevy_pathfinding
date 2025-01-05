@@ -10,7 +10,7 @@ impl Plugin for GridPlugin {
         app.register_type::<Grid>()
             .init_resource::<OccupiedCells>()
             .add_event::<UpdateCostEv>()
-            .add_systems(Update, update_costs);
+            .add_systems(Update, update_costs.run_if(resource_exists::<Grid>));
     }
 }
 
@@ -132,7 +132,7 @@ pub fn update_costs(
         return;
     }
 
-    println!("updating costs");
+    // println!("updating costs");
     let mut current_occupied = HashSet::new();
 
     // Mark cells occupied by units
