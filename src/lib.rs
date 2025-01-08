@@ -1,7 +1,8 @@
-use crate::events::*;
-use crate::resources::*;
 use bevy::color::palettes::css::*;
 use bevy::prelude::*;
+
+use crate::events::*;
+use crate::resources::*;
 
 mod cell;
 pub mod components;

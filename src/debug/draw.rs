@@ -3,6 +3,8 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 
+use bevy::render::view::NoFrustumCulling;
+use bevy::render::view::RenderLayers;
 use cell::Cell;
 use debug::shader::InstanceData;
 use debug::shader::InstanceMaterialData;
@@ -17,17 +19,21 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<MyTimer>();
         app.add_systems(
             Update,
             (
-                draw_grid,
-                detect_debug_change,
-                update_cell_cost.after(grid::update_costs),
+                draw_grid.run_if(resource_exists::<Grid>),
+                detect_debug_change.run_if(resource_exists::<Grid>),
+                update_cell_cost
+                    .after(grid::update_costs)
+                    .run_if(resource_exists::<Grid>),
             ),
         )
+        .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
-        .add_observer(draw_flowfield)
+        // .add_observer(draw_flowfield)
         .add_observer(draw_integration_field)
         .add_observer(draw_index);
     }
@@ -71,147 +77,21 @@ fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
 }
 
 // TODO: Cleanup this method
-fn draw_flowfield(
-    _trigger: Trigger<DrawDebugEv>,
-    dbg: Res<DebugOptions>,
-    grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-    q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
-    mut cmds: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Remove current arrows before rendering new ones
-    for arrow_entity in &q_flowfield_arrow {
-        cmds.entity(arrow_entity).despawn_recursive();
-    }
-
-    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
-        return;
-    };
-
-    let mut marker_scale = 0.7;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = 1.0;
-    }
-
-    let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
-    let Some(offset) = offset else {
-        return;
-    };
-
-    println!("Drawing Flowfield");
-
-    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
-    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-    let arrow_clr = Color::WHITE;
-
-    // Create the arrowhead mesh
-    let half_arrow_size = arrow_length / 2.0;
-    let d1 = half_arrow_size - grid.cell_diameter * 0.09;
-    let d2 = arrow_width + grid.cell_diameter * 0.0125;
-    let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
-    let b = Vec2::new(d1, d2);
-    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
-
-    // Mesh for arrow
-    let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-    let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
-
-    let material = materials.add(StandardMaterial {
-        base_color: arrow_clr,
-        unlit: true,
-        ..default()
-    });
-
-    // println!("Drawing flowfield");
-    for cell_row in &active_dbg_flowfield.grid {
-        for cell in cell_row.iter() {
-            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
-
-            let rotation = match is_destination_cell {
-                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
-            };
-
-            let mesh = match is_destination_cell {
-                true => meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale)),
-                false => arrow_mesh.clone(),
-            };
-
-            let marker = (
-                Mesh3d(mesh.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform {
-                    translation: cell.world_pos + offset,
-                    rotation,
-                    ..default()
-                },
-                FlowFieldArrow,
-                Name::new("Flowfield Marker Arrow"),
-            );
-
-            let arrow_head = (
-                Mesh3d(arrow_head_mesh.clone()),
-                MeshMaterial3d(material.clone()),
-                Transform {
-                    translation: Vec3::ZERO,
-                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                    ..default()
-                },
-                Name::new("Arrowhead"),
-            );
-
-            if cell.cost < u8::MAX {
-                let mut draw = cmds.spawn(marker);
-
-                if !is_destination_cell {
-                    draw.with_children(|parent| {
-                        parent.spawn(arrow_head);
-                    });
-                }
-            } else {
-                let cross = (
-                    Transform::default(),
-                    Mesh3d(mesh),
-                    MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
-                    FlowFieldArrow,
-                    Name::new("Flowfield Marker 'X'"),
-                );
-
-                let mut cross_1 = cross.clone();
-                cross_1.0 = Transform {
-                    translation: cell.world_pos + offset,
-                    rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
-                    ..default()
-                };
-
-                let mut cross_2 = cross.clone();
-                cross_2.0 = Transform {
-                    translation: cell.world_pos + offset,
-                    rotation: Quat::from_rotation_y(FRAC_PI_4),
-                    ..default()
-                };
-
-                cmds.spawn(cross_1);
-                cmds.spawn(cross_2);
-            }
-        }
-        // println!();
-    }
-}
-
 // fn draw_flowfield(
 //     _trigger: Trigger<DrawDebugEv>,
 //     dbg: Res<DebugOptions>,
 //     grid: Res<Grid>,
 //     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+//     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
 //     mut cmds: Commands,
 //     mut meshes: ResMut<Assets<Mesh>>,
 //     mut materials: ResMut<Assets<StandardMaterial>>,
 // ) {
+//     // Remove current arrows before rendering new ones
+//     for arrow_entity in &q_flowfield_arrow {
+//         cmds.entity(arrow_entity).despawn_recursive();
+//     }
+
 //     let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
 //         return;
 //     };
@@ -230,89 +110,200 @@ fn draw_flowfield(
 
 //     println!("Drawing Flowfield");
 
-//     // Arrow properties
 //     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
 //     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
+//     let arrow_clr = Color::WHITE;
 
-//     // Shared arrow mesh and material
+//     // Create the arrowhead mesh
+//     let half_arrow_size = arrow_length / 2.0;
+//     let d1 = half_arrow_size - grid.cell_diameter * 0.09;
+//     let d2 = arrow_width + grid.cell_diameter * 0.0125;
+//     let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
+//     let b = Vec2::new(d1, d2);
+//     let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
+
+//     // Mesh for arrow
 //     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+//     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
+
 //     let material = materials.add(StandardMaterial {
-//         base_color: Color::WHITE,
+//         base_color: arrow_clr,
+//         unlit: true,
 //         ..default()
 //     });
 
-//     // Instance data for all arrows
-//     let mut instance_data = Vec::new();
-
-//     // let offset = Vec3::new(22.0, 0.0, 22.0);
-
-//     for (row_idx, cell_row) in active_dbg_flowfield.grid.iter().enumerate() {
-//         for (col_idx, cell) in cell_row.iter().enumerate() {
+//     // println!("Drawing flowfield");
+//     for cell_row in &active_dbg_flowfield.grid {
+//         for cell in cell_row.iter() {
 //             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
-//             let rotation = if is_destination_cell {
-//                 Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)
-//             } else {
-//                 Quat::from_rotation_y(cell.best_direction.to_angle())
+//             let rotation = match is_destination_cell {
+//                 true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+//                 false => Quat::from_rotation_y(cell.best_direction.to_angle()),
 //             };
 
-//             let position = cell.world_pos + offset;
-//             let color = if cell.cost < u8::MAX {
-//                 [1.0, 1.0, 1.0, 1.0] // White for valid cells
-//             } else {
-//                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
+//             let mesh = match is_destination_cell {
+//                 true => meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale)),
+//                 false => arrow_mesh.clone(),
 //             };
 
-//             instance_data.push(InstanceData {
-//                 position,
-//                 // position: Vec3::new(offset.x * row_idx as f32, 2., offset.z * col_idx as f32),
-//                 scale: marker_scale,
-//                 // rotation,
-//                 color,
-//             });
+//             let marker = (
+//                 Mesh3d(mesh.clone()),
+//                 MeshMaterial3d(material.clone()),
+//                 Transform {
+//                     translation: cell.world_pos + offset,
+//                     rotation,
+//                     ..default()
+//                 },
+//                 FlowFieldArrow,
+//                 Name::new("Flowfield Marker Arrow"),
+//             );
+
+//             let arrow_head = (
+//                 Mesh3d(arrow_head_mesh.clone()),
+//                 MeshMaterial3d(material.clone()),
+//                 Transform {
+//                     translation: Vec3::ZERO,
+//                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+//                     ..default()
+//                 },
+//                 Name::new("Arrowhead"),
+//             );
+
+//             if cell.cost < u8::MAX {
+//                 let mut draw = cmds.spawn(marker);
+
+//                 if !is_destination_cell {
+//                     draw.with_children(|parent| {
+//                         parent.spawn(arrow_head);
+//                     });
+//                 }
+//             } else {
+//                 let cross = (
+//                     Transform::default(),
+//                     Mesh3d(mesh),
+//                     MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
+//                     FlowFieldArrow,
+//                     Name::new("Flowfield Marker 'X'"),
+//                 );
+
+//                 let mut cross_1 = cross.clone();
+//                 cross_1.0 = Transform {
+//                     translation: cell.world_pos + offset,
+//                     rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
+//                     ..default()
+//                 };
+
+//                 let mut cross_2 = cross.clone();
+//                 cross_2.0 = Transform {
+//                     translation: cell.world_pos + offset,
+//                     rotation: Quat::from_rotation_y(FRAC_PI_4),
+//                     ..default()
+//                 };
+
+//                 cmds.spawn(cross_1);
+//                 cmds.spawn(cross_2);
+//             }
 //         }
+//         // println!();
 //     }
-
-//     println!("Instance Data Count: {}", instance_data.len());
-//     // Spawn a single entity with instance data
-//     cmds.spawn((
-//         Mesh3d(arrow_mesh),
-//         // MeshMaterial3d(material),
-//         InstanceMaterialData(instance_data), // Name::new("Flowfield Arrows"),
-//     ));
-
-//     // let offset = Vec3::new(1.0, 0.0, 1.0);
-//     // let grid_size = (100 as f32).sqrt().ceil() as usize;
-
-//     // let mut instance_data_vec = Vec::new();
-//     // let mut count = 0;
-
-//     // for row in 0..grid_size {
-//     //     for col in 0..grid_size {
-//     //         if count >= 100 {
-//     //             break;
-//     //         }
-
-//     //         let instance_data = InstanceData {
-//     //             position: Vec3::new(offset.x * row as f32, 2., offset.z * col as f32),
-//     //             scale: 1.,
-//     //             color: [0.64, 0.41, 0.23, 1.],
-//     //         };
-
-//     //         instance_data_vec.push(instance_data);
-//     //         count += 1;
-//     //     }
-//     // }
-
-//     // let arrow_mesh = meshes.add(Plane3d::default().mesh().size(10.0, 5.0));
-//     // println!("Spawning {} arrows", instance_data_vec.len());
-
-//     // cmds.spawn((
-//     //     Mesh3d(arrow_mesh),
-//     //     Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
-//     //     InstanceMaterialData(instance_data_vec),
-//     // ));
 // }
+
+#[derive(Resource)]
+struct MyTimer(Timer);
+
+impl Default for MyTimer {
+    fn default() -> Self {
+        MyTimer(Timer::from_seconds(0.50, TimerMode::Once))
+    }
+}
+
+pub fn draw_flowfield(
+    // _trigger: Trigger<DrawDebugEv>,
+    time: Res<Time>,
+    mut timer: ResMut<MyTimer>,
+    dbg: Res<DebugOptions>,
+    grid: Res<Grid>,
+    // active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    timer.0.tick(time.delta());
+    if !timer.0.just_finished() {
+        return;
+    }
+
+    // Remove current arrows before rendering new ones
+    for arrow_entity in &q_flowfield_arrow {
+        cmds.entity(arrow_entity).despawn_recursive();
+    }
+
+    // let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
+    //     return;
+    // };
+
+    let mut marker_scale = 0.7;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        marker_scale = 1.0;
+    }
+
+    let offset = calculate_offset(20.0, dbg, DrawMode::FlowField);
+    // let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+    let Some(offset) = offset else {
+        return;
+    };
+
+    println!("Drawing Flowfield");
+
+    // Arrow properties
+    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
+    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
+    // let arrow_length = 10.0;
+    // let arrow_width = 2.0;
+
+    // Shared arrow mesh and material
+    let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+
+    // Instance data for all arrows
+    let mut instance_data = Vec::new();
+
+    // let offset = Vec3::new(22.0, 0.0, 22.0);
+
+    // for cell_row in active_dbg_flowfield.grid.iter() {
+    for cell_row in grid.grid.iter() {
+        for cell in cell_row.iter() {
+            // let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
+
+            // let rotation = match is_destination_cell {
+            //     true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+            //     false => Quat::from_rotation_y(cell.best_direction.to_angle()),
+            // };
+
+            let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
+
+            let color = if cell.cost < u8::MAX {
+                [1.0, 1.0, 1.0, 1.0] // White for valid cells
+            } else {
+                [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
+            };
+
+            instance_data.push(InstanceData {
+                position: cell.world_pos + offset,
+                scale: marker_scale,
+                color,
+            });
+        }
+    }
+
+    cmds.spawn((
+        FlowFieldArrow,
+        Mesh3d(arrow_mesh),
+        InstanceMaterialData(instance_data),
+    ));
+}
 
 fn draw_integration_field(
     _trigger: Trigger<DrawDebugEv>,

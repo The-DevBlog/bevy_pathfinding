@@ -1,131 +1,27 @@
-//! A shader that renders a mesh multiple times in one draw call.
-//!
-//! Bevy will automatically batch and instance your meshes assuming you use the same
-//! `Handle<Material>` and `Handle<Mesh>` for all of your instances.
-//!
-//! This example is intended for advanced users and shows how to make a custom instancing
-//! implementation using bevy's low level rendering api.
-//! It's generally recommended to try the built-in instancing before going with this approach.
-
+use allocator::MeshAllocator;
 use bevy::{
+    asset::embedded_asset,
     core_pipeline::core_3d::Transparent3d,
     ecs::{
-        event::EventRegistry,
         query::QueryItem,
         system::{lifetimeless::*, SystemParamItem},
     },
-    pbr::{
-        MeshPipeline, MeshPipelineKey, RenderMeshInstances, SetMeshBindGroup, SetMeshViewBindGroup,
-    },
+    pbr::*,
     prelude::*,
     render::{
-        extract_component::{ExtractComponent, ExtractComponentPlugin},
-        mesh::{
-            allocator::MeshAllocator, MeshVertexBufferLayoutRef, RenderMesh, RenderMeshBufferInfo,
-        },
-        render_asset::RenderAssets,
-        render_phase::{
-            AddRenderCommand, DrawFunctions, PhaseItem, PhaseItemExtraIndex, RenderCommand,
-            RenderCommandResult, SetItemPipeline, TrackedRenderPass, ViewSortedRenderPhases,
-        },
-        render_resource::*,
-        renderer::RenderDevice,
-        sync_world::MainEntity,
-        view::{ExtractedView, NoFrustumCulling},
-        Render, RenderApp, RenderSet,
+        self, extract_component::*, mesh::*, render_asset::RenderAssets, render_phase::*,
+        render_resource::*, renderer::RenderDevice, view::ExtractedView, *,
     },
 };
-use bevy_render::{
-    extract_resource::{ExtractResource, ExtractResourcePlugin},
-    RenderPlugin,
-};
 use bytemuck::{Pod, Zeroable};
+use sync_world::MainEntity;
 
-/// This example uses a shader source file from the assets subdirectory
-// const SHADER_ASSET_PATH: &str = "arrow.wgsl";
-// const SHADER_ASSET_PATH: &str = "instancing.wgsl";
+pub struct ShaderPlugin;
 
-const SHADER: &str = r#"
-#import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip}
-
-// Define the vertex input structure
-struct Vertex {
-    @location(0) position: vec3<f32>, 
-    @location(3) pos_scale: vec4<f32>,
-    @location(4) color: vec4<f32>,
-    // @location(3) i_rot: f32,
-};
-
-// Define the vertex output structure
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>, // Position in clip space
-    @location(0) color: vec4<f32>, // Color passed to the fragment shader
-};
-
-// Vertex shader
-@vertex
-fn vertex(input: VertexInput) -> VertexOutput {
-    let position = vertex.position * vertex.pos_scale.w + vertex.pos_scale.xyz;
-    var out: VertexOutput;
-    // NOTE: Passing 0 as the instance_index to get_world_from_local() is a hack
-    // for this example as the instance_index builtin would map to the wrong
-    // index in the Mesh array. This index could be passed in via another
-    // uniform instead but it's unnecessary for the example.
-    out.clip_position = mesh_position_local_to_clip(
-        get_world_from_local(0u),
-        vec4<f32>(position, 1.0)
-    );
-
-    out.color = vertex.color;
-    return out;
-}
-
-// Fragment shader
-@fragment
-fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.color;
-}
-"#;
-
-fn main() {
-    App::new()
-        .add_plugins((DefaultPlugins, ShaderPlugin))
-        .add_systems(Startup, setup)
-        .run();
-}
-
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
-    // commands.spawn((
-    //     Mesh3d(meshes.add(Cuboid::new(0.5, 0.5, 0.5))),
-    //     InstanceMaterialData(
-    //         (1..=100)
-    //             .flat_map(|x| (1..=100).map(move |y| (x as f32 / 10.0, y as f32 / 10.0)))
-    //             .map(|(x, y)| InstanceData {
-    //                 position: Vec3::new(x * 10.0 - 5.0, y * 10.0 - 5.0, 0.0),
-    //                 scale: 1.0,
-    //                 color: [0.2, 0.6, 0.8, 1.0],
-    //             })
-    //             .collect(),
-    //     ),
-    //     // NOTE: Frustum culling is done based on the Aabb of the Mesh and the GlobalTransform.
-    //     // As the cube is at the origin, if its Aabb moves outside the view frustum, all the
-    //     // instanced cubes will be culled.
-    //     // The InstanceMaterialData contains the 'GlobalTransform' information for this custom
-    //     // instancing, and that is not taken into account with the built-in frustum culling.
-    //     // We must disable the built-in frustum culling by adding the `NoFrustumCulling` marker
-    //     // component to avoid incorrect culling.
-    //     NoFrustumCulling,
-    // ));
-
-    // camera
-    // commands.spawn((
-    //     Camera3d::default(),
-    //     Transform::from_xyz(0.0, 0.0, 200.0).looking_at(Vec3::ZERO, Vec3::Y),
-    //     // We need this component because we use `draw_indexed` and `draw`
-    //     // instead of `draw_indirect_indexed` and `draw_indirect` in
-    //     // `DrawMeshInstanced::render`.
-    //     NoIndirectDrawing,
-    // ));
+impl Plugin for ShaderPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(CustomMaterialPlugin);
+    }
 }
 
 #[derive(Component, Deref)]
@@ -141,11 +37,12 @@ impl ExtractComponent for InstanceMaterialData {
     }
 }
 
-pub struct ShaderPlugin;
+struct CustomMaterialPlugin;
 
-impl Plugin for ShaderPlugin {
+impl Plugin for CustomMaterialPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ExtractComponentPlugin::<InstanceMaterialData>::default());
+
         app.sub_app_mut(RenderApp)
             .add_render_command::<Transparent3d, DrawCustom>()
             .init_resource::<SpecializedMeshPipelines<CustomPipeline>>()
@@ -157,6 +54,8 @@ impl Plugin for ShaderPlugin {
                     prepare_instance_buffers.in_set(RenderSet::PrepareResources),
                 ),
             );
+
+        embedded_asset!(app, "instancing.wgsl");
     }
 
     fn finish(&self, app: &mut App) {
@@ -169,7 +68,6 @@ impl Plugin for ShaderPlugin {
 pub struct InstanceData {
     pub position: Vec3,
     pub scale: f32,
-    // pub rotation: Quat,
     pub color: [f32; 4],
 }
 
@@ -183,20 +81,19 @@ fn queue_custom(
     render_mesh_instances: Res<RenderMeshInstances>,
     material_meshes: Query<(Entity, &MainEntity), With<InstanceMaterialData>>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
-    views: Query<(Entity, &ExtractedView, &Msaa)>,
+    mut views: Query<(Entity, &ExtractedView, &Msaa)>,
 ) {
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
 
-    for (view_entity, view, msaa) in &views {
+    for (view_entity, view, msaa) in &mut views {
+        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
+
         let Some(transparent_phase) = transparent_render_phases.get_mut(&view_entity) else {
             continue;
         };
 
-        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
-
         let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
         let rangefinder = view.rangefinder3d();
-
         for (entity, main_entity) in &material_meshes {
             let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(*main_entity)
             else {
@@ -216,8 +113,7 @@ fn queue_custom(
                 draw_function: draw_custom,
                 distance: rangefinder.distance_translation(&mesh_instance.translation),
                 batch_range: 0..1,
-                // extra_index: PhaseItemExtraIndex::None,
-                extra_index: PhaseItemExtraIndex(0),
+                extra_index: PhaseItemExtraIndex::NONE,
             });
         }
     }
@@ -253,44 +149,17 @@ struct CustomPipeline {
     mesh_pipeline: MeshPipeline,
 }
 
-// impl FromWorld for CustomPipeline {
-//     fn from_world(world: &mut World) -> Self {
-//         println!("from_world");
-//         let mesh_pipeline = world.resource::<MeshPipeline>();
-//         // Grab the shader handle we embedded at startup
-//         // let embedded_shader = world.resource::<MyEmbeddedShader>();
-
-//         // Grab the `Assets<Shader>` resource, so we can insert our WGSL
-//         let mut shaders = world.resource_mut::<Assets<Shader>>();
-//         let embedded_shader_handle = shaders.add(Shader::from_wgsl(SHADER, "dummy_path.wgsl"));
-
-//         CustomPipeline {
-//             // shader: embedded_shader.0.clone(), // Use the embedded shader handle
-//             // shader: world.load_asset(SHADER_ASSET_PATH), // add inline shader here
-//             shader: embedded_shader_handle, // add inline shader here
-//             mesh_pipeline: mesh_pipeline.clone(),
-//         }
-//     }
-// }
-
 impl FromWorld for CustomPipeline {
     fn from_world(world: &mut World) -> Self {
-        // Step 1: Immutable borrow in a limited scope
-        let mesh_pipeline = {
-            let mesh_pipeline_ref = world.resource::<MeshPipeline>();
-            mesh_pipeline_ref.clone()
-        };
-        // `mesh_pipeline_ref` is dropped here when the scope ends
+        let mesh_pipeline = { world.resource::<MeshPipeline>().clone() };
 
-        // Step 2: Mutable borrow in a new scope
-        let embedded_shader_handle = {
-            let mut shaders = world.resource_mut::<Assets<Shader>>();
-            shaders.add(Shader::from_wgsl(SHADER, "arrow.wgsl"))
-        };
+        // Load the embedded shader by its virtual path
+        let asset_server = world.resource::<AssetServer>();
+        let shader: Handle<Shader> =
+            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
 
         CustomPipeline {
-            // shader: world.load_asset(SHADER), // add inline shader here
-            shader: embedded_shader_handle,
+            shader,
             mesh_pipeline,
         }
     }
@@ -308,7 +177,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
 
         descriptor.vertex.shader = self.shader.clone();
         descriptor.vertex.buffers.push(VertexBufferLayout {
-            array_stride: size_of::<InstanceData>() as u64,
+            array_stride: std::mem::size_of::<InstanceData>() as u64,
             step_mode: VertexStepMode::Instance,
             attributes: vec![
                 VertexAttribute {
