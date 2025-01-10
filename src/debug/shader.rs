@@ -67,7 +67,6 @@ impl Plugin for CustomShaderPlugin {
 #[repr(C)]
 pub struct InstanceData {
     pub position: Vec3,
-    // pub rotation: Quat,
     pub scale: f32,
     pub color: [f32; 4],
 }
