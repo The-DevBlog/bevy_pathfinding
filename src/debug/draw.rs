@@ -6,8 +6,8 @@ use crate::*;
 use bevy::render::view::NoFrustumCulling;
 use bevy::render::view::RenderLayers;
 use cell::Cell;
-use debug::shader::InstanceData;
-use debug::shader::InstanceMaterialData;
+// use debug::shader::InstanceData;
+// use debug::shader::InstanceMaterialData;
 use debug::COLOR_GRID;
 use events::UpdateCostEv;
 use grid::Grid;
@@ -19,7 +19,6 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MyTimer>();
         app.add_systems(
             Update,
             (
@@ -30,10 +29,10 @@ impl Plugin for DrawPlugin {
                     .run_if(resource_exists::<Grid>),
             ),
         )
-        .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
+        // .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
-        // .add_observer(draw_flowfield)
+        .add_observer(draw_flowfield)
         .add_observer(draw_integration_field)
         .add_observer(draw_index);
     }
@@ -209,39 +208,23 @@ fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
 //     }
 // }
 
-#[derive(Resource)]
-struct MyTimer(Timer);
-
-impl Default for MyTimer {
-    fn default() -> Self {
-        MyTimer(Timer::from_seconds(0.50, TimerMode::Once))
-    }
-}
-
 pub fn draw_flowfield(
-    // _trigger: Trigger<DrawDebugEv>,
-    time: Res<Time>,
-    mut timer: ResMut<MyTimer>,
+    _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
-    // active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    timer.0.tick(time.delta());
-    if !timer.0.just_finished() {
-        return;
-    }
-
     // Remove current arrows before rendering new ones
     for arrow_entity in &q_flowfield_arrow {
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    // let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
-    //     return;
-    // };
+    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
 
     let mut marker_scale = 0.7;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
@@ -250,8 +233,7 @@ pub fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let offset = calculate_offset(20.0, dbg, DrawMode::FlowField);
-    // let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+    let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
     let Some(offset) = offset else {
         return;
     };
@@ -261,8 +243,6 @@ pub fn draw_flowfield(
     // Arrow properties
     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-    // let arrow_length = 10.0;
-    // let arrow_width = 2.0;
 
     // Shared arrow mesh and material
     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
@@ -270,19 +250,17 @@ pub fn draw_flowfield(
     // Instance data for all arrows
     let mut instance_data = Vec::new();
 
-    // let offset = Vec3::new(22.0, 0.0, 22.0);
-
     // for cell_row in active_dbg_flowfield.grid.iter() {
     for cell_row in grid.grid.iter() {
         for cell in cell_row.iter() {
-            // let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
+            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
-            // let rotation = match is_destination_cell {
-            //     true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-            //     false => Quat::from_rotation_y(cell.best_direction.to_angle()),
-            // };
+            let rotation = match is_destination_cell {
+                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
+            };
 
-            let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
+            // let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
 
             let color = if cell.cost < u8::MAX {
                 [1.0, 1.0, 1.0, 1.0] // White for valid cells
@@ -290,7 +268,7 @@ pub fn draw_flowfield(
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
 
-            instance_data.push(InstanceData {
+            instance_data.push(debug::shader::InstanceData {
                 position: cell.world_pos + offset,
                 scale: marker_scale,
                 color,
@@ -301,7 +279,7 @@ pub fn draw_flowfield(
     cmds.spawn((
         FlowFieldArrow,
         Mesh3d(arrow_mesh),
-        InstanceMaterialData(instance_data),
+        debug::shader::InstanceMaterialData(instance_data),
     ));
 }
 

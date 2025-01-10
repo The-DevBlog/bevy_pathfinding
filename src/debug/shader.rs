@@ -9,7 +9,7 @@ use bevy::{
     pbr::*,
     prelude::*,
     render::{
-        self, extract_component::*, mesh::*, render_asset::RenderAssets, render_phase::*,
+        extract_component::*, mesh::*, render_asset::RenderAssets, render_phase::*,
         render_resource::*, renderer::RenderDevice, view::ExtractedView, *,
     },
 };
@@ -20,7 +20,7 @@ pub struct ShaderPlugin;
 
 impl Plugin for ShaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(CustomMaterialPlugin);
+        app.add_plugins(CustomShaderPlugin);
     }
 }
 
@@ -37,9 +37,9 @@ impl ExtractComponent for InstanceMaterialData {
     }
 }
 
-struct CustomMaterialPlugin;
+struct CustomShaderPlugin;
 
-impl Plugin for CustomMaterialPlugin {
+impl Plugin for CustomShaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ExtractComponentPlugin::<InstanceMaterialData>::default());
 
@@ -67,6 +67,7 @@ impl Plugin for CustomMaterialPlugin {
 #[repr(C)]
 pub struct InstanceData {
     pub position: Vec3,
+    // pub rotation: Quat,
     pub scale: f32,
     pub color: [f32; 4],
 }
@@ -136,6 +137,7 @@ fn prepare_instance_buffers(
             contents: bytemuck::cast_slice(instance_data.as_slice()),
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
         });
+
         commands.entity(entity).insert(InstanceBuffer {
             buffer,
             length: instance_data.len(),
@@ -174,7 +176,6 @@ impl SpecializedMeshPipeline for CustomPipeline {
         layout: &MeshVertexBufferLayoutRef,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
-
         descriptor.vertex.shader = self.shader.clone();
         descriptor.vertex.buffers.push(VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceData>() as u64,

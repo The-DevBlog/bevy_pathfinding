@@ -14,6 +14,7 @@ bevy = { version = "0.15.1", default-features = false, features = [
 ] }
 bytemuck = "1.21.0"
 image = "0.25.5"
+radsort = "0.1.1"
 
 [profile.dev]
 opt-level = 0

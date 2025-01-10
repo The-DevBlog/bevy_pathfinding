@@ -828,6 +828,7 @@ dependencies = [
  "bevy",
  "bytemuck",
  "image",
+ "radsort",
 ]
 
 [[package]]

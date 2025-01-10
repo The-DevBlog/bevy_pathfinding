@@ -42,7 +42,7 @@ impl Default for DebugOptions {
         DebugOptions {
             hide: false,
             draw_grid: true,
-            draw_mode_1: DrawMode::Index,
+            draw_mode_1: DrawMode::None,
             draw_mode_2: DrawMode::FlowField,
         }
     }
