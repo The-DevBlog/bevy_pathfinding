@@ -3,7 +3,8 @@
 struct Vertex {
     @location(0) position: vec3<f32>,
     @location(3) pos_scale: vec4<f32>,
-    @location(4) color: vec4<f32>,
+    @location(4) rotation: vec4<f32>,  // x, y, z, w
+    @location(5) color: vec4<f32>,
 };
 
 struct VertexOutput {
@@ -11,9 +12,21 @@ struct VertexOutput {
     @location(0) color: vec4<f32>,
 };
 
+fn rotate_by_quat(pos: vec3<f32>, q: vec4<f32>) -> vec3<f32> {
+    // q.xyz is the imaginary part (x, y, z)
+    let q_xyz = vec3<f32>(q.x, q.y, q.z);
+    let t = 2.0 * cross(q_xyz, pos);
+    return pos + q.w * t + cross(q_xyz, t);
+}
+
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
-    let position = vertex.position * vertex.pos_scale.w + vertex.pos_scale.xyz;
+    // Rotate the mesh vertex by the quaternion
+    let rotated = rotate_by_quat(vertex.position, vertex.rotation);
+
+    // Then apply scale and translation
+    let position = rotated * vertex.pos_scale.w + vertex.pos_scale.xyz;
+
     var out: VertexOutput;
     out.clip_position = mesh_position_local_to_clip(
         get_world_from_local(0u),

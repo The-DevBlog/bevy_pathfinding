@@ -250,8 +250,8 @@ pub fn draw_flowfield(
     // Instance data for all arrows
     let mut instance_data = Vec::new();
 
-    // for cell_row in active_dbg_flowfield.grid.iter() {
-    for cell_row in grid.grid.iter() {
+    for cell_row in active_dbg_flowfield.grid.iter() {
+        // for cell_row in grid.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
@@ -260,17 +260,17 @@ pub fn draw_flowfield(
                 false => Quat::from_rotation_y(cell.best_direction.to_angle()),
             };
 
-            // let rotation = Quat::from_rotation_y(cell.best_direction.to_angle());
-
             let color = if cell.cost < u8::MAX {
                 [1.0, 1.0, 1.0, 1.0] // White for valid cells
             } else {
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
 
+            let rotation = rotation.into();
             instance_data.push(debug::shader::InstanceData {
                 position: cell.world_pos + offset,
                 scale: marker_scale,
+                rotation,
                 color,
             });
         }

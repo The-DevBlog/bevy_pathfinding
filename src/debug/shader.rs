@@ -68,6 +68,7 @@ impl Plugin for CustomShaderPlugin {
 pub struct InstanceData {
     pub position: Vec3,
     pub scale: f32,
+    pub rotation: [f32; 4],
     pub color: [f32; 4],
 }
 
@@ -179,16 +180,22 @@ impl SpecializedMeshPipeline for CustomPipeline {
         descriptor.vertex.buffers.push(VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceData>() as u64,
             step_mode: VertexStepMode::Instance,
+            // shader locations 0-2 are taken up by Position, Normal and UV attributes
             attributes: vec![
                 VertexAttribute {
                     format: VertexFormat::Float32x4,
                     offset: 0,
-                    shader_location: 3, // shader locations 0-2 are taken up by Position, Normal and UV attributes
+                    shader_location: 3, // pos_scale
                 },
                 VertexAttribute {
                     format: VertexFormat::Float32x4,
                     offset: VertexFormat::Float32x4.size(),
-                    shader_location: 4,
+                    shader_location: 4, // rotation
+                },
+                VertexAttribute {
+                    format: VertexFormat::Float32x4,
+                    offset: VertexFormat::Float32x4.size() * 2,
+                    shader_location: 5, // color
                 },
             ],
         });
