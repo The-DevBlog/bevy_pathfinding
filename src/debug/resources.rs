@@ -41,7 +41,7 @@ impl Default for DebugOptions {
     fn default() -> Self {
         DebugOptions {
             hide: false,
-            draw_grid: true,
+            draw_grid: false, // TODO make this a shader. This is actually expensive using gizmos to draw every frame of it
             draw_mode_1: DrawMode::None,
             draw_mode_2: DrawMode::FlowField,
         }

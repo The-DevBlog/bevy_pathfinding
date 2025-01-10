@@ -1,17 +1,15 @@
+use bevy::render::view::NoFrustumCulling;
+use bevy::render::view::RenderLayers;
+use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
+
 use super::components::*;
 use super::events::*;
 use super::resources::*;
 use crate::*;
-
-use bevy::render::view::NoFrustumCulling;
-use bevy::render::view::RenderLayers;
 use cell::Cell;
-// use debug::shader::InstanceData;
-// use debug::shader::InstanceMaterialData;
 use debug::COLOR_GRID;
 use events::UpdateCostEv;
 use grid::Grid;
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 const BASE_SCALE: f32 = 0.25;
 
@@ -22,13 +20,14 @@ impl Plugin for DrawPlugin {
         app.add_systems(
             Update,
             (
-                draw_grid.run_if(resource_exists::<Grid>),
+                // draw_grid.run_if(resource_exists::<Grid>),
                 detect_debug_change.run_if(resource_exists::<Grid>),
                 update_cell_cost
                     .after(grid::update_costs)
                     .run_if(resource_exists::<Grid>),
             ),
         )
+        .add_observer(draw_grid)
         // .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
@@ -62,7 +61,7 @@ fn set_active_dbg_flowfield(
     }
 }
 
-fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
+fn draw_grid_2(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
     if !debug.draw_grid {
         return;
     }
@@ -75,13 +74,13 @@ fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
     );
 }
 
-// TODO: Cleanup this method
+// TODO: REMOVE
 fn draw_flowfield2(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-    q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
+    q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -154,7 +153,7 @@ fn draw_flowfield2(
                     rotation,
                     ..default()
                 },
-                FlowFieldArrow,
+                FlowFieldMarker,
                 Name::new("Flowfield Marker Arrow"),
             );
 
@@ -182,7 +181,7 @@ fn draw_flowfield2(
                     Transform::default(),
                     Mesh3d(mesh),
                     MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
-                    FlowFieldArrow,
+                    FlowFieldMarker,
                     Name::new("Flowfield Marker 'X'"),
                 );
 
@@ -208,12 +207,81 @@ fn draw_flowfield2(
     }
 }
 
+#[derive(Component)]
+struct GridMarker;
+
+fn draw_grid(
+    _trigger: Trigger<DrawDebugEv>,
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    q_grid_lines: Query<Entity, With<GridMarker>>,
+    grid: Res<Grid>,
+    dbg: Res<DebugOptions>,
+) {
+    // Remove old grid lines before re-drawing
+    for line_entity in &q_grid_lines {
+        cmds.entity(line_entity).despawn_recursive();
+    }
+
+    if !dbg.draw_grid {
+        return;
+    }
+
+    let line_length = grid.size.x as f32 * grid.cell_diameter;
+    let line_mesh_row = meshes.add(Plane3d::default().mesh().size(line_length, 0.2));
+    let line_mesh_col = meshes.add(Plane3d::default().mesh().size(0.2, line_length));
+
+    let mut row_instances = Vec::new();
+    let mut column_instances = Vec::new();
+
+    let row_count = grid.grid.len() + 1;
+    let col_count = grid.grid[0].len() + 1;
+
+    let offset = Vec3::new(-line_length / 2.0, 0.0, -line_length / 2.0);
+
+    // Horizontal lines (rows)
+    for row in 0..row_count {
+        let y = row as f32 * grid.cell_diameter;
+
+        row_instances.push(debug::shader::InstanceData {
+            position: Vec3::new(line_length / 2.0, 0.1, y) + offset,
+            scale: 1.0,
+            rotation: Quat::IDENTITY.into(),
+            color: [1.0, 1.0, 1.0, 1.0],
+        });
+    }
+
+    // Vertical lines (columns)
+    for col in 0..col_count {
+        let x = col as f32 * grid.cell_diameter;
+
+        column_instances.push(debug::shader::InstanceData {
+            position: Vec3::new(x, 0.1, line_length / 2.0) + offset,
+            scale: 1.0,
+            rotation: Quat::IDENTITY.into(),
+            color: [1.0, 1.0, 1.0, 1.0],
+        });
+    }
+
+    cmds.spawn((
+        GridMarker,
+        Mesh3d(line_mesh_row),
+        debug::shader::InstanceMaterialData(row_instances),
+    ));
+
+    cmds.spawn((
+        GridMarker,
+        Mesh3d(line_mesh_col),
+        debug::shader::InstanceMaterialData(column_instances),
+    ));
+}
+
 pub fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-    q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
+    q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -259,9 +327,9 @@ pub fn draw_flowfield(
     // Instance data for all arrows
     let mut instance_data = Vec::new();
     let mut arrow_head_instances = Vec::new();
+    let mut destination_instances = Vec::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
-        // for cell_row in grid.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
@@ -276,33 +344,51 @@ pub fn draw_flowfield(
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
 
-            instance_data.push(debug::shader::InstanceData {
-                position: cell.world_pos + offset,
-                scale: marker_scale,
-                rotation: rotation.into(),
-                color,
-            });
+            if !is_destination_cell {
+                instance_data.push(debug::shader::InstanceData {
+                    position: cell.world_pos + offset,
+                    scale: marker_scale,
+                    rotation: rotation.into(),
+                    color,
+                });
 
-            // Then push this final rotation into your instance data
-            arrow_head_instances.push(debug::shader::InstanceData {
-                position: cell.world_pos + offset,
-                scale: 1.0,
-                rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)).into(),
-                color,
-            });
+                // Then push this final rotation into your instance data
+                arrow_head_instances.push(debug::shader::InstanceData {
+                    position: cell.world_pos + offset,
+                    scale: 1.0,
+                    rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
+                        .into(),
+                    color,
+                });
+            }
+
+            if is_destination_cell {
+                destination_instances.push(debug::shader::InstanceData {
+                    position: cell.world_pos + offset,
+                    scale: grid.cell_radius * 0.15 * marker_scale,
+                    rotation: rotation.into(),
+                    color,
+                });
+            }
         }
     }
 
     cmds.spawn((
-        FlowFieldArrow,
+        FlowFieldMarker,
         Mesh3d(arrow_shaft_mesh),
         debug::shader::InstanceMaterialData(instance_data),
     ));
 
     cmds.spawn((
-        FlowFieldArrow,
+        FlowFieldMarker,
         Mesh3d(arrow_head_mesh),
         debug::shader::InstanceMaterialData(arrow_head_instances),
+    ));
+
+    cmds.spawn((
+        FlowFieldMarker,
+        Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),
+        debug::shader::InstanceMaterialData(destination_instances),
     ));
 }
 
