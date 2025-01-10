@@ -76,137 +76,137 @@ fn draw_grid(grid: Res<Grid>, mut gizmos: Gizmos, debug: Res<DebugOptions>) {
 }
 
 // TODO: Cleanup this method
-// fn draw_flowfield(
-//     _trigger: Trigger<DrawDebugEv>,
-//     dbg: Res<DebugOptions>,
-//     grid: Res<Grid>,
-//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-//     q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
-//     mut cmds: Commands,
-//     mut meshes: ResMut<Assets<Mesh>>,
-//     mut materials: ResMut<Assets<StandardMaterial>>,
-// ) {
-//     // Remove current arrows before rendering new ones
-//     for arrow_entity in &q_flowfield_arrow {
-//         cmds.entity(arrow_entity).despawn_recursive();
-//     }
+fn draw_flowfield2(
+    _trigger: Trigger<DrawDebugEv>,
+    dbg: Res<DebugOptions>,
+    grid: Res<Grid>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    q_flowfield_arrow: Query<Entity, With<FlowFieldArrow>>,
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Remove current arrows before rendering new ones
+    for arrow_entity in &q_flowfield_arrow {
+        cmds.entity(arrow_entity).despawn_recursive();
+    }
 
-//     let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
-//         return;
-//     };
+    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
 
-//     let mut marker_scale = 0.7;
-//     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-//         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-//     {
-//         marker_scale = 1.0;
-//     }
+    let mut marker_scale = 0.7;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        marker_scale = 1.0;
+    }
 
-//     let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
-//     let Some(offset) = offset else {
-//         return;
-//     };
+    let offset = calculate_offset(active_dbg_flowfield.cell_diameter, dbg, DrawMode::FlowField);
+    let Some(offset) = offset else {
+        return;
+    };
 
-//     println!("Drawing Flowfield");
+    println!("Drawing Flowfield");
 
-//     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
-//     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-//     let arrow_clr = Color::WHITE;
+    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
+    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
+    let arrow_clr = Color::WHITE;
 
-//     // Create the arrowhead mesh
-//     let half_arrow_size = arrow_length / 2.0;
-//     let d1 = half_arrow_size - grid.cell_diameter * 0.09;
-//     let d2 = arrow_width + grid.cell_diameter * 0.0125;
-//     let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
-//     let b = Vec2::new(d1, d2);
-//     let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
+    // Create the arrowhead mesh
+    let half_arrow_size = arrow_length / 2.0;
+    let d1 = half_arrow_size - grid.cell_diameter * 0.09;
+    let d2 = arrow_width + grid.cell_diameter * 0.0125;
+    let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
+    let b = Vec2::new(d1, d2);
+    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
 
-//     // Mesh for arrow
-//     let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-//     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
+    // Mesh for arrow
+    let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+    let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
-//     let material = materials.add(StandardMaterial {
-//         base_color: arrow_clr,
-//         unlit: true,
-//         ..default()
-//     });
+    let material = materials.add(StandardMaterial {
+        base_color: arrow_clr,
+        unlit: true,
+        ..default()
+    });
 
-//     // println!("Drawing flowfield");
-//     for cell_row in &active_dbg_flowfield.grid {
-//         for cell in cell_row.iter() {
-//             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
+    // println!("Drawing flowfield");
+    for cell_row in &active_dbg_flowfield.grid {
+        for cell in cell_row.iter() {
+            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
 
-//             let rotation = match is_destination_cell {
-//                 true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-//                 false => Quat::from_rotation_y(cell.best_direction.to_angle()),
-//             };
+            let rotation = match is_destination_cell {
+                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
+            };
 
-//             let mesh = match is_destination_cell {
-//                 true => meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale)),
-//                 false => arrow_mesh.clone(),
-//             };
+            let mesh = match is_destination_cell {
+                true => meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale)),
+                false => arrow_mesh.clone(),
+            };
 
-//             let marker = (
-//                 Mesh3d(mesh.clone()),
-//                 MeshMaterial3d(material.clone()),
-//                 Transform {
-//                     translation: cell.world_pos + offset,
-//                     rotation,
-//                     ..default()
-//                 },
-//                 FlowFieldArrow,
-//                 Name::new("Flowfield Marker Arrow"),
-//             );
+            let marker = (
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform {
+                    translation: cell.world_pos + offset,
+                    rotation,
+                    ..default()
+                },
+                FlowFieldArrow,
+                Name::new("Flowfield Marker Arrow"),
+            );
 
-//             let arrow_head = (
-//                 Mesh3d(arrow_head_mesh.clone()),
-//                 MeshMaterial3d(material.clone()),
-//                 Transform {
-//                     translation: Vec3::ZERO,
-//                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-//                     ..default()
-//                 },
-//                 Name::new("Arrowhead"),
-//             );
+            let arrow_head = (
+                Mesh3d(arrow_head_mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform {
+                    translation: Vec3::ZERO,
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                    ..default()
+                },
+                Name::new("Arrowhead"),
+            );
 
-//             if cell.cost < u8::MAX {
-//                 let mut draw = cmds.spawn(marker);
+            if cell.cost < u8::MAX {
+                let mut draw = cmds.spawn(marker);
 
-//                 if !is_destination_cell {
-//                     draw.with_children(|parent| {
-//                         parent.spawn(arrow_head);
-//                     });
-//                 }
-//             } else {
-//                 let cross = (
-//                     Transform::default(),
-//                     Mesh3d(mesh),
-//                     MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
-//                     FlowFieldArrow,
-//                     Name::new("Flowfield Marker 'X'"),
-//                 );
+                if !is_destination_cell {
+                    draw.with_children(|parent| {
+                        parent.spawn(arrow_head);
+                    });
+                }
+            } else {
+                let cross = (
+                    Transform::default(),
+                    Mesh3d(mesh),
+                    MeshMaterial3d(materials.add(StandardMaterial::from_color(RED))),
+                    FlowFieldArrow,
+                    Name::new("Flowfield Marker 'X'"),
+                );
 
-//                 let mut cross_1 = cross.clone();
-//                 cross_1.0 = Transform {
-//                     translation: cell.world_pos + offset,
-//                     rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
-//                     ..default()
-//                 };
+                let mut cross_1 = cross.clone();
+                cross_1.0 = Transform {
+                    translation: cell.world_pos + offset,
+                    rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4),
+                    ..default()
+                };
 
-//                 let mut cross_2 = cross.clone();
-//                 cross_2.0 = Transform {
-//                     translation: cell.world_pos + offset,
-//                     rotation: Quat::from_rotation_y(FRAC_PI_4),
-//                     ..default()
-//                 };
+                let mut cross_2 = cross.clone();
+                cross_2.0 = Transform {
+                    translation: cell.world_pos + offset,
+                    rotation: Quat::from_rotation_y(FRAC_PI_4),
+                    ..default()
+                };
 
-//                 cmds.spawn(cross_1);
-//                 cmds.spawn(cross_2);
-//             }
-//         }
-//         // println!();
-//     }
-// }
+                cmds.spawn(cross_1);
+                cmds.spawn(cross_2);
+            }
+        }
+        // println!();
+    }
+}
 
 pub fn draw_flowfield(
     _trigger: Trigger<DrawDebugEv>,
@@ -244,11 +244,21 @@ pub fn draw_flowfield(
     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
 
-    // Shared arrow mesh and material
-    let arrow_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+    // Create the arrowhead mesh
+    let half_arrow_size = arrow_length / 2.0;
+    let d1 = half_arrow_size - grid.cell_diameter * 0.09;
+    let d2 = arrow_width + grid.cell_diameter * 0.0125;
+    let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
+    let b = Vec2::new(d1, d2);
+    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
+
+    // Mesh for arrow
+    let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
+    let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
     // Instance data for all arrows
     let mut instance_data = Vec::new();
+    let mut arrow_head_instances = Vec::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         // for cell_row in grid.grid.iter() {
@@ -266,11 +276,18 @@ pub fn draw_flowfield(
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
 
-            let rotation = rotation.into();
             instance_data.push(debug::shader::InstanceData {
                 position: cell.world_pos + offset,
                 scale: marker_scale,
-                rotation,
+                rotation: rotation.into(),
+                color,
+            });
+
+            // Then push this final rotation into your instance data
+            arrow_head_instances.push(debug::shader::InstanceData {
+                position: cell.world_pos + offset,
+                scale: 1.0,
+                rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)).into(),
                 color,
             });
         }
@@ -278,8 +295,14 @@ pub fn draw_flowfield(
 
     cmds.spawn((
         FlowFieldArrow,
-        Mesh3d(arrow_mesh),
+        Mesh3d(arrow_shaft_mesh),
         debug::shader::InstanceMaterialData(instance_data),
+    ));
+
+    cmds.spawn((
+        FlowFieldArrow,
+        Mesh3d(arrow_head_mesh),
+        debug::shader::InstanceMaterialData(arrow_head_instances),
     ));
 }
 
