@@ -228,9 +228,6 @@ fn draw_grid(
     }
 
     let line_length = grid.size.x as f32 * grid.cell_diameter;
-    let line_mesh_row = meshes.add(Plane3d::default().mesh().size(line_length, 0.2));
-    let line_mesh_col = meshes.add(Plane3d::default().mesh().size(0.2, line_length));
-
     let mut row_instances = Vec::new();
     let mut column_instances = Vec::new();
 
@@ -265,13 +262,13 @@ fn draw_grid(
 
     cmds.spawn((
         GridMarker,
-        Mesh3d(line_mesh_row),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(line_length, 0.2))),
         debug::shader::InstanceMaterialData(row_instances),
     ));
 
     cmds.spawn((
         GridMarker,
-        Mesh3d(line_mesh_col),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(0.2, line_length))),
         debug::shader::InstanceMaterialData(column_instances),
     ));
 }
