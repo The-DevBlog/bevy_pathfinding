@@ -322,9 +322,10 @@ pub fn draw_flowfield(
     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
     // Instance data for all arrows
-    let mut instance_data = Vec::new();
+    let mut arrow_shaft_instances = Vec::new();
     let mut arrow_head_instances = Vec::new();
     let mut destination_instances = Vec::new();
+    let mut occupied_cell_instances = Vec::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -342,7 +343,26 @@ pub fn draw_flowfield(
             };
 
             if !is_destination_cell {
-                instance_data.push(debug::shader::InstanceData {
+                if cell.cost == u8::MAX {
+                    println!("HIT");
+                    occupied_cell_instances.push(debug::shader::InstanceData {
+                        position: cell.world_pos + offset,
+                        scale: marker_scale,
+                        rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4).into(),
+                        color,
+                    });
+
+                    occupied_cell_instances.push(debug::shader::InstanceData {
+                        position: cell.world_pos + offset,
+                        scale: marker_scale,
+                        rotation: Quat::from_rotation_y(FRAC_PI_4).into(),
+                        color,
+                    });
+
+                    continue;
+                }
+
+                arrow_shaft_instances.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: rotation.into(),
@@ -370,18 +390,30 @@ pub fn draw_flowfield(
         }
     }
 
+    // spawn occupied cell marker (if there are any)
+    if !occupied_cell_instances.is_empty() {
+        cmds.spawn((
+            FlowFieldMarker,
+            Mesh3d(arrow_shaft_mesh.clone()),
+            debug::shader::InstanceMaterialData(occupied_cell_instances),
+        ));
+    }
+
+    // spawn arrow shaft marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(arrow_shaft_mesh),
-        debug::shader::InstanceMaterialData(instance_data),
+        debug::shader::InstanceMaterialData(arrow_shaft_instances),
     ));
 
+    // spawn arrow head marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(arrow_head_mesh),
         debug::shader::InstanceMaterialData(arrow_head_instances),
     ));
 
+    // spawn destination cell marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),
