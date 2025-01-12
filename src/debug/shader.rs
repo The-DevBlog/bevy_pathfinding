@@ -15,7 +15,7 @@ use bevy::{
     },
 };
 use bytemuck::{Pod, Zeroable};
-use extract_resource::{ExtractResource, ExtractResourcePlugin};
+use extract_resource::ExtractResource;
 use image::ImageFormat;
 use sync_world::MainEntity;
 use texture::GpuImage;
@@ -23,7 +23,6 @@ use texture::GpuImage;
 use super::resources::DebugOptions;
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
-const SHADER_PATH: &str = "shader_digit.wgsl";
 
 pub struct ShaderPlugin;
 
@@ -209,32 +208,29 @@ fn queue_custom(
         }
     }
 
-     // For example, always pick digit 0. Or pick whichever you want
-     let handle = &digits.0[0];
+    // For example, always pick digit 0. Or pick whichever you want
+    let handle = &digits.0[0];
 
-     if let Some(gpu_image) = gpu_images.get(handle) {
-         for entity in &q_entities {
-             // render_device.create_bind_group_layout
-             let bind_group = render_device.create_bind_group(
-                 Some("digit bind group"),
-                 &custom_pipeline.texture_layout, // match your pipeline
-                 &[
-                     BindGroupEntry {
-                         binding: 0,
-                         resource: BindingResource::TextureView(&gpu_image.texture_view),
-                     },
-                     BindGroupEntry {
-                         binding: 1,
-                         resource: BindingResource::Sampler(&gpu_image.sampler),
-                     },
-                 ],
-             );
- 
-             cmds
-                 .entity(entity)
-                 .insert(DigitBindGroup { bind_group });
-         }
-     }
+    if let Some(gpu_image) = gpu_images.get(handle) {
+        for entity in &q_entities {
+            let bind_group = render_device.create_bind_group(
+                Some("digit bind group"),
+                &custom_pipeline.texture_layout, // match your pipeline
+                &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::TextureView(&gpu_image.texture_view),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Sampler(&gpu_image.sampler),
+                    },
+                ],
+            );
+
+            cmds.entity(entity).insert(DigitBindGroup { bind_group });
+        }
+    }
 }
 
 #[derive(Component)]
@@ -390,44 +386,6 @@ struct DigitBindGroup {
     bind_group: BindGroup,
 }
 
-fn queue_digit_bind_groups(
-    mut commands: Commands,
-    digits: Res<Digits>, // your array of 10 handles
-    // digits: Extract<Res<Digits>>, // your array of 10 handles
-    gpu_images: Res<RenderAssets<GpuImage>>,
-    pipeline: Res<CustomPipeline>,
-    render_device: Res<RenderDevice>,
-    // Entities that need a texture bind group, but don't have it yet
-    q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
-) {
-    // For example, always pick digit 0. Or pick whichever you want
-    let handle = &digits.0[0];
-
-    if let Some(gpu_image) = gpu_images.get(handle) {
-        for entity in &q_entities {
-            // render_device.create_bind_group_layout
-            let bind_group = render_device.create_bind_group(
-                Some("digit bind group"),
-                &pipeline.texture_layout, // match your pipeline
-                &[
-                    BindGroupEntry {
-                        binding: 0,
-                        resource: BindingResource::TextureView(&gpu_image.texture_view),
-                    },
-                    BindGroupEntry {
-                        binding: 1,
-                        resource: BindingResource::Sampler(&gpu_image.sampler),
-                    },
-                ],
-            );
-
-            commands
-                .entity(entity)
-                .insert(DigitBindGroup { bind_group });
-        }
-    }
-}
-
 struct DrawMeshInstanced;
 
 impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
@@ -494,26 +452,3 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
         RenderCommandResult::Success
     }
 }
-
-// This struct defines the data that will be passed to your shader
-// #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-// pub struct CustomMaterial {
-//     #[uniform(0)]
-//     pub color: LinearRgba,
-//     #[texture(1)]
-//     #[sampler(2)]
-//     pub color_texture: Option<Handle<Image>>,
-//     pub alpha_mode: AlphaMode,
-// }
-
-// /// The Material trait is very configurable, but comes with sensible defaults for all methods.
-// /// You only need to implement functions for features that need non-default behavior. See the Material api docs for details!
-// impl Material for CustomMaterial {
-//     fn fragment_shader() -> ShaderRef {
-//         SHADER_PATH.into()
-//     }
-
-//     fn alpha_mode(&self) -> AlphaMode {
-//         self.alpha_mode
-//     }
-// }

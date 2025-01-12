@@ -464,7 +464,7 @@ fn draw_costfield(
 
     // let material = materials.add(CustomMaterial {
     //     color: LinearRgba::BLUE,
-    //     color_texture: Some(digits.0[0].clone()),
+    //     color_texture: Some(digits.0[1].clone()),
     //     // color_texture: Some(asset_server.load("branding/icon.png")),
     //     alpha_mode: AlphaMode::Blend,
     // });
