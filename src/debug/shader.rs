@@ -6,6 +6,7 @@ use bevy::{
         query::QueryItem,
         system::{lifetimeless::*, SystemParamItem},
     },
+    image::*,
     pbr::*,
     prelude::*,
     render::{
@@ -14,7 +15,15 @@ use bevy::{
     },
 };
 use bytemuck::{Pod, Zeroable};
+use extract_resource::{ExtractResource, ExtractResourcePlugin};
+use image::ImageFormat;
 use sync_world::MainEntity;
+use texture::GpuImage;
+
+use super::resources::DebugOptions;
+
+const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
+const SHADER_PATH: &str = "shader_digit.wgsl";
 
 pub struct ShaderPlugin;
 
@@ -41,27 +50,52 @@ struct CustomShaderPlugin;
 
 impl Plugin for CustomShaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ExtractComponentPlugin::<InstanceMaterialData>::default());
+        app.add_plugins((
+            ExtractComponentPlugin::<InstanceMaterialData>::default(),
+            // MaterialPlugin::<CustomMaterial>::default(),
+        ))
+        .init_resource::<Digits>()
+        .add_systems(Startup, load_digit_texture_atlas);
 
         app.sub_app_mut(RenderApp)
             .add_render_command::<Transparent3d, DrawCustom>()
             .init_resource::<SpecializedMeshPipelines<CustomPipeline>>()
             .init_resource::<Assets<Shader>>()
+            .add_systems(ExtractSchedule, sync_data_from_main_app.run_if(run_once))
             .add_systems(
                 Render,
                 (
+                    // queue_digit_bind_groups.in_set(RenderSet::QueueMeshes),
                     queue_custom.in_set(RenderSet::QueueMeshes),
                     prepare_instance_buffers.in_set(RenderSet::PrepareResources),
                 ),
             );
 
         embedded_asset!(app, "instancing.wgsl");
+        embedded_asset!(app, "instancing3.wgsl");
+        embedded_asset!(app, "shader_digit.wgsl");
     }
 
     fn finish(&self, app: &mut App) {
         app.sub_app_mut(RenderApp).init_resource::<CustomPipeline>();
     }
 }
+
+pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
+    let Some(dbg) = world.get_resource::<DebugOptions>() else { return; };
+    
+    cmds.insert_resource(dbg.clone());
+    dbg.print("\nsync_data() start");
+
+    if let Some(digits) = world.get_resource::<Digits>() {
+        cmds.insert_resource(digits.clone());
+    }
+
+    dbg.print("sync_data() end");
+}
+
+#[derive(Default, Resource, Clone, Deref, ExtractResource, Reflect)]
+pub struct Digits(pub [Handle<Image>; 10]);
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
@@ -70,6 +104,51 @@ pub struct InstanceData {
     pub scale: f32,
     pub rotation: [f32; 4],
     pub color: [f32; 4],
+}
+
+fn load_digit_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>, dbg: Res<DebugOptions>) {
+    dbg.print("\nload_digit_texture_atlas() start");
+
+    // Decode the image
+    let image = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
+        .expect("Failed to load digit image");
+    let rgba_image = image.to_rgba8();
+    let (width, height) = rgba_image.dimensions();
+    let digit_width = width / 10;
+
+    // Extract each digit as a separate texture
+    for idx in 0..10 {
+        let x_start = idx * digit_width;
+        let cropped_digit_data =
+            image::imageops::crop_imm(&rgba_image, x_start, 0, digit_width, height)
+                .to_image()
+                .into_raw();
+
+        let cropped_digit = Image {
+            data: cropped_digit_data,
+            texture_descriptor: TextureDescriptor {
+                label: None,
+                size: Extent3d {
+                    width: digit_width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+                view_formats: &[],
+            },
+            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
+            texture_view_descriptor: None,
+            asset_usage: Default::default(),
+        };
+
+        digits.0[idx as usize] = images.add(cropped_digit);
+    }
+
+    dbg.print("load_digit_texture_atlas() end");
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -149,6 +228,7 @@ fn prepare_instance_buffers(
 struct CustomPipeline {
     shader: Handle<Shader>,
     mesh_pipeline: MeshPipeline,
+    // texture_layout: BindGroupLayout,
 }
 
 impl FromWorld for CustomPipeline {
@@ -157,12 +237,41 @@ impl FromWorld for CustomPipeline {
 
         // Load the embedded shader by its virtual path
         let asset_server = world.resource::<AssetServer>();
+        // let shader: Handle<Shader> =
+        //     asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing3.wgsl");
         let shader: Handle<Shader> =
             asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
+
+        // Create a bind group layout for { texture, sampler }.
+        let render_device = world.resource::<RenderDevice>();
+        // let texture_layout = render_device.create_bind_group_layout(
+        //     Some("digit_texture_layout"),
+        //     &[
+        //         // texture
+        //         BindGroupLayoutEntry {
+        //             binding: 0,
+        //             visibility: ShaderStages::FRAGMENT,
+        //             ty: BindingType::Texture {
+        //                 multisampled: false,
+        //                 sample_type: TextureSampleType::Float { filterable: true },
+        //                 view_dimension: TextureViewDimension::D2,
+        //             },
+        //             count: None,
+        //         },
+        //         // sampler
+        //         BindGroupLayoutEntry {
+        //             binding: 1,
+        //             visibility: ShaderStages::FRAGMENT,
+        //             ty: BindingType::Sampler(SamplerBindingType::Filtering),
+        //             count: None,
+        //         },
+        //     ],
+        // );
 
         CustomPipeline {
             shader,
             mesh_pipeline,
+            // texture_layout,
         }
     }
 }
@@ -176,6 +285,9 @@ impl SpecializedMeshPipeline for CustomPipeline {
         layout: &MeshVertexBufferLayoutRef,
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
+
+        // descriptor.layout.push(self.texture_layout.clone());
+
         descriptor.vertex.shader = self.shader.clone();
         descriptor.vertex.buffers.push(VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceData>() as u64,
@@ -208,8 +320,75 @@ type DrawCustom = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
+    // SetDigitTextureBindGroup<2>,
     DrawMeshInstanced,
 );
+
+// struct SetDigitTextureBindGroup<const I: usize>;
+
+// impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDigitTextureBindGroup<I> {
+//     type Param = ();
+//     type ViewQuery = ();
+//     // This expects you to store something like `DigitBindGroup { bind_group: BindGroup }` on the item
+//     type ItemQuery = Read<DigitBindGroup>;
+
+//     fn render<'w>(
+//         _item: &P,
+//         _view: (),
+//         digit_bind_group: Option<&'w DigitBindGroup>,
+//         _param: SystemParamItem<'w, '_, Self::Param>,
+//         pass: &mut TrackedRenderPass<'w>,
+//     ) -> RenderCommandResult {
+//         let Some(digit_bind_group) = digit_bind_group else {
+//             return RenderCommandResult::Skip;
+//         };
+//         pass.set_bind_group(I, &digit_bind_group.bind_group, &[]);
+//         RenderCommandResult::Success
+//     }
+// }
+
+#[derive(Component)]
+struct DigitBindGroup {
+    bind_group: BindGroup,
+}
+
+// fn queue_digit_bind_groups(
+//     mut commands: Commands,
+//     digits: Res<Digits>, // your array of 10 handles
+//     // digits: Extract<Res<Digits>>, // your array of 10 handles
+//     gpu_images: Res<RenderAssets<GpuImage>>,
+//     pipeline: Res<CustomPipeline>,
+//     render_device: Res<RenderDevice>,
+//     // Entities that need a texture bind group, but don't have it yet
+//     q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
+// ) {
+//     // For example, always pick digit 0. Or pick whichever you want
+//     let handle = &digits.0[0];
+
+//     if let Some(gpu_image) = gpu_images.get(handle) {
+//         for entity in &q_entities {
+//             // render_device.create_bind_group_layout
+//             let bind_group = render_device.create_bind_group(
+//                 Some("digit bind group"),
+//                 &pipeline.texture_layout, // match your pipeline
+//                 &[
+//                     BindGroupEntry {
+//                         binding: 0,
+//                         resource: BindingResource::TextureView(&gpu_image.texture_view),
+//                     },
+//                     BindGroupEntry {
+//                         binding: 1,
+//                         resource: BindingResource::Sampler(&gpu_image.sampler),
+//                     },
+//                 ],
+//             );
+
+//             commands
+//                 .entity(entity)
+//                 .insert(DigitBindGroup { bind_group });
+//         }
+//     }
+// }
 
 struct DrawMeshInstanced;
 
@@ -277,3 +456,26 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
         RenderCommandResult::Success
     }
 }
+
+// This struct defines the data that will be passed to your shader
+// #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+// pub struct CustomMaterial {
+//     #[uniform(0)]
+//     pub color: LinearRgba,
+//     #[texture(1)]
+//     #[sampler(2)]
+//     pub color_texture: Option<Handle<Image>>,
+//     pub alpha_mode: AlphaMode,
+// }
+
+// /// The Material trait is very configurable, but comes with sensible defaults for all methods.
+// /// You only need to implement functions for features that need non-default behavior. See the Material api docs for details!
+// impl Material for CustomMaterial {
+//     fn fragment_shader() -> ShaderRef {
+//         SHADER_PATH.into()
+//     }
+
+//     fn alpha_mode(&self) -> AlphaMode {
+//         self.alpha_mode
+//     }
+// }

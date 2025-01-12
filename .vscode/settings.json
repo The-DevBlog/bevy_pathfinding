@@ -1,9 +1,4 @@
 {
-    "cSpell.words": [
-        "costfield",
-        "despawn",
-        "Fira",
-        "flowfield",
-        "intercardinal"
-    ]
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 200
 }
