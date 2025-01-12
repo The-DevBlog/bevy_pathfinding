@@ -82,8 +82,10 @@ impl Plugin for CustomShaderPlugin {
 }
 
 pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
-    let Some(dbg) = world.get_resource::<DebugOptions>() else { return; };
-    
+    let Some(dbg) = world.get_resource::<DebugOptions>() else {
+        return;
+    };
+
     cmds.insert_resource(dbg.clone());
     dbg.print("\nsync_data() start");
 
@@ -106,7 +108,11 @@ pub struct InstanceData {
     pub color: [f32; 4],
 }
 
-fn load_digit_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMut<Digits>, dbg: Res<DebugOptions>) {
+fn load_digit_texture_atlas(
+    mut images: ResMut<Assets<Image>>,
+    mut digits: ResMut<Digits>,
+    dbg: Res<DebugOptions>,
+) {
     dbg.print("\nload_digit_texture_atlas() start");
 
     // Decode the image
@@ -153,6 +159,9 @@ fn load_digit_texture_atlas(mut images: ResMut<Assets<Image>>, mut digits: ResMu
 
 #[allow(clippy::too_many_arguments)]
 fn queue_custom(
+    mut cmds: Commands,
+    digits: Res<Digits>,
+    gpu_images: Res<RenderAssets<GpuImage>>,
     transparent_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
     custom_pipeline: Res<CustomPipeline>,
     mut pipelines: ResMut<SpecializedMeshPipelines<CustomPipeline>>,
@@ -162,6 +171,8 @@ fn queue_custom(
     material_meshes: Query<(Entity, &MainEntity), With<InstanceMaterialData>>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
     mut views: Query<(Entity, &ExtractedView, &Msaa)>,
+    q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
+    render_device: Res<RenderDevice>,
 ) {
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
 
@@ -197,6 +208,33 @@ fn queue_custom(
             });
         }
     }
+
+     // For example, always pick digit 0. Or pick whichever you want
+     let handle = &digits.0[0];
+
+     if let Some(gpu_image) = gpu_images.get(handle) {
+         for entity in &q_entities {
+             // render_device.create_bind_group_layout
+             let bind_group = render_device.create_bind_group(
+                 Some("digit bind group"),
+                 &custom_pipeline.texture_layout, // match your pipeline
+                 &[
+                     BindGroupEntry {
+                         binding: 0,
+                         resource: BindingResource::TextureView(&gpu_image.texture_view),
+                     },
+                     BindGroupEntry {
+                         binding: 1,
+                         resource: BindingResource::Sampler(&gpu_image.sampler),
+                     },
+                 ],
+             );
+ 
+             cmds
+                 .entity(entity)
+                 .insert(DigitBindGroup { bind_group });
+         }
+     }
 }
 
 #[derive(Component)]
@@ -228,7 +266,7 @@ fn prepare_instance_buffers(
 struct CustomPipeline {
     shader: Handle<Shader>,
     mesh_pipeline: MeshPipeline,
-    // texture_layout: BindGroupLayout,
+    texture_layout: BindGroupLayout,
 }
 
 impl FromWorld for CustomPipeline {
@@ -237,41 +275,41 @@ impl FromWorld for CustomPipeline {
 
         // Load the embedded shader by its virtual path
         let asset_server = world.resource::<AssetServer>();
-        // let shader: Handle<Shader> =
-        //     asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing3.wgsl");
         let shader: Handle<Shader> =
-            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
+            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing3.wgsl");
+        // let shader: Handle<Shader> =
+        //     asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
 
         // Create a bind group layout for { texture, sampler }.
         let render_device = world.resource::<RenderDevice>();
-        // let texture_layout = render_device.create_bind_group_layout(
-        //     Some("digit_texture_layout"),
-        //     &[
-        //         // texture
-        //         BindGroupLayoutEntry {
-        //             binding: 0,
-        //             visibility: ShaderStages::FRAGMENT,
-        //             ty: BindingType::Texture {
-        //                 multisampled: false,
-        //                 sample_type: TextureSampleType::Float { filterable: true },
-        //                 view_dimension: TextureViewDimension::D2,
-        //             },
-        //             count: None,
-        //         },
-        //         // sampler
-        //         BindGroupLayoutEntry {
-        //             binding: 1,
-        //             visibility: ShaderStages::FRAGMENT,
-        //             ty: BindingType::Sampler(SamplerBindingType::Filtering),
-        //             count: None,
-        //         },
-        //     ],
-        // );
+        let texture_layout = render_device.create_bind_group_layout(
+            Some("digit_texture_layout"),
+            &[
+                // texture
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // sampler
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        );
 
         CustomPipeline {
             shader,
             mesh_pipeline,
-            // texture_layout,
+            texture_layout,
         }
     }
 }
@@ -286,7 +324,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
     ) -> Result<RenderPipelineDescriptor, SpecializedMeshPipelineError> {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
 
-        // descriptor.layout.push(self.texture_layout.clone());
+        descriptor.layout.push(self.texture_layout.clone());
 
         descriptor.vertex.shader = self.shader.clone();
         descriptor.vertex.buffers.push(VertexBufferLayout {
@@ -320,75 +358,75 @@ type DrawCustom = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetMeshBindGroup<1>,
-    // SetDigitTextureBindGroup<2>,
+    SetDigitTextureBindGroup<2>,
     DrawMeshInstanced,
 );
 
-// struct SetDigitTextureBindGroup<const I: usize>;
+struct SetDigitTextureBindGroup<const I: usize>;
 
-// impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDigitTextureBindGroup<I> {
-//     type Param = ();
-//     type ViewQuery = ();
-//     // This expects you to store something like `DigitBindGroup { bind_group: BindGroup }` on the item
-//     type ItemQuery = Read<DigitBindGroup>;
+impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDigitTextureBindGroup<I> {
+    type Param = ();
+    type ViewQuery = ();
+    // This expects you to store something like `DigitBindGroup { bind_group: BindGroup }` on the item
+    type ItemQuery = Read<DigitBindGroup>;
 
-//     fn render<'w>(
-//         _item: &P,
-//         _view: (),
-//         digit_bind_group: Option<&'w DigitBindGroup>,
-//         _param: SystemParamItem<'w, '_, Self::Param>,
-//         pass: &mut TrackedRenderPass<'w>,
-//     ) -> RenderCommandResult {
-//         let Some(digit_bind_group) = digit_bind_group else {
-//             return RenderCommandResult::Skip;
-//         };
-//         pass.set_bind_group(I, &digit_bind_group.bind_group, &[]);
-//         RenderCommandResult::Success
-//     }
-// }
+    fn render<'w>(
+        _item: &P,
+        _view: (),
+        digit_bind_group: Option<&'w DigitBindGroup>,
+        _param: SystemParamItem<'w, '_, Self::Param>,
+        pass: &mut TrackedRenderPass<'w>,
+    ) -> RenderCommandResult {
+        let Some(digit_bind_group) = digit_bind_group else {
+            return RenderCommandResult::Skip;
+        };
+        pass.set_bind_group(I, &digit_bind_group.bind_group, &[]);
+        RenderCommandResult::Success
+    }
+}
 
 #[derive(Component)]
 struct DigitBindGroup {
     bind_group: BindGroup,
 }
 
-// fn queue_digit_bind_groups(
-//     mut commands: Commands,
-//     digits: Res<Digits>, // your array of 10 handles
-//     // digits: Extract<Res<Digits>>, // your array of 10 handles
-//     gpu_images: Res<RenderAssets<GpuImage>>,
-//     pipeline: Res<CustomPipeline>,
-//     render_device: Res<RenderDevice>,
-//     // Entities that need a texture bind group, but don't have it yet
-//     q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
-// ) {
-//     // For example, always pick digit 0. Or pick whichever you want
-//     let handle = &digits.0[0];
+fn queue_digit_bind_groups(
+    mut commands: Commands,
+    digits: Res<Digits>, // your array of 10 handles
+    // digits: Extract<Res<Digits>>, // your array of 10 handles
+    gpu_images: Res<RenderAssets<GpuImage>>,
+    pipeline: Res<CustomPipeline>,
+    render_device: Res<RenderDevice>,
+    // Entities that need a texture bind group, but don't have it yet
+    q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
+) {
+    // For example, always pick digit 0. Or pick whichever you want
+    let handle = &digits.0[0];
 
-//     if let Some(gpu_image) = gpu_images.get(handle) {
-//         for entity in &q_entities {
-//             // render_device.create_bind_group_layout
-//             let bind_group = render_device.create_bind_group(
-//                 Some("digit bind group"),
-//                 &pipeline.texture_layout, // match your pipeline
-//                 &[
-//                     BindGroupEntry {
-//                         binding: 0,
-//                         resource: BindingResource::TextureView(&gpu_image.texture_view),
-//                     },
-//                     BindGroupEntry {
-//                         binding: 1,
-//                         resource: BindingResource::Sampler(&gpu_image.sampler),
-//                     },
-//                 ],
-//             );
+    if let Some(gpu_image) = gpu_images.get(handle) {
+        for entity in &q_entities {
+            // render_device.create_bind_group_layout
+            let bind_group = render_device.create_bind_group(
+                Some("digit bind group"),
+                &pipeline.texture_layout, // match your pipeline
+                &[
+                    BindGroupEntry {
+                        binding: 0,
+                        resource: BindingResource::TextureView(&gpu_image.texture_view),
+                    },
+                    BindGroupEntry {
+                        binding: 1,
+                        resource: BindingResource::Sampler(&gpu_image.sampler),
+                    },
+                ],
+            );
 
-//             commands
-//                 .entity(entity)
-//                 .insert(DigitBindGroup { bind_group });
-//         }
-//     }
-// }
+            commands
+                .entity(entity)
+                .insert(DigitBindGroup { bind_group });
+        }
+    }
+}
 
 struct DrawMeshInstanced;
 
