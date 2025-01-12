@@ -49,12 +49,9 @@ struct CustomShaderPlugin;
 
 impl Plugin for CustomShaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            ExtractComponentPlugin::<InstanceMaterialData>::default(),
-            // MaterialPlugin::<CustomMaterial>::default(),
-        ))
-        .init_resource::<Digits>()
-        .add_systems(Startup, load_digit_texture_atlas);
+        app.add_plugins((ExtractComponentPlugin::<InstanceMaterialData>::default(),))
+            .init_resource::<Digits>()
+            .add_systems(Startup, load_digit_texture_atlas);
 
         app.sub_app_mut(RenderApp)
             .add_render_command::<Transparent3d, DrawCustom>()
@@ -64,7 +61,6 @@ impl Plugin for CustomShaderPlugin {
             .add_systems(
                 Render,
                 (
-                    // queue_digit_bind_groups.in_set(RenderSet::QueueMeshes),
                     queue_custom.in_set(RenderSet::QueueMeshes),
                     prepare_instance_buffers.in_set(RenderSet::PrepareResources),
                 ),
