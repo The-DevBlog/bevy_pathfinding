@@ -246,6 +246,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
+            use_texture: 0,
         });
     }
 
@@ -258,6 +259,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
+            use_texture: 0,
         });
     }
 
@@ -354,6 +356,7 @@ pub fn draw_flowfield(
                         scale: marker_scale,
                         rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4).into(),
                         color,
+                        use_texture: 0,
                     });
 
                     occupied_cell_instances.push(debug::shader::InstanceData {
@@ -361,6 +364,7 @@ pub fn draw_flowfield(
                         scale: marker_scale,
                         rotation: Quat::from_rotation_y(FRAC_PI_4).into(),
                         color,
+                        use_texture: 0,
                     });
 
                     continue;
@@ -371,6 +375,7 @@ pub fn draw_flowfield(
                     scale: marker_scale,
                     rotation: rotation.into(),
                     color,
+                    use_texture: 0,
                 });
 
                 // Then push this final rotation into your instance data
@@ -380,6 +385,7 @@ pub fn draw_flowfield(
                     rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
                         .into(),
                     color,
+                    use_texture: 0,
                 });
             }
 
@@ -389,6 +395,7 @@ pub fn draw_flowfield(
                     scale: grid.cell_radius * 0.15 * marker_scale,
                     rotation: rotation.into(),
                     color,
+                    use_texture: 0,
                 });
             }
         }
@@ -476,13 +483,13 @@ fn draw_costfield(
                 scale: 0.2,
                 rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                 color: [1.0, 1.0, 1.0, 1.0],
+                use_texture: 1,
             });
         }
     }
 
     cmds.spawn((
         Cost,
-        // MeshMaterial3d(material),
         Mesh3d(mesh),
         debug::shader::InstanceMaterialData(instances),
     ));

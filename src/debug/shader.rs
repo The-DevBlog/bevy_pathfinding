@@ -67,8 +67,6 @@ impl Plugin for CustomShaderPlugin {
             );
 
         embedded_asset!(app, "instancing.wgsl");
-        embedded_asset!(app, "instancing3.wgsl");
-        embedded_asset!(app, "shader_digit.wgsl");
     }
 
     fn finish(&self, app: &mut App) {
@@ -101,6 +99,7 @@ pub struct InstanceData {
     pub scale: f32,
     pub rotation: [f32; 4],
     pub color: [f32; 4],
+    pub use_texture: u32,
 }
 
 fn load_digit_texture_atlas(
@@ -268,9 +267,7 @@ impl FromWorld for CustomPipeline {
         // Load the embedded shader by its virtual path
         let asset_server = world.resource::<AssetServer>();
         let shader: Handle<Shader> =
-            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing3.wgsl");
-        // let shader: Handle<Shader> =
-        //     asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
+            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
 
         // Create a bind group layout for { texture, sampler }.
         let render_device = world.resource::<RenderDevice>();
@@ -338,6 +335,11 @@ impl SpecializedMeshPipeline for CustomPipeline {
                     format: VertexFormat::Float32x4,
                     offset: VertexFormat::Float32x4.size() * 2,
                     shader_location: 5, // color
+                },
+                VertexAttribute {
+                    format: VertexFormat::Uint32,
+                    offset: VertexFormat::Float32x4.size() * 3,
+                    shader_location: 6, // use_texture
                 },
             ],
         });
