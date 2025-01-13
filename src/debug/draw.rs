@@ -474,7 +474,7 @@ fn draw_costfield(
             instances.push(debug::shader::InstanceData {
                 position: cell.world_pos + base_offset,
                 scale: 0.2,
-                rotation: Quat::IDENTITY.into(),
+                rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                 color: [1.0, 1.0, 1.0, 1.0],
             });
         }
