@@ -1,6 +1,3 @@
-use bevy::render::view::NoFrustumCulling;
-use bevy::render::view::RenderLayers;
-// use debug::shader::CustomMaterial;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use super::components::*;
@@ -8,7 +5,6 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 use cell::Cell;
-use debug::COLOR_GRID;
 use events::UpdateCostEv;
 use grid::Grid;
 

@@ -12,8 +12,6 @@ mod resources;
 mod shader;
 mod ui;
 
-const COLOR_GRID: Srgba = GRAY;
-
 pub struct BevyRtsPathFindingDebugPlugin;
 
 impl Plugin for BevyRtsPathFindingDebugPlugin {
