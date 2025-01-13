@@ -66,7 +66,8 @@ impl Plugin for CustomShaderPlugin {
                 ),
             );
 
-        embedded_asset!(app, "instancing.wgsl");
+        // embedded_asset!(app, "instancing.wgsl");
+        embedded_asset!(app, "../../assets/shaders/instancing.wgsl");
     }
 
     fn finish(&self, app: &mut App) {
@@ -266,8 +267,8 @@ impl FromWorld for CustomPipeline {
 
         // Load the embedded shader by its virtual path
         let asset_server = world.resource::<AssetServer>();
-        let shader: Handle<Shader> =
-            asset_server.load("embedded://bevy_rts_pathfinding/debug/instancing.wgsl");
+        let shader: Handle<Shader> = asset_server
+            .load("embedded://bevy_rts_pathfinding/debug/../../assets/shaders/instancing.wgsl");
 
         // Create a bind group layout for { texture, sampler }.
         let render_device = world.resource::<RenderDevice>();
