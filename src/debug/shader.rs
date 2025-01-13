@@ -66,7 +66,6 @@ impl Plugin for CustomShaderPlugin {
                 ),
             );
 
-        // embedded_asset!(app, "instancing.wgsl");
         embedded_asset!(app, "../../assets/shaders/instancing.wgsl");
     }
 
