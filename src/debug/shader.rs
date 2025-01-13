@@ -22,7 +22,7 @@ use texture::GpuImage;
 
 use super::resources::DebugOptions;
 
-const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
+const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/imgs/digit_atlas.png");
 
 pub struct ShaderPlugin;
 

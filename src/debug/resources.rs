@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use bevy::{image::*, prelude::*, render::render_resource::*};
 use image::ImageFormat;
 
-const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/digits/digit_atlas.png");
-const DBG_ICON: &[u8] = include_bytes!("../../assets/dbg_icon.png");
+const DBG_ICON: &[u8] = include_bytes!("../../assets/imgs/dbg_icon.png");
 
 pub struct ResourcesPlugin;
 
