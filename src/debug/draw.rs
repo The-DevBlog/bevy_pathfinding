@@ -441,8 +441,6 @@ fn draw_costfield(
     digits: Res<debug::shader::Digits>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
-    // mut materials: ResMut<Assets<StandardMaterial>>,
-    // mut materials: ResMut<Assets<CustomMaterial>>,
     mut cmds: Commands,
     q_cost: Query<Entity, With<Cost>>,
 ) {
@@ -456,31 +454,38 @@ fn draw_costfield(
         return;
     };
 
+    let mut marker_scale = 0.25;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        marker_scale = 0.4;
+    }
+
     dbg.print("\ndraw_costfield() start");
 
     let base_digit_spacing = grid.cell_diameter * 0.275;
     let mesh = meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter));
 
     let mut instances = Vec::new();
-    // let material = materials.add(StandardMaterial {
-    //     base_color_texture: Some(digits.0[0].clone()),
-    //     alpha_mode: AlphaMode::Blend,
-    //     unlit: true,
-    //     ..default()
-    // });
-
-    // let material = materials.add(CustomMaterial {
-    //     color: LinearRgba::BLUE,
-    //     color_texture: Some(digits.0[1].clone()),
-    //     // color_texture: Some(asset_server.load("branding/icon.png")),
-    //     alpha_mode: AlphaMode::Blend,
-    // });
 
     for cell_row in &grid.grid {
         for cell in cell_row.iter() {
+            // let digits_vec: Vec<u32> = cell
+            //     .cost
+            //     .to_string()
+            //     .chars()
+            //     .filter_map(|c| c.to_digit(10))
+            //     .collect();
+
+            // let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
+            //     grid.cell_diameter,
+            //     digits_vec.len(),
+            //     base_digit_spacing,
+            // );
+
             instances.push(debug::shader::InstanceData {
                 position: cell.world_pos + base_offset,
-                scale: 0.2,
+                scale: marker_scale,
                 rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                 color: [1.0, 1.0, 1.0, 1.0],
                 use_texture: 1,
