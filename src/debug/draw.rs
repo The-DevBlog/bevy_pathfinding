@@ -434,7 +434,6 @@ fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
     mut costmap: ResMut<CostMap>,
     dbg: Res<DebugOptions>,
-    digits: Res<debug::shader::Digits>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     mut cmds: Commands,
@@ -450,11 +449,11 @@ fn draw_costfield(
         return;
     };
 
-    let mut marker_scale = 0.25;
+    let mut marker_scale = 0.2;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
     {
-        marker_scale = 0.4;
+        marker_scale = 0.25;
     }
 
     dbg.print("\ndraw_costfield() start");
@@ -466,26 +465,33 @@ fn draw_costfield(
 
     for cell_row in &grid.grid {
         for cell in cell_row.iter() {
-            // let digits_vec: Vec<u32> = cell
-            //     .cost
-            //     .to_string()
-            //     .chars()
-            //     .filter_map(|c| c.to_digit(10))
-            //     .collect();
+            let digits_vec: Vec<u32> = cell
+                .cost
+                .to_string()
+                .chars()
+                .filter_map(|c| c.to_digit(10))
+                .collect();
 
-            // let (scale, digit_spacing) = calculate_digit_spacing_and_scale(
-            //     grid.cell_diameter.0,
-            //     digits_vec.len(),
-            //     base_digit_spacing,
-            // );
+            let digit_spacing = calculate_digit_spacing_and_scale(
+                grid.cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
 
-            instances.push(debug::shader::InstanceData {
-                position: cell.world_pos + base_offset,
-                scale: marker_scale,
-                rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
-                color: [1.0, 1.0, 1.0, 1.0],
-                digit: 1.0,
-            });
+            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+            for (i, &digit) in digits_vec.iter().enumerate() {
+                let mut offset = base_offset;
+                offset.x += x_offset + i as f32 * digit_spacing;
+
+                instances.push(debug::shader::InstanceData {
+                    position: cell.world_pos + offset,
+                    scale: marker_scale,
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
+                    color: [1.0, 1.0, 1.0, 1.0],
+                    digit: digit as f32,
+                });
+            }
         }
     }
 
@@ -774,20 +780,16 @@ fn calculate_digit_spacing_and_scale(
     cell_diameter: f32,
     digit_count: usize,
     base_digit_spacing: f32,
-) -> (Vec3, f32) {
+) -> f32 {
     let digit_width = cell_diameter * BASE_SCALE;
     let total_digit_width = digit_count as f32 * digit_width;
     let total_spacing_width = (digit_count as f32 - 1.0) * base_digit_spacing;
     let total_width = total_digit_width + total_spacing_width;
 
     if total_width > cell_diameter {
-        let scale_factor = cell_diameter / total_width;
-        (
-            Vec3::splat(BASE_SCALE * scale_factor),
-            base_digit_spacing * scale_factor,
-        )
+        base_digit_spacing * cell_diameter / total_width
     } else {
-        (Vec3::splat(BASE_SCALE), base_digit_spacing)
+        base_digit_spacing
     }
 }
 

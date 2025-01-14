@@ -32,6 +32,17 @@ impl Plugin for ShaderPlugin {
     }
 }
 
+#[derive(Component)]
+struct DigitBindGroup {
+    bind_group: BindGroup,
+}
+
+#[derive(Component)]
+struct InstanceBuffer {
+    buffer: Buffer,
+    length: usize,
+}
+
 #[derive(Component, Deref)]
 pub struct InstanceMaterialData(pub Vec<InstanceData>);
 
@@ -99,7 +110,7 @@ pub struct InstanceData {
     pub scale: f32,
     pub rotation: [f32; 4],
     pub color: [f32; 4],
-    pub digit: f32, // New field to specify the digit (0-9)
+    pub digit: f32,
 }
 
 fn load_digit_texture_atlas(
@@ -221,12 +232,6 @@ fn queue_custom(
     }
 }
 
-#[derive(Component)]
-struct InstanceBuffer {
-    buffer: Buffer,
-    length: usize,
-}
-
 fn prepare_instance_buffers(
     mut commands: Commands,
     query: Query<(Entity, &InstanceMaterialData)>,
@@ -319,7 +324,6 @@ impl SpecializedMeshPipeline for CustomPipeline {
         let mut descriptor = self.mesh_pipeline.specialize(key, layout)?;
 
         descriptor.layout.push(self.texture_layout.clone());
-
         descriptor.vertex.shader = self.shader.clone();
         descriptor.vertex.buffers.push(VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceData>() as u64,
@@ -382,11 +386,6 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetDigitTextureBindGroup
         pass.set_bind_group(I, &digit_bind_group.bind_group, &[]);
         RenderCommandResult::Success
     }
-}
-
-#[derive(Component)]
-struct DigitBindGroup {
-    bind_group: BindGroup,
 }
 
 struct DrawMeshInstanced;
