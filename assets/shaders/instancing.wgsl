@@ -34,7 +34,7 @@ struct VertexInput {
     @location(3) pos_scale      : vec4<f32>, 
     @location(4) rotation       : vec4<f32>,
     @location(5) color          : vec4<f32>,
-    @location(6) use_texture    : u32,
+    @location(6) digit          : f32, // New field for digit index
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +45,7 @@ struct VertexOutput {
     @builtin(position) clip_position : vec4<f32>,
     @location(0) color               : vec4<f32>,
     @location(1) uv                  : vec2<f32>,
-    @location(2) use_texture         : u32,
+    @location(2) digit               : f32, // Pass digit index to fragment shader
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,23 +66,21 @@ fn rotate_by_quat(pos: vec3<f32>, q: vec4<f32>) -> vec3<f32> {
 fn vertex(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
 
-    // 1) rotate the mesh local position by the instance quaternion
+    // Rotate and transform the position
     let rotated = rotate_by_quat(in.position, in.rotation);
-    // 2) apply scale (pos_scale.w) + translation (pos_scale.xyz)
     let local_pos = rotated * in.pos_scale.w + in.pos_scale.xyz;
 
-    // 3) transform by the camera's combined view+proj matrix
+    // Transform by the camera's view-projection matrix
     out.clip_position = camera_data.view_proj * vec4<f32>(local_pos, 1.0);
 
-    // pass color + uv to the fragment
+    // Pass color and UV to the fragment shader
     out.color = in.color;
     out.uv = in.uv;
-
-    // Assign use_texture, converting from f32 to u32
-    out.use_texture = u32(in.use_texture);
+    out.digit = in.digit; // Pass digit index
 
     return out;
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // TEXTURE BIND GROUP
@@ -106,10 +104,17 @@ var my_sampler: sampler;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    if (in.use_texture == 1u) {
-        let tex_color = textureSample(my_texture, my_sampler, in.uv);
+    if (in.digit >= 0f && in.digit < 10f) { // Ensure digit index is valid
+        let digits_per_row = 10u; // Number of digits in the atlas
+        let digit_width = 1.0 / f32(digits_per_row);
+        let adjusted_uv = vec2<f32>(
+            in.uv.x * digit_width + (f32(in.digit) * digit_width),
+            in.uv.y
+        );
+
+        let tex_color = textureSample(my_texture, my_sampler, adjusted_uv);
         return tex_color * in.color;
     } else {
-        return in.color;
+        return in.color; // Fallback if digit index is out of range
     }
 }
