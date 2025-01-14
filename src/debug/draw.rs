@@ -28,9 +28,9 @@ impl Plugin for DrawPlugin {
         // .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
-        .add_observer(draw_flowfield);
+        .add_observer(draw_flowfield)
         // .add_observer(draw_integration_field)
-        // .add_observer(draw_index);
+        .add_observer(draw_index);
     }
 }
 
@@ -224,6 +224,8 @@ fn draw_grid(
         return;
     }
 
+    dbg.print("\ndraw_grid() start");
+
     let line_length = grid.size.x as f32 * grid.cell_diameter;
     let mut row_instances = Vec::new();
     let mut column_instances = Vec::new();
@@ -270,6 +272,8 @@ fn draw_grid(
         Mesh3d(meshes.add(Plane3d::default().mesh().size(0.2, line_length))),
         debug::shader::InstanceMaterialData(column_instances),
     ));
+
+    dbg.print("draw_grid() end");
 }
 
 pub fn draw_flowfield(
@@ -459,7 +463,6 @@ fn draw_costfield(
     dbg.print("\ndraw_costfield() start");
 
     let base_digit_spacing = grid.cell_diameter * 0.275;
-    let mesh = meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter));
 
     let mut instances = Vec::new();
 
@@ -497,7 +500,7 @@ fn draw_costfield(
 
     cmds.spawn((
         Cost,
-        Mesh3d(mesh),
+        Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
     ));
 
@@ -544,45 +547,80 @@ fn draw_costfield(
 //     );
 // }
 
-// fn draw_index(
-//     _trigger: Trigger<DrawDebugEv>,
-//     dbg: Res<DebugOptions>,
-//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-//     digits: Res<Digits>,
-//     meshes: ResMut<Assets<Mesh>>,
-//     materials: ResMut<Assets<StandardMaterial>>,
-//     q_idx: Query<Entity, With<Index>>,
-//     mut cmds: Commands,
-// ) {
-//     // Remove current index entities before rendering new ones
-//     for idx_entity in &q_idx {
-//         cmds.entity(idx_entity).despawn_recursive();
-//     }
+fn draw_index(
+    _trigger: Trigger<DrawDebugEv>,
+    dbg: Res<DebugOptions>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    grid: Res<Grid>,
+    q_idx: Query<Entity, With<Index>>,
+    mut cmds: Commands,
+) {
+    // Remove current index entities before rendering new ones
+    for idx_entity in &q_idx {
+        cmds.entity(idx_entity).despawn_recursive();
+    }
 
-//     let Some(flowfield) = &active_dbg_flowfield.0 else {
-//         return;
-//     };
+    if !dbg.draw_grid {
+        return;
+    }
 
-//     let offset = calculate_offset(flowfield.cell_diameter, dbg, DrawMode::Index);
-//     let Some(offset) = offset else {
-//         return;
-//     };
+    let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::Index);
+    let Some(base_offset) = base_offset else {
+        return;
+    };
 
-//     println!("Drawing Index");
+    let mut marker_scale = 0.2;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        marker_scale = 0.25;
+    }
 
-//     let str = |cell: &Cell| format!("{}{}", cell.idx.y, cell.idx.x);
-//     draw(
-//         meshes,
-//         materials,
-//         &flowfield.grid,
-//         flowfield.cell_diameter,
-//         digits,
-//         Index,
-//         cmds,
-//         str,
-//         offset,
-//     );
-// }
+    dbg.print("\ndraw_index() start");
+
+    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO: move this to const?
+    let mut instances = Vec::new();
+
+    for cell_row in &grid.grid {
+        for cell in cell_row.iter() {
+            let digits_vec: Vec<u32> = cell
+                .idx
+                .to_string()
+                .chars()
+                .filter_map(|c| c.to_digit(10))
+                .collect();
+
+            let digit_spacing = calculate_digit_spacing_and_scale(
+                grid.cell_diameter,
+                digits_vec.len(),
+                base_digit_spacing,
+            );
+
+            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+            for (i, &digit) in digits_vec.iter().enumerate() {
+                let mut offset = base_offset;
+                offset.x += x_offset + i as f32 * digit_spacing;
+
+                instances.push(debug::shader::InstanceData {
+                    position: cell.world_pos + offset,
+                    scale: marker_scale,
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
+                    color: [1.0, 1.0, 1.0, 1.0],
+                    digit: digit as f32,
+                });
+            }
+        }
+    }
+
+    cmds.spawn((
+        Index,
+        Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
+        debug::shader::InstanceMaterialData(instances),
+    ));
+
+    dbg.print("draw_index() end");
+}
 
 // fn draw_costfield(
 //     _trigger: Trigger<DrawDebugEv>,
