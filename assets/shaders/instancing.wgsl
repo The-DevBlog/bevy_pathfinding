@@ -104,7 +104,7 @@ var my_sampler: sampler;
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    if (in.digit >= 0f && in.digit < 10f) { // Ensure digit index is valid
+    if (in.digit >= 0f && in.digit < 10f) { // Using u32 for digit
         let digits_per_row = 10u; // Number of digits in the atlas
         let digit_width = 1.0 / f32(digits_per_row);
         let adjusted_uv = vec2<f32>(
@@ -113,8 +113,16 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         );
 
         let tex_color = textureSample(my_texture, my_sampler, adjusted_uv);
+
+        // Optional: Discard pixels with zero alpha to optimize rendering
+        if (tex_color.a * in.color.a == 0.0) {
+            discard;
+        }
+
+        // Multiply the texture color by the instance color, preserving alpha
         return tex_color * in.color;
     } else {
-        return in.color; // Fallback if digit index is out of range
+        // If not using texture, return the instance color with its alpha
+        return in.color;
     }
 }
