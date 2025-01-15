@@ -16,6 +16,7 @@ impl Plugin for ResourcesPlugin {
     }
 }
 
+// TODO DO I need this?
 #[derive(Resource, Default)]
 pub struct CostMap(pub HashMap<IVec2, Vec<Entity>>);
 
