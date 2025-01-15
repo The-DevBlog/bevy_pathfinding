@@ -146,7 +146,7 @@ pub fn update_costs(
     for idx in occupied_cells.0.difference(&current_occupied) {
         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
-            cell.cost = 1;
+            cell.cost = 1; // TODO This is a problem. This will reset back to 1 even if its previously at 255
 
             // Send event for cell reset to cost 1
             events.send(UpdateCostEv::new(*cell));

@@ -1,14 +1,12 @@
-use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
+use std::f32::consts::{FRAC_PI_4};
 
 use super::components::*;
 use super::events::*;
 use super::resources::*;
 use crate::*;
-use cell::Cell;
-use events::UpdateCostEv;
 use grid::Grid;
 
-const BASE_SCALE: f32 = 0.25;
+const BASE_SCALE: f32 = 0.2;
 
 pub struct DrawPlugin;
 
@@ -17,17 +15,13 @@ impl Plugin for DrawPlugin {
         app.add_systems(
             Update,
             (
-                // draw_grid.run_if(resource_exists::<Grid>),
                 detect_debug_change.run_if(resource_exists::<Grid>),
-                // update_cell_cost
-                //     .after(grid::update_costs)
-                //     .run_if(resource_exists::<Grid>),
             ),
         )
         .add_observer(draw_grid)
         // .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
-        .add_observer(draw_costfield)
+        // .add_observer(draw_costfield)
         .add_observer(draw_flowfield)
         .add_observer(draw_integration_field)
         .add_observer(draw_index);
@@ -290,7 +284,6 @@ pub fn draw_flowfield(
 
 fn draw_costfield(
     _trigger: Trigger<DrawDebugEv>,
-    mut costmap: ResMut<CostMap>,
     dbg: Res<DebugOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
@@ -327,7 +320,7 @@ fn draw_costfield(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
-                0.2, // Base scale, adjust as needed
+                BASE_SCALE,
             );
 
             // Adjust marker_scale based on draw mode
@@ -408,7 +401,7 @@ fn draw_integration_field(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
-                0.2, // Base scale, adjust as needed
+                BASE_SCALE,
             );
 
             // Adjust marker_scale based on draw mode
@@ -489,7 +482,7 @@ fn draw_index(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
-                0.2, // Base scale, adjust as needed
+                BASE_SCALE,
             );
 
             // Adjust marker_scale based on draw mode
@@ -498,7 +491,7 @@ fn draw_index(
                 || (dbg.draw_mode_1 == DrawMode::FlowField
                     && dbg.draw_mode_2 == DrawMode::FlowField)
             {
-                marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+                marker_scale = scale_factor * 1.25;
             }
 
             let x_offset = if digits_vec.len() > 1 {
