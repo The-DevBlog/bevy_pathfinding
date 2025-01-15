@@ -464,16 +464,9 @@ fn draw_index(
         return;
     };
 
-    let mut marker_scale = 0.2;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = 0.25;
-    }
-
     dbg.print("\ndraw_index() start");
 
-    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO: move this to const?
+    let base_digit_spacing = grid.cell_diameter * 0.275; // Consider moving to a constant
     let mut instances = Vec::new();
 
     for cell_row in &grid.grid {
@@ -487,13 +480,28 @@ fn draw_index(
 
             digits_vec.reverse();
 
-            let digit_spacing = calculate_digit_spacing_and_scale(
+            // Calculate spacing and scale based on digit count
+            let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
+                0.2, // Base scale, adjust as needed
             );
 
-            let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+            // Adjust marker_scale based on draw mode
+            let mut marker_scale = scale_factor;
+            if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+                || (dbg.draw_mode_1 == DrawMode::FlowField
+                    && dbg.draw_mode_2 == DrawMode::FlowField)
+            {
+                marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+            }
+
+            let x_offset = if digits_vec.len() > 1 {
+                -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0
+            } else {
+                0.0
+            };
 
             for (i, &digit) in digits_vec.iter().enumerate() {
                 let mut offset = base_offset;
@@ -557,16 +565,24 @@ fn calculate_digit_spacing_and_scale(
     cell_diameter: f32,
     digit_count: usize,
     base_digit_spacing: f32,
-) -> f32 {
-    let digit_width = cell_diameter * BASE_SCALE;
+    base_scale: f32,
+) -> (f32, f32) {
+    let digit_width = cell_diameter * base_scale;
     let total_digit_width = digit_count as f32 * digit_width;
-    let total_spacing_width = (digit_count as f32 - 1.0) * base_digit_spacing;
+    let total_spacing_width = if digit_count > 1 {
+        (digit_count as f32 - 1.0) * base_digit_spacing
+    } else {
+        0.0
+    };
     let total_width = total_digit_width + total_spacing_width;
 
     if total_width > cell_diameter {
-        base_digit_spacing * cell_diameter / total_width
+        let scale = cell_diameter / total_width;
+        let adjusted_spacing = base_digit_spacing * scale;
+        let adjusted_scale = base_scale * scale;
+        (adjusted_spacing, adjusted_scale)
     } else {
-        base_digit_spacing
+        (base_digit_spacing, base_scale)
     }
 }
 
