@@ -420,8 +420,6 @@ fn draw_integration_field(
                 marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
             }
 
-            println!("Best Cost of Idx {} -> {}", cell.idx, cell.best_cost);
-
             let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
 
             for (i, &digit) in digits_vec.iter().enumerate() {
