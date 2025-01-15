@@ -102,7 +102,6 @@ pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
 
 #[derive(Default, Resource, Clone, Deref, ExtractResource, Reflect)]
 pub struct Digits(pub Handle<Image>);
-// pub struct Digits(pub [Handle<Image>; 10]);
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
