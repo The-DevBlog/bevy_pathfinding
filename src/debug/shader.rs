@@ -101,7 +101,8 @@ pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
 }
 
 #[derive(Default, Resource, Clone, Deref, ExtractResource, Reflect)]
-pub struct Digits(pub [Handle<Image>; 10]);
+pub struct Digits(pub Handle<Image>);
+// pub struct Digits(pub [Handle<Image>; 10]);
 
 #[derive(Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
@@ -121,12 +122,12 @@ fn load_digit_texture_atlas(
     dbg.print("\nload_digit_texture_atlas() start");
 
     // Load the entire atlas as a single texture
-    let image = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
+    let img = image::load_from_memory_with_format(DIGIT_ATLAS, ImageFormat::Png)
         .expect("Failed to load digit atlas image");
-    let rgba_image = image.to_rgba8();
+    let rgba_image = img.to_rgba8();
     let (width, height) = rgba_image.dimensions();
 
-    let atlas_image = Image {
+    let atlas_img = Image {
         data: rgba_image.into_raw(),
         texture_descriptor: TextureDescriptor {
             label: Some("digit_atlas"),
@@ -148,7 +149,7 @@ fn load_digit_texture_atlas(
     };
 
     // Store the atlas in the first slot of the Digits array
-    digits.0[0] = images.add(atlas_image); // TODO: DO I need this?
+    digits.0 = images.add(atlas_img); // TODO: DO I need this?
 
     dbg.print("load_digit_texture_atlas() end");
 }
@@ -206,7 +207,7 @@ fn queue_custom(
     }
 
     // In the queue_custom function, bind the atlas texture once
-    if let Some(gpu_image) = gpu_images.get(&digits.0[0]) {
+    if let Some(gpu_image) = gpu_images.get(&digits.0) {
         // Use the atlas handle
         let bind_group = render_device.create_bind_group(
             Some("digit atlas bind group"),
