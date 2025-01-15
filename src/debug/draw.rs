@@ -1,4 +1,4 @@
-use std::f32::consts::{FRAC_PI_4};
+use std::f32::consts::FRAC_PI_4;
 
 use super::components::*;
 use super::events::*;
@@ -14,14 +14,11 @@ impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (
-                detect_debug_change.run_if(resource_exists::<Grid>),
-            ),
+            (detect_debug_change.run_if(resource_exists::<Grid>),),
         )
         .add_observer(draw_grid)
-        // .add_systems(Update, draw_flowfield.run_if(resource_exists::<Grid>))
         .add_observer(set_active_dbg_flowfield)
-        // .add_observer(draw_costfield)
+        .add_observer(draw_costfield)
         .add_observer(draw_flowfield)
         .add_observer(draw_integration_field)
         .add_observer(draw_index);
