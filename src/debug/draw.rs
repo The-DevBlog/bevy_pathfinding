@@ -307,13 +307,6 @@ fn draw_costfield(
         return;
     };
 
-    let mut marker_scale = 0.2;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = 0.25;
-    }
-
     dbg.print("\ndraw_costfield() start");
 
     let base_digit_spacing = grid.cell_diameter * 0.275;
@@ -329,11 +322,22 @@ fn draw_costfield(
                 .filter_map(|c| c.to_digit(10))
                 .collect();
 
-            let digit_spacing = calculate_digit_spacing_and_scale(
+            // Calculate spacing and scale based on digit count
+            let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
+                0.2, // Base scale, adjust as needed
             );
+
+            // Adjust marker_scale based on draw mode
+            let mut marker_scale = scale_factor;
+            if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+                || (dbg.draw_mode_1 == DrawMode::FlowField
+                    && dbg.draw_mode_2 == DrawMode::FlowField)
+            {
+                marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+            }
 
             let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
 
@@ -386,15 +390,6 @@ fn draw_integration_field(
 
     dbg.print("\ndraw_integration_field() start");
 
-    let mut marker_scale = 0.2;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = 0.25;
-    }
-
-    dbg.print("\ndraw_costfield() start");
-
     let base_digit_spacing = grid.cell_diameter * 0.275;
 
     let mut instances = Vec::new();
@@ -408,11 +403,22 @@ fn draw_integration_field(
                 .filter_map(|c| c.to_digit(10))
                 .collect();
 
-            let digit_spacing = calculate_digit_spacing_and_scale(
+            // Calculate spacing and scale based on digit count
+            let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
                 grid.cell_diameter,
                 digits_vec.len(),
                 base_digit_spacing,
+                0.2, // Base scale, adjust as needed
             );
+
+            // Adjust marker_scale based on draw mode
+            let mut marker_scale = scale_factor;
+            if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+                || (dbg.draw_mode_1 == DrawMode::FlowField
+                    && dbg.draw_mode_2 == DrawMode::FlowField)
+            {
+                marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+            }
 
             println!("Best Cost of Idx {} -> {}", cell.idx, cell.best_cost);
 
