@@ -560,7 +560,7 @@ fn draw_index(
         cmds.entity(idx_entity).despawn_recursive();
     }
 
-    if !dbg.draw_grid {
+    if dbg.draw_mode_1 != DrawMode::Index && dbg.draw_mode_2 != DrawMode::Index {
         return;
     }
 
@@ -583,12 +583,14 @@ fn draw_index(
 
     for cell_row in &grid.grid {
         for cell in cell_row.iter() {
-            let digits_vec: Vec<u32> = cell
+            let mut digits_vec: Vec<u32> = cell
                 .idx
                 .to_string()
                 .chars()
                 .filter_map(|c| c.to_digit(10))
                 .collect();
+
+            digits_vec.reverse();
 
             let digit_spacing = calculate_digit_spacing_and_scale(
                 grid.cell_diameter,
