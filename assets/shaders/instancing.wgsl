@@ -105,6 +105,12 @@ var x_texture: texture_2d<f32>;
 @group(2) @binding(5)
 var x_sampler: sampler;
 
+// 'X' IMG
+@group(2) @binding(6)
+var destination_texture: texture_2d<f32>;
+@group(2) @binding(7)
+var destination_sampler: sampler;
+
 ////////////////////////////////////////////////////////////////////////////////
 // FRAGMENT SHADER
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,7 +152,13 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         return tex_color * in.color;
-    } else {
-        return in.color;
+    } else if(in.texture == -3i) {
+        let tex_color = textureSample(destination_texture, destination_sampler, in.uv);
+
+        if (tex_color.a * in.color.a == 0.0) {
+            discard;
+        }
+
+        return tex_color * in.color;
     }
 }
