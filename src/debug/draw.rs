@@ -179,13 +179,9 @@ pub fn draw_flowfield(
     // Arrow properties
     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-
-    // Mesh for arrow
-    let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-
+    
     // Instance data for all arrows
     let mut arrow_instances = HashMap::new();
-    // let mut arrow_head_instances = HashMap::new();
     let mut destination_instances = HashMap::new();
     let mut occupied_cell_instances = HashMap::new();
 
@@ -199,7 +195,7 @@ pub fn draw_flowfield(
             };
 
             let color = if cell.cost < u8::MAX {
-                [1.0, 1.0, 1.0, 1.0] // White for valid cells
+                [0.6, 0.6, 0.6, 0.6] // White for valid cells
             } else {
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
@@ -268,7 +264,7 @@ pub fn draw_flowfield(
     if !occupied_cell_instances.is_empty() {
         cmds.spawn((
             FlowFieldMarker,
-            Mesh3d(arrow_shaft_mesh.clone()),
+            Mesh3d(meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width))),
             debug::shader::InstanceMaterialData(occupied_cell_instances),
         ));
     }
@@ -277,7 +273,6 @@ pub fn draw_flowfield(
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
-        // Mesh3d(arrow_shaft_mesh),
         debug::shader::InstanceMaterialData(arrow_instances),
     ));
 
