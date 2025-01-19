@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::f32::consts::FRAC_PI_4;
 
 use super::components::*;
 use super::events::*;
@@ -102,7 +101,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -1.0,
+            texture: -3,
         });
 
         row_instances.insert(-(row as i32), instance_data);
@@ -119,7 +118,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -1.0,
+            texture: -3,
         });
 
         column_instances.insert(-(col as i32), instance_data);
@@ -158,7 +157,7 @@ pub fn draw_flowfield(
         return;
     };
 
-    let mut marker_scale = 0.7;
+    let mut marker_scale = 0.6;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
     {
@@ -176,62 +175,26 @@ pub fn draw_flowfield(
 
     dbg.print("\ndraw_flowfield() start");
 
-    // Arrow properties
-    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
-    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-
-    // Create the arrowhead mesh
-    let half_arrow_size = arrow_length / 2.0;
-    let d1 = half_arrow_size - grid.cell_diameter * 0.09;
-    let d2 = arrow_width + grid.cell_diameter * 0.0125;
-    let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
-    let b = Vec2::new(d1, d2);
-    let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
-
-    // Mesh for arrow
-    let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-    let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
-
     // Instance data for all arrows
-    let mut arrow_shaft_instances = HashMap::new();
-    let mut arrow_head_instances = HashMap::new();
+    let mut arrow_instances = HashMap::new();
     let mut destination_instances = HashMap::new();
     let mut occupied_cell_instances = HashMap::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
-
-            let rotation = match is_destination_cell {
-                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
-            };
-
-            let color = if cell.cost < u8::MAX {
-                [1.0, 1.0, 1.0, 1.0] // White for valid cells
-            } else {
-                [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
-            };
-
+            let color = [1.0, 1.0, 1.0, 1.0];
             let id = cell.idx_to_id(grid.grid.len());
+
             if !is_destination_cell {
                 if cell.cost == u8::MAX {
                     let mut occupied_cell_instance_data = Vec::new();
                     occupied_cell_instance_data.push(debug::shader::InstanceData {
                         position: cell.world_pos + offset,
                         scale: marker_scale,
-                        rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4).into(),
+                        rotation: Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2).into(),
                         color,
-                        digit: -1.0,
-                        id,
-                    });
-
-                    occupied_cell_instance_data.push(debug::shader::InstanceData {
-                        position: cell.world_pos + offset,
-                        scale: marker_scale,
-                        rotation: Quat::from_rotation_y(FRAC_PI_4).into(),
-                        color,
-                        digit: -1.0,
+                        texture: -2,
                         id,
                     });
 
@@ -240,31 +203,21 @@ pub fn draw_flowfield(
                     continue;
                 }
 
-                let mut arrow_shaft_instance_data = Vec::new();
-                arrow_shaft_instance_data.push(debug::shader::InstanceData {
+                let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+                let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+                let rotation = flatten * heading;
+
+                let mut arrow_instance_data = Vec::new();
+                arrow_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: rotation.into(),
                     color,
-                    digit: -1.0,
+                    texture: -1,
                     id: id,
                 });
 
-                arrow_shaft_instances.insert(id, arrow_shaft_instance_data);
-
-                // Then push this final rotation into your instance data
-                let mut arrow_head_instance_data = Vec::new();
-                arrow_head_instance_data.push(debug::shader::InstanceData {
-                    position: cell.world_pos + offset,
-                    scale: 1.0,
-                    rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
-                        .into(),
-                    color,
-                    digit: -1.0,
-                    id,
-                });
-
-                arrow_head_instances.insert(id, arrow_head_instance_data);
+                arrow_instances.insert(id, arrow_instance_data);
             }
 
             if is_destination_cell {
@@ -272,9 +225,9 @@ pub fn draw_flowfield(
                 destination_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: grid.cell_radius * 0.15 * marker_scale,
-                    rotation: rotation.into(),
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color,
-                    digit: -1.0,
+                    texture: -3,
                     id,
                 });
 
@@ -287,26 +240,25 @@ pub fn draw_flowfield(
     if !occupied_cell_instances.is_empty() {
         cmds.spawn((
             FlowFieldMarker,
-            Mesh3d(arrow_shaft_mesh.clone()),
+            Mesh3d(
+                meshes.add(
+                    Plane3d::default()
+                        .mesh()
+                        .size(grid.cell_diameter, grid.cell_diameter),
+                ),
+            ),
             debug::shader::InstanceMaterialData(occupied_cell_instances),
         ));
     }
 
-    // spawn arrow shaft marker
+    // spawn arrow marker
     cmds.spawn((
         FlowFieldMarker,
-        Mesh3d(arrow_shaft_mesh),
-        debug::shader::InstanceMaterialData(arrow_shaft_instances),
+        Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
+        debug::shader::InstanceMaterialData(arrow_instances),
     ));
 
-    // spawn arrow head marker
-    cmds.spawn((
-        FlowFieldMarker,
-        Mesh3d(arrow_head_mesh),
-        debug::shader::InstanceMaterialData(arrow_head_instances),
-    ));
-
-    // spawn destination cell marker
+    // spawn destination marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),
@@ -375,7 +327,7 @@ fn draw_costfield(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as f32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -457,7 +409,7 @@ fn draw_integration_field(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as f32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -544,7 +496,7 @@ fn draw_index(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as f32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -614,7 +566,7 @@ fn update_cost(
             scale: marker_scale,
             rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: digit as f32,
+            texture: digit as i32,
             id,
         });
     }
