@@ -1,7 +1,8 @@
+use bevy::prelude::*;
+
+use crate::debug::DebugPlugin;
 use crate::events::*;
 use crate::resources::*;
-use bevy::color::palettes::css::*;
-use bevy::prelude::*;
 
 mod cell;
 pub mod components;
@@ -21,6 +22,12 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((FlowfieldPlugin, ResourcesPlugin, GridPlugin));
+        app.add_plugins((
+            FlowfieldPlugin,
+            ResourcesPlugin,
+            GridPlugin,
+            #[cfg(feature = "debug")]
+            DebugPlugin,
+        ));
     }
 }

@@ -9,6 +9,9 @@ pub struct InitializeFlowFieldEv(pub Vec<Entity>);
 pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
 
 #[derive(Event)]
+pub struct DrawCostFieldEv;
+
+#[derive(Event)]
 pub struct UpdateCostEv {
     pub cell: Cell,
 }

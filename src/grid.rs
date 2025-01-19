@@ -1,4 +1,4 @@
-use crate::{cell::Cell, components::Destination, utils, UpdateCostEv};
+use crate::{cell::Cell, components::Destination, utils,  UpdateCostEv};
 
 use bevy::prelude::*;
 use std::collections::HashSet;
@@ -10,7 +10,7 @@ impl Plugin for GridPlugin {
         app.register_type::<Grid>()
             .init_resource::<OccupiedCells>()
             .add_event::<UpdateCostEv>()
-            .add_systems(Update, update_costs);
+            .add_systems(Update, update_costs.run_if(resource_exists::<Grid>));
     }
 }
 
@@ -124,7 +124,7 @@ impl Grid {
 
 pub fn update_costs(
     mut grid: ResMut<Grid>,
-    mut events: EventWriter<UpdateCostEv>,
+    mut cmds: Commands,
     mut occupied_cells: ResMut<OccupiedCells>,
     q_units: Query<&Transform, With<Destination>>,
 ) {
@@ -132,24 +132,23 @@ pub fn update_costs(
         return;
     }
 
-    println!("updating costs");
     let mut current_occupied = HashSet::new();
 
     // Mark cells occupied by units
     for transform in q_units.iter() {
         let cell = grid.update_unit_cell_costs(transform.translation);
         current_occupied.insert(cell.idx);
-        events.send(UpdateCostEv::new(cell)); // Send event for occupied cell
+        cmds.trigger(UpdateCostEv::new(cell));
     }
 
     // Reset previously occupied cells that are no longer occupied
     for idx in occupied_cells.0.difference(&current_occupied) {
         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
-            cell.cost = 1;
+            cell.cost = 1; // TODO This is a problem. This will reset back to 1 even if its previously at 255
 
             // Send event for cell reset to cost 1
-            events.send(UpdateCostEv::new(*cell));
+            cmds.trigger(UpdateCostEv::new(*cell));
         }
     }
 

@@ -91,4 +91,4 @@ pub struct BestCost;
 pub struct Index;
 
 #[derive(Component, Clone, Copy)]
-pub struct FlowFieldArrow;
+pub struct FlowFieldMarker;

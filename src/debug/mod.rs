@@ -1,20 +1,21 @@
-use bevy::{color::palettes::css::GRAY, prelude::*};
+use bevy::prelude::*;
+
 use draw::DrawPlugin;
 use resources::ResourcesPlugin;
+use shader::ShaderPlugin;
 use ui::UiPlugin;
 
 mod components;
 pub mod draw;
 mod events;
 mod resources;
+mod shader;
 mod ui;
 
-const COLOR_GRID: Srgba = GRAY;
+pub struct DebugPlugin;
 
-pub struct BevyRtsPathFindingDebugPlugin;
-
-impl Plugin for BevyRtsPathFindingDebugPlugin {
+impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((DrawPlugin, UiPlugin, ResourcesPlugin));
+        app.add_plugins((DrawPlugin, UiPlugin, ResourcesPlugin, ShaderPlugin));
     }
 }
