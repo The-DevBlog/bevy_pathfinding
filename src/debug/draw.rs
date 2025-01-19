@@ -101,7 +101,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            texture: -3,
+            texture: -4,
         });
 
         row_instances.insert(-(row as i32), instance_data);
@@ -118,7 +118,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            texture: -3,
+            texture: -4,
         });
 
         column_instances.insert(-(col as i32), instance_data);
@@ -175,9 +175,7 @@ pub fn draw_flowfield(
 
     dbg.print("\ndraw_flowfield() start");
 
-    // Instance data for all arrows
     let mut instances = HashMap::new();
-    // let mut destination_instances = HashMap::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -220,7 +218,7 @@ pub fn draw_flowfield(
             } else {
                 instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
-                    scale: grid.cell_radius * 0.15 * marker_scale,
+                    scale: marker_scale * 0.65,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color,
                     texture: -3,
@@ -238,13 +236,6 @@ pub fn draw_flowfield(
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
     ));
-
-    // spawn destination marker
-    // cmds.spawn((
-    //     FlowFieldMarker,
-    //     Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),
-    //     debug::shader::InstanceMaterialData(destination_instances),
-    // ));
 
     dbg.print("draw_flowfield() end");
 }

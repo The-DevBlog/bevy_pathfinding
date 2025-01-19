@@ -134,8 +134,10 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
         // Multiply the texture color by the instance color, preserving alpha
         return tex_color * in.color;
+    } 
+    
     // ARROW IMG
-    } else if (in.texture == -1i) {
+    if (in.texture == -1i) {
         let tex_color = textureSample(arrow_texture, arrow_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {
@@ -143,8 +145,10 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         return tex_color * in.color;
+    } 
+    
     // 'X' IMG
-    } else if (in.texture == -2i) {
+    if (in.texture == -2i) {
         let tex_color = textureSample(x_texture, x_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {
@@ -152,7 +156,10 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         return tex_color * in.color;
-    } else if(in.texture == -3i) {
+    } 
+    
+    // DESTINATION IMG
+    if(in.texture == -3i) {
         let tex_color = textureSample(destination_texture, destination_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {
@@ -160,5 +167,8 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         return tex_color * in.color;
-    }
+    } 
+    
+    // GRID LINES
+    return in.color;
 }
