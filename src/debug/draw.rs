@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::f32::consts::FRAC_PI_4;
 
 use super::components::*;
 use super::events::*;
@@ -102,7 +101,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -2,
+            digit: -3,
         });
 
         row_instances.insert(-(row as i32), instance_data);
@@ -119,7 +118,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -2,
+            digit: -3,
         });
 
         column_instances.insert(-(col as i32), instance_data);
@@ -176,10 +175,6 @@ pub fn draw_flowfield(
 
     dbg.print("\ndraw_flowfield() start");
 
-    // Arrow properties
-    let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
-    let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
-    
     // Instance data for all arrows
     let mut arrow_instances = HashMap::new();
     let mut destination_instances = HashMap::new();
@@ -188,35 +183,16 @@ pub fn draw_flowfield(
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
-
-            let rotation = match is_destination_cell {
-                true => Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
-                false => Quat::from_rotation_y(cell.best_direction.to_angle()),
-            };
-
-            let color = if cell.cost < u8::MAX {
-                [0.6, 0.6, 0.6, 0.6] // White for valid cells
-            } else {
-                [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
-            };
-
+            let color = [1.0, 1.0, 1.0, 1.0];
             let id = cell.idx_to_id(grid.grid.len());
+
             if !is_destination_cell {
                 if cell.cost == u8::MAX {
                     let mut occupied_cell_instance_data = Vec::new();
                     occupied_cell_instance_data.push(debug::shader::InstanceData {
                         position: cell.world_pos + offset,
                         scale: marker_scale,
-                        rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4).into(),
-                        color,
-                        digit: -2,
-                        id,
-                    });
-
-                    occupied_cell_instance_data.push(debug::shader::InstanceData {
-                        position: cell.world_pos + offset,
-                        scale: marker_scale,
-                        rotation: Quat::from_rotation_y(FRAC_PI_4).into(),
+                        rotation: Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2).into(),
                         color,
                         digit: -2,
                         id,
@@ -249,9 +225,9 @@ pub fn draw_flowfield(
                 destination_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: grid.cell_radius * 0.15 * marker_scale,
-                    rotation: rotation.into(),
+                    rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color,
-                    digit: -2,
+                    digit: -3,
                     id,
                 });
 
@@ -264,19 +240,19 @@ pub fn draw_flowfield(
     if !occupied_cell_instances.is_empty() {
         cmds.spawn((
             FlowFieldMarker,
-            Mesh3d(meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width))),
+            Mesh3d(meshes.add(Plane3d::default().mesh().size(grid.cell_diameter, grid.cell_diameter))),
             debug::shader::InstanceMaterialData(occupied_cell_instances),
         ));
     }
 
-    // spawn arrow shaft marker
+    // spawn arrow marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(arrow_instances),
     ));
 
-    // spawn destination cell marker
+    // spawn destination marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),

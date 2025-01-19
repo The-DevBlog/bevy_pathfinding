@@ -99,12 +99,18 @@ var arrow_texture: texture_2d<f32>;
 @group(2) @binding(3)
 var arrow_sampler: sampler;
 
+// 'X' IMG
+@group(2) @binding(4)
+var x_texture: texture_2d<f32>;
+@group(2) @binding(5)
+var x_sampler: sampler;
+
 ////////////////////////////////////////////////////////////////////////////////
 // FRAGMENT SHADER
 ////////////////////////////////////////////////////////////////////////////////
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    // If digit is 0..9, sample from the digit atlas
+    // DIGIT ATLAS
     if (in.digit >= 0i && in.digit < 10i) {
         let digits_per_row = 10u; // Number of digits in the atlas
         let digit_width = 1.0 / f32(digits_per_row);
@@ -122,8 +128,18 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
         // Multiply the texture color by the instance color, preserving alpha
         return tex_color * in.color;
+    // ARROW IMG
     } else if (in.digit == -1i) {
         let tex_color = textureSample(arrow_texture, arrow_sampler, in.uv);
+
+        if (tex_color.a * in.color.a == 0.0) {
+            discard;
+        }
+
+        return tex_color * in.color;
+    // 'X' IMG
+    } else if (in.digit == -2i) {
+        let tex_color = textureSample(x_texture, x_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {
             discard;
