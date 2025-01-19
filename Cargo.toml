@@ -15,6 +15,9 @@ bevy = { version = "0.15.1", default-features = false, features = [
 bytemuck = "1.21.0"
 image = "0.25.5"
 
+[features]
+debug = []
+
 [profile.dev]
 opt-level = 0
 debug = true

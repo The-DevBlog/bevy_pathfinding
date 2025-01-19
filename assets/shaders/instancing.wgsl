@@ -34,7 +34,8 @@ struct VertexInput {
     @location(3) pos_scale      : vec4<f32>, 
     @location(4) rotation       : vec4<f32>,
     @location(5) color          : vec4<f32>,
-    @location(6) digit          : f32, // New field for digit index
+    @location(6) digit          : f32, 
+    @location(7) id             : i32, 
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +46,7 @@ struct VertexOutput {
     @builtin(position) clip_position : vec4<f32>,
     @location(0) color               : vec4<f32>,
     @location(1) uv                  : vec2<f32>,
-    @location(2) digit               : f32, // Pass digit index to fragment shader
+    @location(2) digit               : f32,
 };
 
 ////////////////////////////////////////////////////////////////////////////////

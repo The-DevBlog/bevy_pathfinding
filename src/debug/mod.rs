@@ -1,4 +1,4 @@
-use bevy::{color::palettes::css::GRAY, prelude::*};
+use bevy::prelude::*;
 
 use draw::DrawPlugin;
 use resources::ResourcesPlugin;
@@ -12,9 +12,9 @@ mod resources;
 mod shader;
 mod ui;
 
-pub struct BevyRtsPathFindingDebugPlugin;
+pub struct DebugPlugin;
 
-impl Plugin for BevyRtsPathFindingDebugPlugin {
+impl Plugin for DebugPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((DrawPlugin, UiPlugin, ResourcesPlugin, ShaderPlugin));
     }

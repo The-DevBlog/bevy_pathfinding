@@ -1,4 +1,4 @@
-use crate::{cell::Cell, components::Destination, utils, UpdateCostEv};
+use crate::{cell::Cell, components::Destination, utils, DrawCostFieldEv, UpdateCostEv};
 
 use bevy::prelude::*;
 use std::collections::HashSet;
@@ -124,7 +124,7 @@ impl Grid {
 
 pub fn update_costs(
     mut grid: ResMut<Grid>,
-    mut events: EventWriter<UpdateCostEv>,
+    mut cmds: Commands,
     mut occupied_cells: ResMut<OccupiedCells>,
     q_units: Query<&Transform, With<Destination>>,
 ) {
@@ -132,14 +132,13 @@ pub fn update_costs(
         return;
     }
 
-    // println!("updating costs");
     let mut current_occupied = HashSet::new();
 
     // Mark cells occupied by units
     for transform in q_units.iter() {
         let cell = grid.update_unit_cell_costs(transform.translation);
         current_occupied.insert(cell.idx);
-        events.send(UpdateCostEv::new(cell)); // Send event for occupied cell
+        cmds.trigger(UpdateCostEv::new(cell));
     }
 
     // Reset previously occupied cells that are no longer occupied
@@ -149,7 +148,7 @@ pub fn update_costs(
             cell.cost = 1; // TODO This is a problem. This will reset back to 1 even if its previously at 255
 
             // Send event for cell reset to cost 1
-            events.send(UpdateCostEv::new(*cell));
+            cmds.trigger(UpdateCostEv::new(*cell));
         }
     }
 

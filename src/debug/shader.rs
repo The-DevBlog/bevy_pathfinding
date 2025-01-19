@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use allocator::MeshAllocator;
 use bevy::{
     asset::embedded_asset,
@@ -44,7 +45,8 @@ struct InstanceBuffer {
 }
 
 #[derive(Component, Deref)]
-pub struct InstanceMaterialData(pub Vec<InstanceData>);
+pub struct InstanceMaterialData(pub HashMap<i32, Vec<InstanceData>>);
+// pub struct InstanceMaterialData(pub HashMap<u32, InstanceData>);
 
 impl ExtractComponent for InstanceMaterialData {
     type QueryData = &'static InstanceMaterialData;
@@ -111,6 +113,7 @@ pub struct InstanceData {
     pub rotation: [f32; 4],
     pub color: [f32; 4],
     pub digit: f32,
+    pub id: i32, // this will be the concatinated idx of the cell. Ex: idx: (1, 2) -> id: 12
 }
 
 fn load_digit_texture_atlas(
@@ -237,28 +240,25 @@ fn prepare_instance_buffers(
     query: Query<(Entity, &InstanceMaterialData)>,
     render_device: Res<RenderDevice>,
 ) {
-    for (entity, instance_data) in &query {
+    for (entity, instance_data_map) in &query {
+        // Collect all `InstanceData` in one big Vec
+        let mut all_instances = Vec::new();
+        for (_key, instance_vec) in instance_data_map.0.iter() {
+            // Extend our flattened list by all items in this Vec<InstanceData>
+            all_instances.extend(instance_vec.iter().copied());
+        }
+
+        // Create a single GPU buffer for all instances
         let buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
             label: Some("instance data buffer"),
-            contents: bytemuck::cast_slice(
-                &instance_data
-                    .0
-                    .iter()
-                    .map(|data| InstanceData {
-                        position: data.position,
-                        scale: data.scale,
-                        rotation: data.rotation,
-                        color: data.color,
-                        digit: data.digit, // Ensure this field is set
-                    })
-                    .collect::<Vec<_>>(),
-            ),
+            contents: bytemuck::cast_slice(&all_instances),
             usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
         });
 
+        // Insert a single `InstanceBuffer` component with the correct length
         commands.entity(entity).insert(InstanceBuffer {
             buffer,
-            length: instance_data.len(),
+            length: all_instances.len(),
         });
     }
 }
@@ -348,6 +348,11 @@ impl SpecializedMeshPipeline for CustomPipeline {
                     format: VertexFormat::Float32,
                     offset: VertexFormat::Float32x4.size() * 3,
                     shader_location: 6, // digit
+                },
+                VertexAttribute {
+                    format: VertexFormat::Sint32,
+                    offset: VertexFormat::Float32x4.size() * 3 + VertexFormat::Float32.size(),
+                    shader_location: 7, // ID
                 },
             ],
         });

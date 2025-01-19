@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_4;
 
 use super::components::*;
 use super::events::*;
 use super::resources::*;
 use crate::*;
+use debug::shader::InstanceMaterialData;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -16,6 +18,8 @@ impl Plugin for DrawPlugin {
             Update,
             (detect_debug_change.run_if(resource_exists::<Grid>),),
         )
+        .add_observer(trigger_events)
+        .add_observer(update_cost)
         .add_observer(draw_grid)
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
@@ -24,6 +28,9 @@ impl Plugin for DrawPlugin {
         .add_observer(draw_index);
     }
 }
+
+#[derive(Component)]
+struct GridLine;
 
 fn set_active_dbg_flowfield(
     trigger: Trigger<SetActiveFlowfieldEv>,
@@ -39,24 +46,28 @@ fn set_active_dbg_flowfield(
         }
         // Set the new flowfield and trigger debug draw
         active_dbg_flowfield.0 = Some(new_flowfield.clone());
-        cmds.trigger(DrawDebugEv);
+        cmds.trigger(DrawAllEv);
     } else {
         // Deactivate if there’s no new flowfield
         if active_dbg_flowfield.0.is_some() {
             active_dbg_flowfield.0 = None;
-            cmds.trigger(DrawDebugEv);
+            cmds.trigger(DrawAllEv);
         }
     }
 }
 
-#[derive(Component)]
-struct GridMarker;
+fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands) {
+    cmds.trigger(DrawGridEv);
+    cmds.trigger(DrawCostFieldEv);
+    cmds.trigger(DrawFlowFieldEv);
+    cmds.trigger(DrawIntegrationFieldEv);
+}
 
 fn draw_grid(
-    _trigger: Trigger<DrawDebugEv>,
+    _trigger: Trigger<DrawGridEv>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    q_grid_lines: Query<Entity, With<GridMarker>>,
+    q_grid_lines: Query<Entity, With<GridLine>>,
     grid: Res<Grid>,
     dbg: Res<DebugOptions>,
 ) {
@@ -72,8 +83,8 @@ fn draw_grid(
     dbg.print("\ndraw_grid() start");
 
     let line_length = grid.size.x as f32 * grid.cell_diameter;
-    let mut row_instances = Vec::new();
-    let mut column_instances = Vec::new();
+    let mut row_instances = HashMap::new();
+    let mut column_instances = HashMap::new();
 
     let row_count = grid.grid.len() + 1;
     let col_count = grid.grid[0].len() + 1;
@@ -84,36 +95,44 @@ fn draw_grid(
     for row in 0..row_count {
         let y = row as f32 * grid.cell_diameter;
 
-        row_instances.push(debug::shader::InstanceData {
+        let mut instance_data = Vec::new();
+        instance_data.push(debug::shader::InstanceData {
+            id: 0,
             position: Vec3::new(line_length / 2.0, 0.1, y) + offset,
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
             digit: -1.0,
         });
+
+        row_instances.insert(-(row as i32), instance_data);
     }
 
     // Vertical lines (columns)
     for col in 0..col_count {
         let x = col as f32 * grid.cell_diameter;
 
-        column_instances.push(debug::shader::InstanceData {
+        let mut instance_data = Vec::new();
+        instance_data.push(debug::shader::InstanceData {
+            id: 0,
             position: Vec3::new(x, 0.1, line_length / 2.0) + offset,
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
             digit: -1.0,
         });
+
+        column_instances.insert(-(col as i32), instance_data);
     }
 
     cmds.spawn((
-        GridMarker,
+        GridLine,
         Mesh3d(meshes.add(Plane3d::default().mesh().size(line_length, 0.2))),
         debug::shader::InstanceMaterialData(row_instances),
     ));
 
     cmds.spawn((
-        GridMarker,
+        GridLine,
         Mesh3d(meshes.add(Plane3d::default().mesh().size(0.2, line_length))),
         debug::shader::InstanceMaterialData(column_instances),
     ));
@@ -122,7 +141,7 @@ fn draw_grid(
 }
 
 pub fn draw_flowfield(
-    _trigger: Trigger<DrawDebugEv>,
+    _trigger: Trigger<DrawFlowFieldEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
@@ -174,10 +193,10 @@ pub fn draw_flowfield(
     let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
     // Instance data for all arrows
-    let mut arrow_shaft_instances = Vec::new();
-    let mut arrow_head_instances = Vec::new();
-    let mut destination_instances = Vec::new();
-    let mut occupied_cell_instances = Vec::new();
+    let mut arrow_shaft_instances = HashMap::new();
+    let mut arrow_head_instances = HashMap::new();
+    let mut destination_instances = HashMap::new();
+    let mut occupied_cell_instances = HashMap::new();
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
@@ -194,54 +213,72 @@ pub fn draw_flowfield(
                 [1.0, 0.0, 0.0, 1.0] // Red for blocked cells
             };
 
+            let id = cell.idx_to_id(grid.grid.len());
             if !is_destination_cell {
                 if cell.cost == u8::MAX {
-                    occupied_cell_instances.push(debug::shader::InstanceData {
+                    let mut occupied_cell_instance_data = Vec::new();
+                    occupied_cell_instance_data.push(debug::shader::InstanceData {
                         position: cell.world_pos + offset,
                         scale: marker_scale,
                         rotation: Quat::from_rotation_y(3.0 * FRAC_PI_4).into(),
                         color,
                         digit: -1.0,
+                        id,
                     });
 
-                    occupied_cell_instances.push(debug::shader::InstanceData {
+                    occupied_cell_instance_data.push(debug::shader::InstanceData {
                         position: cell.world_pos + offset,
                         scale: marker_scale,
                         rotation: Quat::from_rotation_y(FRAC_PI_4).into(),
                         color,
                         digit: -1.0,
+                        id,
                     });
+
+                    occupied_cell_instances.insert(id, occupied_cell_instance_data);
 
                     continue;
                 }
 
-                arrow_shaft_instances.push(debug::shader::InstanceData {
+                let mut arrow_shaft_instance_data = Vec::new();
+                arrow_shaft_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: rotation.into(),
                     color,
                     digit: -1.0,
+                    id: id,
                 });
 
+                arrow_shaft_instances.insert(id, arrow_shaft_instance_data);
+
                 // Then push this final rotation into your instance data
-                arrow_head_instances.push(debug::shader::InstanceData {
+                let mut arrow_head_instance_data = Vec::new();
+                arrow_head_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: 1.0,
                     rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
                         .into(),
                     color,
                     digit: -1.0,
+                    id,
                 });
+
+                arrow_head_instances.insert(id, arrow_head_instance_data);
             }
 
             if is_destination_cell {
-                destination_instances.push(debug::shader::InstanceData {
+                let mut destination_instance_data = Vec::new();
+                destination_instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: grid.cell_radius * 0.15 * marker_scale,
                     rotation: rotation.into(),
                     color,
                     digit: -1.0,
+                    id,
                 });
+
+                destination_instances.insert(id, destination_instance_data);
             }
         }
     }
@@ -280,7 +317,7 @@ pub fn draw_flowfield(
 }
 
 fn draw_costfield(
-    _trigger: Trigger<DrawDebugEv>,
+    _trigger: Trigger<DrawCostFieldEv>,
     dbg: Res<DebugOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
@@ -301,16 +338,11 @@ fn draw_costfield(
 
     let base_digit_spacing = grid.cell_diameter * 0.275;
 
-    let mut instances = Vec::new();
+    let mut instances = HashMap::new();
 
     for cell_row in &grid.grid {
         for cell in cell_row.iter() {
-            let digits_vec: Vec<u32> = cell
-                .cost
-                .to_string()
-                .chars()
-                .filter_map(|c| c.to_digit(10))
-                .collect();
+            let digits_vec: Vec<u32> = cell.cost_to_vec();
 
             // Calculate spacing and scale based on digit count
             let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
@@ -331,18 +363,24 @@ fn draw_costfield(
 
             let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
 
+            let id = cell.idx_to_id(grid.grid.len());
+
+            let mut instance_data = Vec::new();
             for (i, &digit) in digits_vec.iter().enumerate() {
                 let mut offset = base_offset;
                 offset.x += x_offset + i as f32 * digit_spacing;
 
-                instances.push(debug::shader::InstanceData {
+                instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
                     digit: digit as f32,
+                    id,
                 });
             }
+
+            instances.insert(id, instance_data);
         }
     }
 
@@ -356,7 +394,7 @@ fn draw_costfield(
 }
 
 fn draw_integration_field(
-    _trigger: Trigger<DrawDebugEv>,
+    _trigger: Trigger<DrawIntegrationFieldEv>,
     dbg: Res<DebugOptions>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -382,16 +420,11 @@ fn draw_integration_field(
 
     let base_digit_spacing = grid.cell_diameter * 0.275;
 
-    let mut instances = Vec::new();
+    let mut instances = HashMap::new();
 
     for cell_row in &flowfield.grid {
         for cell in cell_row.iter() {
-            let digits_vec: Vec<u32> = cell
-                .best_cost
-                .to_string()
-                .chars()
-                .filter_map(|c| c.to_digit(10))
-                .collect();
+            let digits_vec: Vec<u32> = cell.best_cost_to_vec();
 
             // Calculate spacing and scale based on digit count
             let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
@@ -412,18 +445,24 @@ fn draw_integration_field(
 
             let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
 
+            let id = cell.idx_to_id(grid.grid.len());
+
+            let mut instance_data = Vec::new();
             for (i, &digit) in digits_vec.iter().enumerate() {
                 let mut offset = base_offset;
                 offset.x += x_offset + i as f32 * digit_spacing;
 
-                instances.push(debug::shader::InstanceData {
+                instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
                     digit: digit as f32,
+                    id,
                 });
             }
+
+            instances.insert(id, instance_data);
         }
     }
 
@@ -436,8 +475,68 @@ fn draw_integration_field(
     dbg.print("draw_integration_field() end");
 }
 
+fn update_cost(
+    trigger: Trigger<UpdateCostEv>,
+    grid: Res<Grid>,
+    mut q_instance: Query<&mut InstanceMaterialData, With<Cost>>,
+    dbg: Res<DebugOptions>,
+) {
+    let base_digit_spacing = grid.cell_diameter * 0.275;
+
+    let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::CostField);
+    let Some(base_offset) = base_offset else {
+        return;
+    };
+
+    let cell = trigger.cell;
+    let id = cell.idx_to_id(grid.grid.len());
+
+    let Ok(mut instance) = q_instance.get_single_mut() else {
+        return;
+    };
+    let Some(instance) = instance.0.get_mut(&id) else {
+        return;
+    };
+
+    let digits_vec: Vec<u32> = cell.cost_to_vec();
+
+    let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
+        grid.cell_diameter,
+        digits_vec.len(),
+        base_digit_spacing,
+        BASE_SCALE,
+    );
+
+    // Adjust marker_scale based on draw mode
+    let mut marker_scale = scale_factor;
+    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+    {
+        marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+    }
+
+    let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+
+    let mut new_instances = Vec::new();
+    for (i, &digit) in digits_vec.iter().enumerate() {
+        let mut offset = base_offset;
+        offset.x += x_offset + i as f32 * digit_spacing;
+
+        new_instances.push(debug::shader::InstanceData {
+            position: cell.world_pos + offset,
+            scale: marker_scale,
+            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
+            color: [1.0, 1.0, 1.0, 1.0],
+            digit: digit as f32,
+            id,
+        });
+    }
+
+    *instance = new_instances;
+}
+
 fn draw_index(
-    _trigger: Trigger<DrawDebugEv>,
+    _trigger: Trigger<DrawAllEv>,
     dbg: Res<DebugOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
@@ -461,18 +560,14 @@ fn draw_index(
     dbg.print("\ndraw_index() start");
 
     let base_digit_spacing = grid.cell_diameter * 0.275; // Consider moving to a constant
-    let mut instances = Vec::new();
+    let mut instances = HashMap::new();
 
     for cell_row in &grid.grid {
         for cell in cell_row.iter() {
-            let mut digits_vec: Vec<u32> = cell
-                .idx
-                .to_string()
+            let digits_vec: Vec<u32> = format!("{}{}", cell.idx.y, cell.idx.x)
                 .chars()
                 .filter_map(|c| c.to_digit(10))
                 .collect();
-
-            digits_vec.reverse();
 
             // Calculate spacing and scale based on digit count
             let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
@@ -497,18 +592,24 @@ fn draw_index(
                 0.0
             };
 
+            let mut instance_data = Vec::new();
+            let id = cell.idx_to_id(grid.grid.len());
+
             for (i, &digit) in digits_vec.iter().enumerate() {
                 let mut offset = base_offset;
                 offset.x += x_offset + i as f32 * digit_spacing;
 
-                instances.push(debug::shader::InstanceData {
+                instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
                     digit: digit as f32,
+                    id,
                 });
             }
+
+            instances.insert(id, instance_data);
         }
     }
 
@@ -582,6 +683,6 @@ fn calculate_digit_spacing_and_scale(
 
 fn detect_debug_change(mut cmds: Commands, debug: Res<DebugOptions>) {
     if debug.is_changed() {
-        cmds.trigger(DrawDebugEv);
+        cmds.trigger(DrawAllEv);
     }
 }
