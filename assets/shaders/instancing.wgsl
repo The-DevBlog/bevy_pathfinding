@@ -34,7 +34,7 @@ struct VertexInput {
     @location(3) pos_scale      : vec4<f32>, 
     @location(4) rotation       : vec4<f32>,
     @location(5) color          : vec4<f32>,
-    @location(6) digit          : i32, 
+    @location(6) texture        : i32, 
     @location(7) id             : i32, 
 };
 
@@ -46,7 +46,7 @@ struct VertexOutput {
     @builtin(position) clip_position : vec4<f32>,
     @location(0) color               : vec4<f32>,
     @location(1) uv                  : vec2<f32>,
-    @location(2) digit               : i32,
+    @location(2) texture            : i32,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +77,7 @@ fn vertex(in: VertexInput) -> VertexOutput {
     // Pass color and UV to the fragment shader
     out.color = in.color;
     out.uv = in.uv;
-    out.digit = in.digit; // Pass digit index
+    out.texture = in.texture; // Pass texture index
 
     return out;
 }
@@ -111,11 +111,11 @@ var x_sampler: sampler;
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // DIGIT ATLAS
-    if (in.digit >= 0i && in.digit < 10i) {
+    if (in.texture >= 0i && in.texture < 10i) {
         let digits_per_row = 10u; // Number of digits in the atlas
         let digit_width = 1.0 / f32(digits_per_row);
         let adjusted_uv = vec2<f32>(
-            in.uv.x * digit_width + (f32(in.digit) * digit_width),
+            in.uv.x * digit_width + (f32(in.texture) * digit_width),
             in.uv.y
         );
 
@@ -129,7 +129,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         // Multiply the texture color by the instance color, preserving alpha
         return tex_color * in.color;
     // ARROW IMG
-    } else if (in.digit == -1i) {
+    } else if (in.texture == -1i) {
         let tex_color = textureSample(arrow_texture, arrow_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {
@@ -138,7 +138,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
         return tex_color * in.color;
     // 'X' IMG
-    } else if (in.digit == -2i) {
+    } else if (in.texture == -2i) {
         let tex_color = textureSample(x_texture, x_sampler, in.uv);
 
         if (tex_color.a * in.color.a == 0.0) {

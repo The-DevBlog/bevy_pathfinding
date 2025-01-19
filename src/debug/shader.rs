@@ -60,7 +60,7 @@ pub struct InstanceData {
     pub scale: f32,
     pub rotation: [f32; 4],
     pub color: [f32; 4],
-    pub digit: i32,
+    pub texture: i32,
     pub id: i32,
 }
 

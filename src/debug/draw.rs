@@ -101,7 +101,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -3,
+            texture: -3,
         });
 
         row_instances.insert(-(row as i32), instance_data);
@@ -118,7 +118,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: -3,
+            texture: -3,
         });
 
         column_instances.insert(-(col as i32), instance_data);
@@ -157,7 +157,7 @@ pub fn draw_flowfield(
         return;
     };
 
-    let mut marker_scale = 0.7;
+    let mut marker_scale = 0.6;
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
     {
@@ -194,7 +194,7 @@ pub fn draw_flowfield(
                         scale: marker_scale,
                         rotation: Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2).into(),
                         color,
-                        digit: -2,
+                        texture: -2,
                         id,
                     });
 
@@ -213,7 +213,7 @@ pub fn draw_flowfield(
                     scale: marker_scale,
                     rotation: rotation.into(),
                     color,
-                    digit: -1,
+                    texture: -1,
                     id: id,
                 });
 
@@ -227,7 +227,7 @@ pub fn draw_flowfield(
                     scale: grid.cell_radius * 0.15 * marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color,
-                    digit: -3,
+                    texture: -3,
                     id,
                 });
 
@@ -240,7 +240,13 @@ pub fn draw_flowfield(
     if !occupied_cell_instances.is_empty() {
         cmds.spawn((
             FlowFieldMarker,
-            Mesh3d(meshes.add(Plane3d::default().mesh().size(grid.cell_diameter, grid.cell_diameter))),
+            Mesh3d(
+                meshes.add(
+                    Plane3d::default()
+                        .mesh()
+                        .size(grid.cell_diameter, grid.cell_diameter),
+                ),
+            ),
             debug::shader::InstanceMaterialData(occupied_cell_instances),
         ));
     }
@@ -321,7 +327,7 @@ fn draw_costfield(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as i32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -403,7 +409,7 @@ fn draw_integration_field(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as i32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -490,7 +496,7 @@ fn draw_index(
                     scale: marker_scale,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color: [1.0, 1.0, 1.0, 1.0],
-                    digit: digit as i32,
+                    texture: digit as i32,
                     id,
                 });
             }
@@ -560,7 +566,7 @@ fn update_cost(
             scale: marker_scale,
             rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            digit: digit as i32,
+            texture: digit as i32,
             id,
         });
     }
