@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use allocator::MeshAllocator;
 use bevy::{
     asset::embedded_asset,
@@ -18,12 +17,14 @@ use bevy::{
 use bytemuck::{Pod, Zeroable};
 use extract_resource::ExtractResource;
 use image::ImageFormat;
+use std::collections::HashMap;
 use sync_world::MainEntity;
 use texture::GpuImage;
 
 use super::resources::DebugOptions;
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/imgs/digit_atlas.png");
+const ARROW_IMG: &[u8] = include_bytes!("../../assets/imgs/arrow.png");
 
 pub struct ShaderPlugin;
 
@@ -31,6 +32,12 @@ impl Plugin for ShaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(CustomShaderPlugin);
     }
+}
+
+#[derive(Default, Resource, Clone, ExtractResource, Reflect)]
+pub struct MyAssets {
+    digit_atlas: Handle<Image>,
+    arrow_img: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -44,9 +51,19 @@ struct InstanceBuffer {
     length: usize,
 }
 
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct InstanceData {
+    pub position: Vec3,
+    pub scale: f32,
+    pub rotation: [f32; 4],
+    pub color: [f32; 4],
+    pub digit: i32,
+    pub id: i32,
+}
+
 #[derive(Component, Deref)]
 pub struct InstanceMaterialData(pub HashMap<i32, Vec<InstanceData>>);
-// pub struct InstanceMaterialData(pub HashMap<u32, InstanceData>);
 
 impl ExtractComponent for InstanceMaterialData {
     type QueryData = &'static InstanceMaterialData;
@@ -63,7 +80,7 @@ struct CustomShaderPlugin;
 impl Plugin for CustomShaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((ExtractComponentPlugin::<InstanceMaterialData>::default(),))
-            .init_resource::<Digits>()
+            .init_resource::<MyAssets>()
             .add_systems(Startup, load_digit_texture_atlas);
 
         app.sub_app_mut(RenderApp)
@@ -95,30 +112,16 @@ pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
     cmds.insert_resource(dbg.clone());
     dbg.print("\nsync_data() start");
 
-    if let Some(digits) = world.get_resource::<Digits>() {
-        cmds.insert_resource(digits.clone());
+    if let Some(assets) = world.get_resource::<MyAssets>() {
+        cmds.insert_resource(assets.clone());
     }
 
     dbg.print("sync_data() end");
 }
 
-#[derive(Default, Resource, Clone, Deref, ExtractResource, Reflect)]
-pub struct Digits(pub Handle<Image>);
-
-#[derive(Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct InstanceData {
-    pub position: Vec3,
-    pub scale: f32,
-    pub rotation: [f32; 4],
-    pub color: [f32; 4],
-    pub digit: f32,
-    pub id: i32, // this will be the concatinated idx of the cell. Ex: idx: (1, 2) -> id: 12
-}
-
 fn load_digit_texture_atlas(
     mut images: ResMut<Assets<Image>>,
-    mut digits: ResMut<Digits>,
+    mut assets: ResMut<MyAssets>,
     dbg: Res<DebugOptions>,
 ) {
     dbg.print("\nload_digit_texture_atlas() start");
@@ -129,7 +132,7 @@ fn load_digit_texture_atlas(
     let rgba_image = img.to_rgba8();
     let (width, height) = rgba_image.dimensions();
 
-    let atlas_img = Image {
+    let digit_atlas = Image {
         data: rgba_image.into_raw(),
         texture_descriptor: TextureDescriptor {
             label: Some("digit_atlas"),
@@ -150,8 +153,35 @@ fn load_digit_texture_atlas(
         asset_usage: Default::default(),
     };
 
+    let img = image::load_from_memory_with_format(ARROW_IMG, ImageFormat::Png)
+        .expect("Failed to load arrow image");
+    let rgba_image = img.to_rgba8();
+    let (width, height) = rgba_image.dimensions();
+
+    let arrow_img = Image {
+        data: rgba_image.into_raw(),
+        texture_descriptor: TextureDescriptor {
+            label: Some("arrow_img"),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            view_formats: &[],
+        },
+        sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
+        texture_view_descriptor: None,
+        asset_usage: Default::default(),
+    };
+
     // Store the atlas in the first slot of the Digits array
-    digits.0 = images.add(atlas_img); // TODO: DO I need this?
+    assets.digit_atlas = images.add(digit_atlas);
+    assets.arrow_img = images.add(arrow_img);
 
     dbg.print("load_digit_texture_atlas() end");
 }
@@ -159,7 +189,7 @@ fn load_digit_texture_atlas(
 #[allow(clippy::too_many_arguments)]
 fn queue_custom(
     mut cmds: Commands,
-    digits: Res<Digits>,
+    assets: Res<MyAssets>,
     gpu_images: Res<RenderAssets<GpuImage>>,
     transparent_3d_draw_functions: Res<DrawFunctions<Transparent3d>>,
     custom_pipeline: Res<CustomPipeline>,
@@ -208,31 +238,84 @@ fn queue_custom(
         }
     }
 
-    // In the queue_custom function, bind the atlas texture once
-    if let Some(gpu_image) = gpu_images.get(&digits.0) {
-        // Use the atlas handle
+    if let (Some(digit_gpu), Some(arrow_gpu)) = (
+        gpu_images.get(&assets.digit_atlas),
+        gpu_images.get(&assets.arrow_img),
+    ) {
         let bind_group = render_device.create_bind_group(
-            Some("digit atlas bind group"),
+            Some("digit+arrow bind group"),
             &custom_pipeline.texture_layout,
             &[
+                // digit atlas texture
                 BindGroupEntry {
                     binding: 0,
-                    resource: BindingResource::TextureView(&gpu_image.texture_view),
+                    resource: BindingResource::TextureView(&digit_gpu.texture_view),
                 },
+                // digit atlas sampler
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::Sampler(&gpu_image.sampler),
+                    resource: BindingResource::Sampler(&digit_gpu.sampler),
+                },
+    
+                // arrow texture
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::TextureView(&arrow_gpu.texture_view),
+                },
+                // arrow sampler
+                BindGroupEntry {
+                    binding: 3,
+                    resource: BindingResource::Sampler(&arrow_gpu.sampler),
                 },
             ],
         );
-
-        // Assign the bind group to all relevant entities
+    
+        // Insert the bind group for all relevant entities
         for entity in &q_entities {
             cmds.entity(entity).insert(DigitBindGroup {
                 bind_group: bind_group.clone(),
             });
         }
     }
+    
+
+    // In the queue_custom function, bind the atlas texture once
+    // if let Some(gpu_image) = gpu_images.get(&assets.digit_atlas) {
+    //     // Use the atlas handle
+    //     let bind_group = render_device.create_bind_group(
+    //         Some("digit atlas bind group"),
+    //         &custom_pipeline.texture_layout,
+    //         &[
+    //             // digit atlas texture
+    //             BindGroupEntry {
+    //                 binding: 0,
+    //                 resource: BindingResource::TextureView(&gpu_image.texture_view),
+    //             },
+    //             // digit atlas sampler
+    //             BindGroupEntry {
+    //                 binding: 1,
+    //                 resource: BindingResource::Sampler(&gpu_image.sampler),
+    //             },
+    //             // arrow img texture
+    //             BindGroupEntry {
+    //                 binding: 2,
+    //                 resource: BindingResource::TextureView(&gpu_image.texture_view),
+    //             },
+    //             // arrow img sampler
+    //             BindGroupEntry {
+    //                 binding: 3,
+    //                 resource: BindingResource::Sampler(&gpu_image.sampler),
+    //             },
+    //         ],
+    //     );
+
+    //     // Assign the bind group to all relevant entities
+    //     for entity in &q_entities {
+    //         cmds.entity(entity).insert(DigitBindGroup {
+    //             bind_group: bind_group.clone(),
+    //         });
+    //     }
+    // }
 }
 
 fn prepare_instance_buffers(
@@ -284,7 +367,7 @@ impl FromWorld for CustomPipeline {
         let texture_layout = render_device.create_bind_group_layout(
             Some("digit_texture_layout"),
             &[
-                // texture
+                // digit atlas texture
                 BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::FRAGMENT,
@@ -295,9 +378,27 @@ impl FromWorld for CustomPipeline {
                     },
                     count: None,
                 },
-                // sampler
+                // digit atlas sampler
                 BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                // arrow img texture
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // arrow img sampler
+                BindGroupLayoutEntry {
+                    binding: 3,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
@@ -345,7 +446,7 @@ impl SpecializedMeshPipeline for CustomPipeline {
                     shader_location: 5, // color
                 },
                 VertexAttribute {
-                    format: VertexFormat::Float32,
+                    format: VertexFormat::Sint32,
                     offset: VertexFormat::Float32x4.size() * 3,
                     shader_location: 6, // digit
                 },

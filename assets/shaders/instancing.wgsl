@@ -34,7 +34,7 @@ struct VertexInput {
     @location(3) pos_scale      : vec4<f32>, 
     @location(4) rotation       : vec4<f32>,
     @location(5) color          : vec4<f32>,
-    @location(6) digit          : f32, 
+    @location(6) digit          : i32, 
     @location(7) id             : i32, 
 };
 
@@ -46,7 +46,7 @@ struct VertexOutput {
     @builtin(position) clip_position : vec4<f32>,
     @location(0) color               : vec4<f32>,
     @location(1) uv                  : vec2<f32>,
-    @location(2) digit               : f32,
+    @location(2) digit               : i32,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -85,27 +85,53 @@ fn vertex(in: VertexInput) -> VertexOutput {
 
 ////////////////////////////////////////////////////////////////////////////////
 // TEXTURE BIND GROUP
-// 
-// We assume you added a third bind group layout in your pipeline descriptor:
-//   descriptor.layout = Some(vec![view_layout, mesh_layout, texture_layout])
-// So these declarations match @group(2).
 ////////////////////////////////////////////////////////////////////////////////
 
+// DIGIT ATLAS
 @group(2) @binding(0)
-var my_texture: texture_2d<f32>;
-
+var digit_atlas_texture: texture_2d<f32>;
 @group(2) @binding(1)
-var my_sampler: sampler;
+var digit_atlas_sampler: sampler;
+
+// ARROW IMG
+@group(2) @binding(2)
+var arrow_texture: texture_2d<f32>;
+@group(2) @binding(3)
+var arrow_sampler: sampler;
 
 ////////////////////////////////////////////////////////////////////////////////
 // FRAGMENT SHADER
-// 
-// We sample the texture with the mesh uv, then multiply by instance color.
 ////////////////////////////////////////////////////////////////////////////////
+
+// @fragment
+// fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+//     if (in.digit >= 0f && in.digit < 10f) { // Using u32 for digit
+//         let digits_per_row = 10u; // Number of digits in the atlas
+//         let digit_width = 1.0 / f32(digits_per_row);
+//         let adjusted_uv = vec2<f32>(
+//             in.uv.x * digit_width + (f32(in.digit) * digit_width),
+//             in.uv.y
+//         );
+// 
+//         let tex_color = textureSample(my_texture, my_sampler, adjusted_uv);
+// 
+//         // Optional: Discard pixels with zero alpha to optimize rendering
+//         if (tex_color.a * in.color.a == 0.0) {
+//             discard;
+//         }
+// 
+//         // Multiply the texture color by the instance color, preserving alpha
+//         return tex_color * in.color;
+//     } else {
+//         // If not using texture, return the instance color with its alpha
+//         return in.color;
+//     }
+// }
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    if (in.digit >= 0f && in.digit < 10f) { // Using u32 for digit
+    // If digit is 0..9, sample from the digit atlas
+    if (in.digit >= 0i && in.digit < 10i) {
         let digits_per_row = 10u; // Number of digits in the atlas
         let digit_width = 1.0 / f32(digits_per_row);
         let adjusted_uv = vec2<f32>(
@@ -113,7 +139,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
             in.uv.y
         );
 
-        let tex_color = textureSample(my_texture, my_sampler, adjusted_uv);
+        let tex_color = textureSample(digit_atlas_texture, digit_atlas_sampler, adjusted_uv);
 
         // Optional: Discard pixels with zero alpha to optimize rendering
         if (tex_color.a * in.color.a == 0.0) {
@@ -122,8 +148,15 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
         // Multiply the texture color by the instance color, preserving alpha
         return tex_color * in.color;
+    } else if (in.digit == -1i) {
+        let tex_color = textureSample(arrow_texture, arrow_sampler, in.uv);
+
+        if (tex_color.a * in.color.a == 0.0) {
+            discard;
+        }
+
+        return tex_color * in.color;
     } else {
-        // If not using texture, return the instance color with its alpha
         return in.color;
     }
 }
