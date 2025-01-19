@@ -180,17 +180,8 @@ pub fn draw_flowfield(
     let arrow_length = grid.cell_diameter * 0.6 * marker_scale;
     let arrow_width = grid.cell_diameter * 0.1 * marker_scale;
 
-    // Create the arrowhead mesh
-    // let half_arrow_size = arrow_length / 2.0;
-    // let d1 = half_arrow_size - grid.cell_diameter * 0.09;
-    // let d2 = arrow_width + grid.cell_diameter * 0.0125;
-    // let a = Vec2::new(half_arrow_size + grid.cell_diameter * 0.05, 0.0); // Tip of the arrowhead
-    // let b = Vec2::new(d1, d2);
-    // let c = Vec2::new(d1, -arrow_width - grid.cell_diameter * 0.0125);
-
     // Mesh for arrow
     let arrow_shaft_mesh = meshes.add(Plane3d::default().mesh().size(arrow_length, arrow_width));
-    // let arrow_head_mesh = meshes.add(Triangle2d::new(a, b, c));
 
     // Instance data for all arrows
     let mut arrow_instances = HashMap::new();
@@ -242,7 +233,6 @@ pub fn draw_flowfield(
 
                 let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                 let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-                // let rotation = flatten;
                 let rotation = flatten * heading;
 
                 let mut arrow_instance_data = Vec::new();
@@ -256,20 +246,6 @@ pub fn draw_flowfield(
                 });
 
                 arrow_instances.insert(id, arrow_instance_data);
-
-                // Then push this final rotation into your instance data
-                // let mut arrow_head_instance_data = Vec::new();
-                // arrow_head_instance_data.push(debug::shader::InstanceData {
-                //     position: cell.world_pos + offset,
-                //     scale: 1.0,
-                //     rotation: (rotation * Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2))
-                //         .into(),
-                //     color,
-                //     digit: -1.0,
-                //     id,
-                // });
-
-                // arrow_head_instances.insert(id, arrow_head_instance_data);
             }
 
             if is_destination_cell {
