@@ -1,6 +1,5 @@
 use bevy::{image::*, prelude::*, render::render_resource::*};
 use image::ImageFormat;
-use std::collections::HashMap;
 
 const DBG_ICON: &[u8] = include_bytes!("../../assets/imgs/dbg_icon.png");
 
@@ -8,17 +7,12 @@ pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CostMap>()
-            .init_resource::<DebugOptions>()
+        app.init_resource::<DebugOptions>()
             .init_resource::<DbgIcon>()
             .register_type::<DebugOptions>()
             .add_systems(Startup, load_dbg_icon);
     }
 }
-
-// TODO DO I need this?
-#[derive(Resource, Default)]
-pub struct CostMap(pub HashMap<IVec2, Vec<Entity>>);
 
 #[derive(Resource, Default)]
 pub struct DbgIcon(pub Handle<Image>);

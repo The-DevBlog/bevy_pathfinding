@@ -1,4 +1,4 @@
-use crate::{cell::Cell, components::Destination, utils, DrawCostFieldEv, UpdateCostEv};
+use crate::{cell::Cell, components::Destination, utils,  UpdateCostEv};
 
 use bevy::prelude::*;
 use std::collections::HashSet;
