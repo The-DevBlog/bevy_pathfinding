@@ -148,7 +148,6 @@ pub fn update_costs(
         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
             if let Some(cost) = costmap.0.get(&cell.idx_to_id(columns)) {
-                println!("UPdating cost");
                 cell.cost = *cost;
             }
 

@@ -19,6 +19,7 @@ impl Plugin for ResourcesPlugin {
 #[derive(Resource, Default)]
 pub struct ActiveDebugFlowfield(pub Option<FlowField>);
 
+// Holds the original costs for every cell in the grid
 #[derive(Resource, Default)]
 pub struct CostMap(pub HashMap<i32, u8>);
 
