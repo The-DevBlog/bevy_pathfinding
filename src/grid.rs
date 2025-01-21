@@ -1,4 +1,4 @@
-use crate::{cell::Cell, components::Destination, utils,  UpdateCostEv};
+use crate::{cell::Cell, components::Destination, utils, CostMap, UpdateCostEv};
 
 use bevy::prelude::*;
 use std::collections::HashSet;
@@ -127,6 +127,7 @@ pub fn update_costs(
     mut cmds: Commands,
     mut occupied_cells: ResMut<OccupiedCells>,
     q_units: Query<&Transform, With<Destination>>,
+    costmap: Res<CostMap>,
 ) {
     if q_units.is_empty() {
         return;
@@ -142,10 +143,14 @@ pub fn update_costs(
     }
 
     // Reset previously occupied cells that are no longer occupied
+    let columns = grid.grid.len();
     for idx in occupied_cells.0.difference(&current_occupied) {
         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
-            cell.cost = 1; // TODO This is a problem. This will reset back to 1 even if its previously at 255
+            if let Some(cost) = costmap.0.get(&cell.idx_to_id(columns)) {
+                println!("UPdating cost");
+                cell.cost = *cost;
+            }
 
             // Send event for cell reset to cost 1
             cmds.trigger(UpdateCostEv::new(*cell));
