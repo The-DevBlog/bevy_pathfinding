@@ -16,7 +16,7 @@ impl Plugin for ResourcesPlugin {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone)]
 pub struct ActiveDebugFlowfield(pub Option<FlowField>);
 
 // Holds the original costs for every cell in the grid

@@ -488,19 +488,14 @@ fn update_flowfield(
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
-    dbg: Res<DebugOptions>,
 ) {
-    let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::FlowField);
-    let Some(base_offset) = base_offset else {
-        return;
-    };
-
     let Some(active_flowfield) = &active_dbg_flowfield.0 else {
         return;
     };
 
-    let cell = trigger.cell;
-    let cell = active_flowfield.grid[cell.idx.y as usize][cell.idx.x as usize];
+    let cell_data = trigger.cell;
+    let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+    cell.cost = cell_data.cost;
 
     let id = cell.idx_to_id(grid.grid.len());
 
@@ -508,61 +503,23 @@ fn update_flowfield(
         return;
     };
 
-    let Some(instance) = instance.0.get_mut(&id) else {
+    let Some(instance_data) = instance.0.get_mut(&id) else {
         return;
     };
-
-    let mut marker_scale = 0.6;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = 1.0;
-    }
 
     let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
     let rotation = flatten * heading;
 
-    let mut new_instances = Vec::new();
-
-    // occupied cell
-    if cell.cost == u8::MAX {
-        // println!("Updating cell at max cost");
-        new_instances.push(debug::shader::InstanceData {
-            position: cell.world_pos + base_offset,
-            scale: marker_scale,
-            rotation: flatten.into(),
-            color: [1.0, 1.0, 1.0, 1.0],
-            texture: -2,
-            id,
-        });
-    } else {
-        // println!("Updating cell to min cost");
-        new_instances.push(debug::shader::InstanceData {
-            position: cell.world_pos + base_offset,
-            scale: marker_scale,
-            rotation: rotation.into(),
-            color: [1.0, 1.0, 1.0, 1.0],
-            texture: -1,
-            id: id,
-        });
+    for instance in instance_data.iter_mut() {
+        if cell.cost == u8::MAX {
+            instance.texture = -2;
+            instance.rotation = flatten.into();
+        } else {
+            instance.texture = -1;
+            instance.rotation = rotation.into();
+        }
     }
-
-    *instance = new_instances;
-
-    // let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-    // let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-    // let rotation = flatten * heading;
-
-    // let mut arrow_instance_data = Vec::new();
-    // arrow_instance_data.push(debug::shader::InstanceData {
-    //     position: cell.world_pos + offset,
-    //     scale: marker_scale,
-    //     rotation: rotation.into(),
-    //     color,
-    //     texture: -1,
-    //     id: id,
-    // });
 }
 
 fn update_costfield(

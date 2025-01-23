@@ -1,4 +1,8 @@
-use crate::{cell::Cell, components::Destination, utils, CostMap, UpdateCostEv};
+use crate::{
+    cell::Cell,
+    components::Unit,
+    utils, CostMap, UpdateCostEv,
+};
 
 use bevy::prelude::*;
 use std::collections::HashSet;
@@ -7,8 +11,8 @@ pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<Grid>()
-            .init_resource::<OccupiedCells>()
+        app.init_resource::<OccupiedCells>()
+            .register_type::<Grid>()
             .add_event::<UpdateCostEv>()
             .add_systems(Update, update_costs.run_if(resource_exists::<Grid>));
     }
@@ -123,10 +127,10 @@ impl Grid {
 }
 
 pub fn update_costs(
+    mut occupied_cells: ResMut<OccupiedCells>,
     mut grid: ResMut<Grid>,
     mut cmds: Commands,
-    mut occupied_cells: ResMut<OccupiedCells>,
-    q_units: Query<&Transform, With<Destination>>,
+    q_units: Query<&Transform, With<Unit>>,
     costmap: Res<CostMap>,
 ) {
     if q_units.is_empty() {
@@ -138,8 +142,9 @@ pub fn update_costs(
     // Mark cells occupied by units
     for transform in q_units.iter() {
         let cell = grid.update_unit_cell_costs(transform.translation);
-        current_occupied.insert(cell.idx);
+
         cmds.trigger(UpdateCostEv::new(cell));
+        current_occupied.insert(cell.idx);
     }
 
     // Reset previously occupied cells that are no longer occupied
@@ -151,7 +156,6 @@ pub fn update_costs(
                 cell.cost = *cost;
             }
 
-            // Send event for cell reset to cost 1
             cmds.trigger(UpdateCostEv::new(*cell));
         }
     }
