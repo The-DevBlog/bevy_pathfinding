@@ -82,13 +82,13 @@ impl OptionsSet {
 }
 
 #[derive(Component, Copy, Clone)]
-pub struct Cost;
+pub struct CostMarker;
 
 #[derive(Component, Copy, Clone)]
-pub struct BestCost;
+pub struct BestCostMarker;
 
 #[derive(Component, Copy, Clone)]
-pub struct Index;
+pub struct IndexMarker;
 
 #[derive(Component, Clone, Copy)]
 pub struct FlowFieldMarker;

@@ -26,6 +26,7 @@ use super::resources::DebugOptions;
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/imgs/digit_atlas.png");
 const ARROW_IMG: &[u8] = include_bytes!("../../assets/imgs/arrow.png");
 const X_IMG: &[u8] = include_bytes!("../../assets/imgs/x.png");
+const DESTINATION_IMG: &[u8] = include_bytes!("../../assets/imgs/destination.png");
 
 pub struct ShaderPlugin;
 
@@ -40,6 +41,7 @@ pub struct MyAssets {
     digit_atlas: Handle<Image>,
     arrow_img: Handle<Image>,
     x_img: Handle<Image>,
+    destination_img: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -209,10 +211,38 @@ fn load_textures(
         asset_usage: Default::default(),
     };
 
+    // DESTINATION IMG
+    let img = image::load_from_memory_with_format(DESTINATION_IMG, ImageFormat::Png)
+    .expect("Failed to load destination image");
+    let rgba_image = img.to_rgba8();
+    let (width, height) = rgba_image.dimensions();
+
+    let destination_img = Image {
+        data: rgba_image.into_raw(),
+        texture_descriptor: TextureDescriptor {
+            label: Some("destination_img"),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Rgba8UnormSrgb,
+            usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+            view_formats: &[],
+        },
+        sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
+        texture_view_descriptor: None,
+        asset_usage: Default::default(),
+    };
+
     // Store the atlas in the first slot of the Digits array
     assets.digit_atlas = images.add(digit_atlas);
     assets.arrow_img = images.add(arrow_img);
     assets.x_img = images.add(x_img);
+    assets.destination_img = images.add(destination_img);
 
     dbg.print("load_textures() end");
 }
@@ -269,10 +299,11 @@ fn queue_custom(
         }
     }
 
-    if let (Some(digit_gpu), Some(arrow_gpu), Some(x_gpu)) = (
+    if let (Some(digit_gpu), Some(arrow_gpu), Some(x_gpu), Some(dest_gpu)) = (
         gpu_images.get(&assets.digit_atlas),
         gpu_images.get(&assets.arrow_img),
         gpu_images.get(&assets.x_img),
+        gpu_images.get(&assets.destination_img),
     ) {
         let bind_group = render_device.create_bind_group(
             Some("digit+arrow bind group"),
@@ -298,15 +329,25 @@ fn queue_custom(
                     binding: 3,
                     resource: BindingResource::Sampler(&arrow_gpu.sampler),
                 },
-                // x texture
+                // 'x' texture
                 BindGroupEntry {
                     binding: 4,
                     resource: BindingResource::TextureView(&x_gpu.texture_view),
                 },
-                // x sampler
+                // 'x' sampler
                 BindGroupEntry {
                     binding: 5,
                     resource: BindingResource::Sampler(&x_gpu.sampler),
+                },
+                // destination texture
+                BindGroupEntry {
+                    binding: 6,
+                    resource: BindingResource::TextureView(&dest_gpu.texture_view),
+                },
+                // destination sampler
+                BindGroupEntry {
+                    binding: 7,
+                    resource: BindingResource::Sampler(&dest_gpu.sampler),
                 },
             ],
         );
@@ -419,6 +460,24 @@ impl FromWorld for CustomPipeline {
                 // 'x' img sampler
                 BindGroupLayoutEntry {
                     binding: 5,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                // destination img texture
+                BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        multisampled: false,
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // destination img sampler
+                BindGroupLayoutEntry {
+                    binding: 7,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,

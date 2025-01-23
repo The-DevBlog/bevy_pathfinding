@@ -16,6 +16,9 @@ pub struct UpdateCostEv {
     pub cell: Cell,
 }
 
+#[derive(Event)]
+pub struct DrawFlowFieldEv;
+
 impl UpdateCostEv {
     pub fn new(cell: Cell) -> Self {
         Self { cell }

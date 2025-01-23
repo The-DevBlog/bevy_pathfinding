@@ -18,11 +18,12 @@ impl Plugin for DrawPlugin {
             (detect_debug_change.run_if(resource_exists::<Grid>),),
         )
         .add_observer(trigger_events)
-        .add_observer(update_cost)
+        .add_observer(update_costfield)
         .add_observer(draw_grid)
         .add_observer(set_active_dbg_flowfield)
         .add_observer(draw_costfield)
         .add_observer(draw_flowfield)
+        .add_observer(update_flowfield)
         .add_observer(draw_integration_field)
         .add_observer(draw_index);
     }
@@ -101,7 +102,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            texture: -3,
+            texture: -4,
         });
 
         row_instances.insert(-(row as i32), instance_data);
@@ -118,7 +119,7 @@ fn draw_grid(
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
-            texture: -3,
+            texture: -4,
         });
 
         column_instances.insert(-(col as i32), instance_data);
@@ -175,94 +176,62 @@ pub fn draw_flowfield(
 
     dbg.print("\ndraw_flowfield() start");
 
-    // Instance data for all arrows
-    let mut arrow_instances = HashMap::new();
-    let mut destination_instances = HashMap::new();
-    let mut occupied_cell_instances = HashMap::new();
+    let mut instances = HashMap::new();
+    let color = [1.0, 1.0, 1.0, 1.0];
 
     for cell_row in active_dbg_flowfield.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
-            let color = [1.0, 1.0, 1.0, 1.0];
             let id = cell.idx_to_id(grid.grid.len());
+
+            let mut instance_data = Vec::new();
+
+            let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+            let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+            let rotation = flatten * heading;
 
             if !is_destination_cell {
                 if cell.cost == u8::MAX {
-                    let mut occupied_cell_instance_data = Vec::new();
-                    occupied_cell_instance_data.push(debug::shader::InstanceData {
+                    instance_data.push(debug::shader::InstanceData {
                         position: cell.world_pos + offset,
                         scale: marker_scale,
-                        rotation: Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2).into(),
+                        rotation: flatten.into(),
                         color,
                         texture: -2,
                         id,
                     });
-
-                    occupied_cell_instances.insert(id, occupied_cell_instance_data);
-
-                    continue;
+                } else {
+                    instance_data.push(debug::shader::InstanceData {
+                        position: cell.world_pos + offset,
+                        scale: marker_scale,
+                        rotation: rotation.into(),
+                        color,
+                        texture: -1,
+                        id: id,
+                    });
                 }
 
-                let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-                let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-                let rotation = flatten * heading;
-
-                let mut arrow_instance_data = Vec::new();
-                arrow_instance_data.push(debug::shader::InstanceData {
+                instances.insert(id, instance_data);
+            } else {
+                instance_data.push(debug::shader::InstanceData {
                     position: cell.world_pos + offset,
-                    scale: marker_scale,
-                    rotation: rotation.into(),
-                    color,
-                    texture: -1,
-                    id: id,
-                });
-
-                arrow_instances.insert(id, arrow_instance_data);
-            }
-
-            if is_destination_cell {
-                let mut destination_instance_data = Vec::new();
-                destination_instance_data.push(debug::shader::InstanceData {
-                    position: cell.world_pos + offset,
-                    scale: grid.cell_radius * 0.15 * marker_scale,
+                    scale: marker_scale * 0.65,
                     rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
                     color,
                     texture: -3,
                     id,
                 });
 
-                destination_instances.insert(id, destination_instance_data);
+                instances.insert(id, instance_data);
             }
         }
-    }
-
-    // spawn occupied cell marker (if there are any)
-    if !occupied_cell_instances.is_empty() {
-        cmds.spawn((
-            FlowFieldMarker,
-            Mesh3d(
-                meshes.add(
-                    Plane3d::default()
-                        .mesh()
-                        .size(grid.cell_diameter, grid.cell_diameter),
-                ),
-            ),
-            debug::shader::InstanceMaterialData(occupied_cell_instances),
-        ));
     }
 
     // spawn arrow marker
     cmds.spawn((
         FlowFieldMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
-        debug::shader::InstanceMaterialData(arrow_instances),
-    ));
-
-    // spawn destination marker
-    cmds.spawn((
-        FlowFieldMarker,
-        Mesh3d(meshes.add(Circle::new(grid.cell_radius / 3.0 * marker_scale))),
-        debug::shader::InstanceMaterialData(destination_instances),
+        debug::shader::InstanceMaterialData(instances),
     ));
 
     dbg.print("draw_flowfield() end");
@@ -274,7 +243,7 @@ fn draw_costfield(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     mut cmds: Commands,
-    q_cost: Query<Entity, With<Cost>>,
+    q_cost: Query<Entity, With<CostMarker>>,
 ) {
     // Remove current cost field before rendering new one
     for cost_entity in &q_cost {
@@ -337,7 +306,7 @@ fn draw_costfield(
     }
 
     cmds.spawn((
-        Cost,
+        CostMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
     ));
@@ -350,7 +319,7 @@ fn draw_integration_field(
     dbg: Res<DebugOptions>,
     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
-    q_cost: Query<Entity, With<BestCost>>,
+    q_cost: Query<Entity, With<BestCostMarker>>,
     grid: Res<Grid>,
     mut cmds: Commands,
 ) {
@@ -419,7 +388,7 @@ fn draw_integration_field(
     }
 
     cmds.spawn((
-        BestCost,
+        BestCostMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
     ));
@@ -432,7 +401,7 @@ fn draw_index(
     dbg: Res<DebugOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
-    q_idx: Query<Entity, With<Index>>,
+    q_idx: Query<Entity, With<IndexMarker>>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -506,7 +475,7 @@ fn draw_index(
     }
 
     cmds.spawn((
-        Index,
+        IndexMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
     ));
@@ -514,13 +483,52 @@ fn draw_index(
     dbg.print("draw_index() end");
 }
 
-fn update_cost(
+fn update_flowfield(
     trigger: Trigger<UpdateCostEv>,
     grid: Res<Grid>,
-    mut q_instance: Query<&mut InstanceMaterialData, With<Cost>>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
+) {
+    let Some(active_flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
+    let cell_data = trigger.cell;
+    let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+    cell.cost = cell_data.cost;
+
+    let id = cell.idx_to_id(grid.grid.len());
+
+    let Ok(mut instance) = q_instance.get_single_mut() else {
+        return;
+    };
+
+    let Some(instance_data) = instance.0.get_mut(&id) else {
+        return;
+    };
+
+    let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+    let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+    let rotation = flatten * heading;
+
+    for instance in instance_data.iter_mut() {
+        if cell.cost == u8::MAX {
+            instance.texture = -2;
+            instance.rotation = flatten.into();
+        } else {
+            instance.texture = -1;
+            instance.rotation = rotation.into();
+        }
+    }
+}
+
+fn update_costfield(
+    trigger: Trigger<UpdateCostEv>,
+    grid: Res<Grid>,
+    mut q_instance: Query<&mut InstanceMaterialData, With<CostMarker>>,
     dbg: Res<DebugOptions>,
 ) {
-    let base_digit_spacing = grid.cell_diameter * 0.275;
+    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO move to constant
 
     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::CostField);
     let Some(base_offset) = base_offset else {
@@ -551,7 +559,7 @@ fn update_cost(
     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
     {
-        marker_scale = scale_factor * 1.25; // Adjust multiplier as needed
+        marker_scale = scale_factor * 1.25;
     }
 
     let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
