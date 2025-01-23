@@ -19,7 +19,6 @@ impl Plugin for FlowfieldPlugin {
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
-    pub cell_diameter_squared: f32,
     pub destination_cell: Cell,
     pub grid: Vec<Vec<Cell>>,
     pub size: IVec2,
@@ -31,7 +30,6 @@ impl FlowField {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.0,
-            cell_diameter_squared: (cell_radius * 2.0).squared(),
             destination_cell: Cell::default(),
             grid: Vec::default(),
             size: grid_size,
@@ -159,7 +157,7 @@ fn update_flowfields(
                 // Use squared distance for efficiency
                 let distance_squared = (destination_pos - unit_pos).length_squared();
 
-                if distance_squared < flowfield.cell_diameter_squared {
+                if distance_squared < flowfield.cell_diameter.squared() {
                     units_to_remove.push(unit_entity);
                 }
             }
