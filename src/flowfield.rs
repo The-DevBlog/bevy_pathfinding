@@ -156,14 +156,14 @@ fn update_flowfields(
 
                 // Use squared distance for efficiency
                 let distance_squared = (destination_pos - unit_pos).length_squared();
+                let cell_diamaeter_squared = flowfield.cell_diameter.squared() / 3.0; //TODO: May need adjustment
 
-                println!(
-                    "Distance squared: {} || FF cell diameter squared: {}",
-                    distance_squared,
-                    flowfield.cell_diameter.squared() / 4.0
-                );
+                // println!(
+                //     "Distance squared: {} || FF cell diameter squared: {}",
+                //     distance_squared, cell_diamaeter_squared
+                // );
 
-                if distance_squared < flowfield.cell_diameter.squared() / 4.0 {
+                if distance_squared < cell_diamaeter_squared {
                     units_to_remove.push(unit_entity);
                 }
             }
