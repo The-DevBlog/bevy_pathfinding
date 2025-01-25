@@ -1,6 +1,6 @@
 use crate::{
     cell::Cell,
-    components::Unit,
+    components::{Unit, UnitSize},
     utils, CostMap, UpdateCostEv,
 };
 
@@ -126,11 +126,49 @@ impl Grid {
     }
 }
 
+// pub fn update_costs(
+//     mut occupied_cells: ResMut<OccupiedCells>,
+//     mut grid: ResMut<Grid>,
+//     mut cmds: Commands,
+//     q_units: Query<&Transform, With<Unit>>,
+//     costmap: Res<CostMap>,
+// ) {
+//     if q_units.is_empty() {
+//         return;
+//     }
+
+//     let mut current_occupied = HashSet::new();
+
+//     // Mark cells occupied by units
+//     for transform in q_units.iter() {
+//         let cell = grid.update_unit_cell_costs(transform.translation);
+
+//         cmds.trigger(UpdateCostEv::new(cell));
+//         current_occupied.insert(cell.idx);
+//     }
+
+//     // Reset previously occupied cells that are no longer occupied
+//     let columns = grid.grid.len();
+//     for idx in occupied_cells.0.difference(&current_occupied) {
+//         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
+//             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
+//             if let Some(cost) = costmap.0.get(&cell.idx_to_id(columns)) {
+//                 cell.cost = *cost;
+//             }
+
+//             cmds.trigger(UpdateCostEv::new(*cell));
+//         }
+//     }
+
+//     // Update the occupied cells set
+//     occupied_cells.0 = current_occupied;
+// }
+
 pub fn update_costs(
     mut occupied_cells: ResMut<OccupiedCells>,
     mut grid: ResMut<Grid>,
     mut cmds: Commands,
-    q_units: Query<&Transform, With<Unit>>,
+    q_units: Query<(&Transform, &UnitSize), With<Unit>>,
     costmap: Res<CostMap>,
 ) {
     if q_units.is_empty() {
@@ -139,12 +177,43 @@ pub fn update_costs(
 
     let mut current_occupied = HashSet::new();
 
-    // Mark cells occupied by units
-    for transform in q_units.iter() {
-        let cell = grid.update_unit_cell_costs(transform.translation);
+    // Grid cell size (assumed uniform square grid)
+    let cell_size = grid.cell_diameter;
 
-        cmds.trigger(UpdateCostEv::new(cell));
-        current_occupied.insert(cell.idx);
+    // Calculate the grid offset (world position of the grid's origin)
+    let grid_offset_x = -grid.size.x as f32 * cell_size / 2.0;
+    let grid_offset_y = -grid.size.y as f32 * cell_size / 2.0;
+
+    // Mark cells occupied by units
+    for (unit_transform, unit_size) in q_units.iter() {
+        let unit_pos = unit_transform.translation;
+        let unit_extent = unit_size.0; // Define the unit's size in world space (Vec2)
+
+        // Compute the grid-aligned bounding box (AABB) of the unit
+        let min_x =
+            ((unit_pos.x - unit_extent.x / 2.0 - grid_offset_x) / cell_size).floor() as isize;
+        let max_x =
+            ((unit_pos.x + unit_extent.x / 2.0 - grid_offset_x) / cell_size).ceil() as isize - 1;
+        let min_y =
+            ((unit_pos.z - unit_extent.y / 2.0 - grid_offset_y) / cell_size).floor() as isize;
+        let max_y =
+            ((unit_pos.z + unit_extent.y / 2.0 - grid_offset_y) / cell_size).ceil() as isize - 1;
+
+        // Iterate over all cells the unit intersects
+        for x in min_x..=max_x {
+            for y in min_y..=max_y {
+                if x >= 0 && x < grid.size.x as isize && y >= 0 && y < grid.size.y as isize {
+                    let cell = grid.update_unit_cell_costs(Vec3::new(
+                        x as f32 * cell_size + grid_offset_x,
+                        0.0,
+                        y as f32 * cell_size + grid_offset_y,
+                    ));
+
+                    cmds.trigger(UpdateCostEv::new(cell));
+                    current_occupied.insert(cell.idx);
+                }
+            }
+        }
     }
 
     // Reset previously occupied cells that are no longer occupied
