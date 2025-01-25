@@ -11,8 +11,14 @@ pub struct FlowfieldPlugin;
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, update_flowfields)
+            .add_systems(Update, print_ff_count)
             .add_observer(initialize_flowfield);
     }
+}
+
+//TODO: remove
+fn print_ff_count(q: Query<&FlowField>) {
+    // println!("FF count: {}", q.iter().len());
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
@@ -157,11 +163,6 @@ fn update_flowfields(
                 // Use squared distance for efficiency
                 let distance_squared = (destination_pos - unit_pos).length_squared();
                 let cell_diamaeter_squared = flowfield.cell_diameter.squared() / 3.0; //TODO: May need adjustment
-
-                // println!(
-                //     "Distance squared: {} || FF cell diameter squared: {}",
-                //     distance_squared, cell_diamaeter_squared
-                // );
 
                 if distance_squared < cell_diamaeter_squared {
                     units_to_remove.push(unit_entity);

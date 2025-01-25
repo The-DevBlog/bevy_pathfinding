@@ -5,6 +5,7 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 use debug::shader::InstanceMaterialData;
+use flowfield::FlowField;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -15,7 +16,7 @@ impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (detect_debug_change.run_if(resource_exists::<Grid>),),
+                detect_debug_change.run_if(resource_exists::<Grid>),
         )
         .add_observer(trigger_events)
         .add_observer(update_costfield)
