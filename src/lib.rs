@@ -10,7 +10,7 @@ pub mod debug;
 pub mod events;
 pub mod flowfield;
 pub mod grid;
-mod grid_direction;
+pub mod grid_direction;
 pub mod resources;
 pub mod utils;
 
