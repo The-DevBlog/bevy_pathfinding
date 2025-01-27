@@ -14,19 +14,16 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-                detect_debug_change.run_if(resource_exists::<Grid>),
-        )
-        .add_observer(trigger_events)
-        .add_observer(update_costfield)
-        .add_observer(draw_grid)
-        .add_observer(set_active_dbg_flowfield)
-        .add_observer(draw_costfield)
-        .add_observer(draw_flowfield)
-        .add_observer(update_flowfield)
-        .add_observer(draw_integration_field)
-        .add_observer(draw_index);
+        app.add_systems(Update, detect_debug_change.run_if(resource_exists::<Grid>))
+            .add_observer(trigger_events)
+            .add_observer(update_costfield)
+            .add_observer(draw_grid)
+            .add_observer(set_active_dbg_flowfield)
+            .add_observer(draw_costfield)
+            .add_observer(draw_flowfield)
+            .add_observer(update_flowfield)
+            .add_observer(draw_integration_field)
+            .add_observer(draw_index);
     }
 }
 
@@ -83,23 +80,26 @@ fn draw_grid(
 
     dbg.print("\ndraw_grid() start");
 
-    let line_length = grid.size.x as f32 * grid.cell_diameter;
+    let line_length_x = grid.size.x as f32 * grid.cell_diameter; // Length of horizontal lines
+    let line_length_y = grid.size.y as f32 * grid.cell_diameter; // Length of vertical lines
     let mut row_instances = HashMap::new();
     let mut column_instances = HashMap::new();
 
-    let row_count = grid.grid.len() + 1;
-    let col_count = grid.grid[0].len() + 1;
+    let row_count = grid.grid.len();
+    let col_count = grid.grid[0].len();
 
-    let offset = Vec3::new(-line_length / 2.0, 0.0, -line_length / 2.0);
+    // Calculate the grid origin offset
+    let grid_origin = Vec3::new(-line_length_y / 2.0, 0.0, -line_length_x / 2.0);
 
     // Horizontal lines (rows)
-    for row in 0..row_count {
-        let y = row as f32 * grid.cell_diameter;
+    for row in 0..=row_count {
+        let z = row as f32 * grid.cell_diameter;
 
         let mut instance_data = Vec::new();
         instance_data.push(debug::shader::InstanceData {
             id: 0,
-            position: Vec3::new(line_length / 2.0, 0.1, y) + offset,
+            position: Vec3::new(0.0, 0.1, z)
+                + Vec3::new(0.0, 0.0, -(grid.cell_diameter * row_count as f32) / 2.0), // TODO: Extract logic out into Grid field
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
@@ -110,13 +110,15 @@ fn draw_grid(
     }
 
     // Vertical lines (columns)
-    for col in 0..col_count {
+    for col in 0..=col_count {
         let x = col as f32 * grid.cell_diameter;
 
         let mut instance_data = Vec::new();
         instance_data.push(debug::shader::InstanceData {
             id: 0,
-            position: Vec3::new(x, 0.1, line_length / 2.0) + offset,
+            // position: Vec3::new(x, 0.1, 0.0) + grid_origin,
+            position: Vec3::new(x, 0.1, 0.0)
+                + Vec3::new(-(grid.cell_diameter * col_count as f32) / 2.0, 0.0, 0.0),
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
@@ -126,15 +128,17 @@ fn draw_grid(
         column_instances.insert(-(col as i32), instance_data);
     }
 
+    // Spawn rows
     cmds.spawn((
         GridLine,
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(line_length, 0.2))),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(line_length_x, 0.2))),
         debug::shader::InstanceMaterialData(row_instances),
     ));
 
+    // Spawn columns
     cmds.spawn((
         GridLine,
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(0.2, line_length))),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(0.2, line_length_y))),
         debug::shader::InstanceMaterialData(column_instances),
     ));
 
