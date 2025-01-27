@@ -1,10 +1,10 @@
 use crate::{
     cell::Cell,
-    components::Unit,
+    components::{Unit, UnitSize},
     utils, CostMap, UpdateCostEv,
 };
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::primitives::Aabb};
 use std::collections::HashSet;
 
 pub struct GridPlugin;
@@ -24,7 +24,7 @@ pub struct OccupiedCells(HashSet<IVec2>);
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct Grid {
-    pub size: IVec2,
+    pub size: IVec2, // 'x' represents rows, 'y' represents columns
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
@@ -126,11 +126,12 @@ impl Grid {
     }
 }
 
+// TODO: This is not precise. It does not capture 'every' cell that a unit is currenlty intersecting with.
 pub fn update_costs(
     mut occupied_cells: ResMut<OccupiedCells>,
     mut grid: ResMut<Grid>,
     mut cmds: Commands,
-    q_units: Query<&Transform, With<Unit>>,
+    q_units: Query<(&Transform, &UnitSize), With<Unit>>,
     costmap: Res<CostMap>,
 ) {
     if q_units.is_empty() {
@@ -139,12 +140,62 @@ pub fn update_costs(
 
     let mut current_occupied = HashSet::new();
 
-    // Mark cells occupied by units
-    for transform in q_units.iter() {
-        let cell = grid.update_unit_cell_costs(transform.translation);
+    // Grid cell size (assumed uniform square grid)
+    let cell_size = grid.cell_diameter;
 
-        cmds.trigger(UpdateCostEv::new(cell));
-        current_occupied.insert(cell.idx);
+    // Calculate the grid offset (world position of the grid's origin)
+    let grid_offset_x = -grid.size.x as f32 * cell_size / 2.0;
+    let grid_offset_y = -grid.size.y as f32 * cell_size / 2.0;
+
+    // Mark cells occupied by units
+    for (unit_transform, unit_size) in q_units.iter() {
+        let unit_pos = unit_transform.translation;
+
+        // Construct an Aabb for the unit
+        let half_extent = unit_size.0 / 2.0; // Half size of the unit
+        let aabb = Aabb::from_min_max(
+            Vec3::new(
+                unit_pos.x - half_extent.x,
+                unit_pos.y - half_extent.y,
+                unit_pos.z - half_extent.y,
+            ),
+            Vec3::new(
+                unit_pos.x + half_extent.x,
+                unit_pos.y + half_extent.y,
+                unit_pos.z + half_extent.y,
+            ),
+        );
+
+        // Map AABB to grid coordinates
+        let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
+        let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
+        let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
+        let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
+
+        // Iterate over all cells the unit intersects
+        // let mut idxs = Vec::new();
+        for y in grid_min_y..=grid_max_y {
+            for x in grid_min_x..=grid_max_x {
+                if x >= 0 && x < grid.size.x as isize && y >= 0 && y < grid.size.y as isize {
+                    let cell = grid.update_unit_cell_costs(Vec3::new(
+                        x as f32 * cell_size + grid_offset_x,
+                        0.0,
+                        y as f32 * cell_size + grid_offset_y,
+                    ));
+
+                    // idxs.push(cell.idx);
+
+                    cmds.trigger(UpdateCostEv::new(cell));
+                    current_occupied.insert(cell.idx);
+                }
+            }
+        }
+
+        // print!("Unit occupying cells:");
+        // for i in idxs.iter() {
+        //     print!(" {},{} -", i.y, i.x);
+        // }
+        // println!();
     }
 
     // Reset previously occupied cells that are no longer occupied

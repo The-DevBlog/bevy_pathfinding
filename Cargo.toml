@@ -17,14 +17,3 @@ image = "0.25.5"
 
 [features]
 debug = []
-
-[profile.dev]
-opt-level = 0
-debug = true
-overflow-checks = true
-
-[profile.release]
-opt-level = 3
-debug = false
-lto = "thin"
-codegen-units = 1
