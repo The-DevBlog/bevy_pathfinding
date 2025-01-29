@@ -17,8 +17,8 @@ impl Plugin for FlowfieldPlugin {
 }
 
 //TODO: remove
-fn print_ff_count(q: Query<&FlowField>) {
-    // println!("FF count: {}", q.iter().len());
+fn print_ff_count(_q: Query<&FlowField>) {
+    // println!("FF count: {}", _q.iter().len());
 }
 
 #[derive(Component, Clone, Default, PartialEq)]
