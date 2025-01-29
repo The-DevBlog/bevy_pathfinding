@@ -88,8 +88,8 @@ fn draw_grid(
     let row_count = grid.grid.len();
     let col_count = grid.grid[0].len();
 
-    // Calculate the grid origin offset
-    let grid_origin = Vec3::new(-line_length_y / 2.0, 0.0, -line_length_x / 2.0);
+    let grid_origin_x = Vec3::new(-(grid.cell_diameter * col_count as f32) / 2.0, 0.0, 0.0);
+    let grid_origin_y = Vec3::new(0.0, 0.0, -(grid.cell_diameter * row_count as f32) / 2.0);
 
     // Horizontal lines (rows)
     for row in 0..=row_count {
@@ -98,8 +98,7 @@ fn draw_grid(
         let mut instance_data = Vec::new();
         instance_data.push(debug::shader::InstanceData {
             id: 0,
-            position: Vec3::new(0.0, 0.1, z)
-                + Vec3::new(0.0, 0.0, -(grid.cell_diameter * row_count as f32) / 2.0), // TODO: Extract logic out into Grid field
+            position: Vec3::new(0.0, 0.1, z) + grid_origin_y,
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
@@ -116,9 +115,7 @@ fn draw_grid(
         let mut instance_data = Vec::new();
         instance_data.push(debug::shader::InstanceData {
             id: 0,
-            // position: Vec3::new(x, 0.1, 0.0) + grid_origin,
-            position: Vec3::new(x, 0.1, 0.0)
-                + Vec3::new(-(grid.cell_diameter * col_count as f32) / 2.0, 0.0, 0.0),
+            position: Vec3::new(x, 0.1, 0.0) + grid_origin_x,
             scale: 1.0,
             rotation: Quat::IDENTITY.into(),
             color: [1.0, 1.0, 1.0, 1.0],
