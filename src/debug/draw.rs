@@ -5,7 +5,6 @@ use super::events::*;
 use super::resources::*;
 use crate::*;
 use debug::shader::InstanceMaterialData;
-use flowfield::FlowField;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
