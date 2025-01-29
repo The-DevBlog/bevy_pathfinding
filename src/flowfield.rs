@@ -21,7 +21,30 @@ fn print_ff_count(_q: Query<&FlowField>) {
     // println!("FF count: {}", _q.iter().len());
 }
 
+#[derive(Component)]
+pub struct Boid {
+    pub separation_weight: f32,
+    pub alignment_weight: f32,
+    pub cohesion_weight: f32,
+    pub max_speed: f32,
+    pub neighbor_radius: f32,
+}
+
+impl Default for Boid {
+    fn default() -> Self {
+        Self {
+            separation_weight: 50.0,
+            alignment_weight: 1.0,
+            cohesion_weight: 1.0,
+            max_speed: 4.0,
+            neighbor_radius: 30.0,
+        }
+    }
+}
+
+
 #[derive(Component, Clone, Default, PartialEq)]
+#[require(Boid)]
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
@@ -237,3 +260,4 @@ fn initialize_flowfield(
 
     cmds.trigger(SetActiveFlowfieldEv(Some(flowfield)));
 }
+

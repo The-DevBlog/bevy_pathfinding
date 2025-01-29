@@ -4,7 +4,7 @@ use super::components::*;
 use super::events::*;
 use super::resources::*;
 use crate::*;
-use debug::shader::InstanceMaterialData;
+// use debug::shader::InstanceMaterialData;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -15,12 +15,12 @@ impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, detect_debug_change.run_if(resource_exists::<Grid>))
             .add_observer(trigger_events)
-            .add_observer(update_costfield)
+            // .add_observer(update_costfield)
             .add_observer(draw_grid)
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
-            .add_observer(update_flowfield)
+            // .add_observer(update_flowfield)
             .add_observer(draw_integration_field)
             .add_observer(draw_index);
     }
@@ -484,104 +484,104 @@ fn draw_index(
     dbg.print("draw_index() end");
 }
 
-fn update_flowfield(
-    trigger: Trigger<UpdateCostEv>,
-    grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
-) {
-    let Some(active_flowfield) = &active_dbg_flowfield.0 else {
-        return;
-    };
+// fn update_flowfield(
+//     trigger: Trigger<UpdateCostEv>,
+//     grid: Res<Grid>,
+//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+//     mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
+// ) {
+//     let Some(active_flowfield) = &active_dbg_flowfield.0 else {
+//         return;
+//     };
 
-    let cell_data = trigger.cell;
-    let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
-    cell.cost = cell_data.cost;
+//     let cell_data = trigger.cell;
+//     let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+//     cell.cost = cell_data.cost;
 
-    let id = cell.idx_to_id(grid.grid.len());
+//     let id = cell.idx_to_id(grid.grid.len());
 
-    let Ok(mut instance) = q_instance.get_single_mut() else {
-        return;
-    };
+//     let Ok(mut instance) = q_instance.get_single_mut() else {
+//         return;
+//     };
 
-    let Some(instance_data) = instance.0.get_mut(&id) else {
-        return;
-    };
+//     let Some(instance_data) = instance.0.get_mut(&id) else {
+//         return;
+//     };
 
-    let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-    let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-    let rotation = flatten * heading;
+//     let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+//     let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+//     let rotation = flatten * heading;
 
-    for instance in instance_data.iter_mut() {
-        if cell.cost == u8::MAX {
-            instance.texture = -2;
-            instance.rotation = flatten.into();
-        } else {
-            instance.texture = -1;
-            instance.rotation = rotation.into();
-        }
-    }
-}
+//     for instance in instance_data.iter_mut() {
+//         if cell.cost == u8::MAX {
+//             instance.texture = -2;
+//             instance.rotation = flatten.into();
+//         } else {
+//             instance.texture = -1;
+//             instance.rotation = rotation.into();
+//         }
+//     }
+// }
 
-fn update_costfield(
-    trigger: Trigger<UpdateCostEv>,
-    grid: Res<Grid>,
-    mut q_instance: Query<&mut InstanceMaterialData, With<CostMarker>>,
-    dbg: Res<DebugOptions>,
-) {
-    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO move to constant
+// fn update_costfield(
+//     trigger: Trigger<UpdateCostEv>,
+//     grid: Res<Grid>,
+//     mut q_instance: Query<&mut InstanceMaterialData, With<CostMarker>>,
+//     dbg: Res<DebugOptions>,
+// ) {
+//     let base_digit_spacing = grid.cell_diameter * 0.275; // TODO move to constant
 
-    let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::CostField);
-    let Some(base_offset) = base_offset else {
-        return;
-    };
+//     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::CostField);
+//     let Some(base_offset) = base_offset else {
+//         return;
+//     };
 
-    let cell = trigger.cell;
-    let id = cell.idx_to_id(grid.grid.len());
+//     let cell = trigger.cell;
+//     let id = cell.idx_to_id(grid.grid.len());
 
-    let Ok(mut instance) = q_instance.get_single_mut() else {
-        return;
-    };
-    let Some(instance) = instance.0.get_mut(&id) else {
-        return;
-    };
+//     let Ok(mut instance) = q_instance.get_single_mut() else {
+//         return;
+//     };
+//     let Some(instance) = instance.0.get_mut(&id) else {
+//         return;
+//     };
 
-    let digits_vec: Vec<u32> = cell.cost_to_vec();
+//     let digits_vec: Vec<u32> = cell.cost_to_vec();
 
-    let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
-        grid.cell_diameter,
-        digits_vec.len(),
-        base_digit_spacing,
-        BASE_SCALE,
-    );
+//     let (digit_spacing, scale_factor) = calculate_digit_spacing_and_scale(
+//         grid.cell_diameter,
+//         digits_vec.len(),
+//         base_digit_spacing,
+//         BASE_SCALE,
+//     );
 
-    // Adjust marker_scale based on draw mode
-    let mut marker_scale = scale_factor;
-    if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
-        || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
-    {
-        marker_scale = scale_factor * 1.25;
-    }
+//     // Adjust marker_scale based on draw mode
+//     let mut marker_scale = scale_factor;
+//     if (dbg.draw_mode_1 == DrawMode::None || dbg.draw_mode_2 == DrawMode::None)
+//         || (dbg.draw_mode_1 == DrawMode::FlowField && dbg.draw_mode_2 == DrawMode::FlowField)
+//     {
+//         marker_scale = scale_factor * 1.25;
+//     }
 
-    let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
+//     let x_offset = -(digits_vec.len() as f32 - 1.0) * digit_spacing / 2.0;
 
-    let mut new_instances = Vec::new();
-    for (i, &digit) in digits_vec.iter().enumerate() {
-        let mut offset = base_offset;
-        offset.x += x_offset + i as f32 * digit_spacing;
+//     let mut new_instances = Vec::new();
+//     for (i, &digit) in digits_vec.iter().enumerate() {
+//         let mut offset = base_offset;
+//         offset.x += x_offset + i as f32 * digit_spacing;
 
-        new_instances.push(debug::shader::InstanceData {
-            position: cell.world_pos + offset,
-            scale: marker_scale,
-            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
-            color: [1.0, 1.0, 1.0, 1.0],
-            texture: digit as i32,
-            id,
-        });
-    }
+//         new_instances.push(debug::shader::InstanceData {
+//             position: cell.world_pos + offset,
+//             scale: marker_scale,
+//             rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2).into(),
+//             color: [1.0, 1.0, 1.0, 1.0],
+//             texture: digit as i32,
+//             id,
+//         });
+//     }
 
-    *instance = new_instances;
-}
+//     *instance = new_instances;
+// }
 
 fn calculate_offset(
     cell_diameter: f32,
