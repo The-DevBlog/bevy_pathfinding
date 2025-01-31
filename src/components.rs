@@ -28,11 +28,11 @@ pub struct Boid {
 impl Default for Boid {
     fn default() -> Self {
         Self {
-            separation_weight: 50.0,
+            separation_weight: 40.0,
             alignment_weight: 1.0,
             cohesion_weight: 1.0,
             max_speed: 4.0,
-            neighbor_radius: 30.0,
+            neighbor_radius: 25.0,
         }
     }
 }
