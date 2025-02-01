@@ -4,6 +4,7 @@ use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 
 pub struct FlowfieldPlugin;
@@ -31,6 +32,7 @@ pub struct FlowField {
     pub grid: Vec<Vec<Cell>>,
     pub size: IVec2,
     pub units: Vec<Entity>,
+    pub steering_map: HashMap<Entity, Vec3>
 }
 
 impl FlowField {
@@ -42,6 +44,7 @@ impl FlowField {
             grid: Vec::default(),
             size: grid_size,
             units,
+            steering_map: HashMap::new(),
         }
     }
 
