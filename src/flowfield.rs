@@ -22,29 +22,32 @@ fn print_ff_count(_q: Query<&FlowField>) {
     // println!("FF count: {}", _q.iter().len());
 }
 
-
-
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub destination_cell: Cell,
+    pub destination_radius: f32, // TODO: remove (or put into dbg only logic)
     pub grid: Vec<Vec<Cell>>,
     pub size: IVec2,
+    pub steering_map: HashMap<Entity, Vec3>,
     pub units: Vec<Entity>,
-    pub steering_map: HashMap<Entity, Vec3>
+    pub unit_has_arrived: bool,
 }
 
 impl FlowField {
-    pub fn new(cell_radius: f32, grid_size: IVec2, units: Vec<Entity>) -> Self {
+    pub fn new(cell_radius: f32, grid_size: IVec2, units: Vec<Entity>, unit_size: f32) -> Self {
         FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.0,
             destination_cell: Cell::default(),
+            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0, // TODO: remove (or put into dbg only logic)
+            destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
             grid: Vec::default(),
             size: grid_size,
-            units,
             steering_map: HashMap::new(),
+            units,
+            unit_has_arrived: false,
         }
     }
 
@@ -155,21 +158,35 @@ fn update_flowfields(
     mut cmds: Commands,
     mut q_flowfields: Query<(Entity, &mut FlowField)>,
     q_transform: Query<&Transform>,
+    q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
 ) {
     for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
         let destination_pos = flowfield.destination_cell.world_pos;
         let mut units_to_remove = Vec::new();
 
         // Identify units that need to be removed
+        let mut unit_has_arrived = flowfield.unit_has_arrived;
         for &unit_entity in flowfield.units.iter() {
             if let Ok(transform) = q_transform.get(unit_entity) {
                 let unit_pos = transform.translation;
 
                 // Use squared distance for efficiency
                 let distance_squared = (destination_pos - unit_pos).length_squared();
-                let cell_diamaeter_squared = flowfield.cell_diameter.squared() / 3.0; //TODO: May need adjustment
+                let cell_diamaeter_squared = flowfield.cell_diameter.squared(); //TODO: May need adjustment
 
-                if distance_squared < cell_diamaeter_squared {
+                let radius_squared = flowfield.destination_radius.squared(); // TODO: Remove
+                                                                             // if distance_squared < cell_diamaeter_squared {
+                                                                             //     units_to_remove.push(unit_entity);
+                                                                             // }
+
+                // how to tell if unit_has_arrived and also a unit is in the flowfield.destination_radius?
+                println!("Unit in Radius: {}", distance_squared < radius_squared);
+
+                if distance_squared < cell_diamaeter_squared
+                    || (unit_has_arrived && distance_squared < radius_squared)
+                // TODO: Remove?
+                {
+                    unit_has_arrived = true;
                     units_to_remove.push(unit_entity);
                 }
             }
@@ -181,10 +198,23 @@ fn update_flowfields(
         }
 
         if flowfield.units.len() == 0 {
+            println!("Flowfield removed");
+
+            // TODO: Remove
+            for (ent, d) in q_destination_radius.iter() {
+                if d.0 == flowfield_entity.index() {
+                    cmds.entity(ent).despawn_recursive();
+                }
+            }
+
             cmds.entity(flowfield_entity).despawn_recursive();
         }
     }
 }
+
+// TODO: Remove
+#[derive(Component)]
+pub struct DestinationRadius(pub u32);
 
 fn initialize_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
@@ -194,7 +224,10 @@ fn initialize_flowfield(
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
     q_unit_info: Query<(&Transform, &UnitSize)>,
-    q_flowfields: Query<(Entity, &FlowField)>, // Query all existing flowfields
+    q_flowfields: Query<(Entity, &FlowField)>,
+    mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
+    mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
+    q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
 ) {
     let Some(mouse_pos) = q_windows.single().cursor_position() else {
         return;
@@ -215,14 +248,20 @@ fn initialize_flowfield(
 
     // Remove existing flowfields that contain any of the units
     for (flowfield_entity, flowfield) in q_flowfields.iter() {
+        // TODO: Remove
+        for (ent, d) in q_destination_radius.iter() {
+            if d.0 == flowfield_entity.index() {
+                cmds.entity(ent).despawn_recursive();
+            }
+        }
+
         if flowfield.units.iter().any(|unit| units.contains(unit)) {
             cmds.entity(flowfield_entity).despawn_recursive();
         }
     }
 
-    let mut unit_positions = Vec::new();
-
     // Gather unit positions and sizes
+    let mut unit_positions = Vec::new();
     for &unit in &units {
         if let Ok((transform, size)) = q_unit_info.get(unit) {
             unit_positions.push((transform.translation, size.0));
@@ -233,13 +272,28 @@ fn initialize_flowfield(
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
     // Create a new flowfield
-    let mut flowfield = FlowField::new(grid.cell_radius, grid.size, units.clone());
+    let mut flowfield = FlowField::new(
+        grid.cell_radius,
+        grid.size,
+        units.clone(),
+        unit_positions[0].1.x,
+    );
     flowfield.create_integration_field(grid, destination_cell);
     flowfield.create_flowfield();
 
     // Spawn the new flowfield
-    cmds.spawn(flowfield.clone());
+    // cmds.spawn(flowfield.clone()); // TODO: Uncomment
+    let ff = cmds.spawn(flowfield.clone()).id(); // TODO: remove
+
+    // TODO: Remove
+    let mesh = Mesh3d(meshes.add(Cylinder::new(flowfield.destination_radius, 2.0)));
+    let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+    cmds.spawn((
+        DestinationRadius(ff.index()),
+        mesh,
+        material,
+        Transform::from_translation(flowfield.destination_cell.world_pos),
+    ));
 
     cmds.trigger(SetActiveFlowfieldEv(Some(flowfield)));
 }
-

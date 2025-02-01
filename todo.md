@@ -1,0 +1,2 @@
+- [ ] Units should navigate to the center of grid cell before moving to the next grid cell. Right now, they only need to 'touch' a cell, before moving to the next.
+- [ ] Look into partitioning the grid. This will drastically cut down expenses with the boid separation logic.
