@@ -22,6 +22,10 @@ fn print_ff_count(_q: Query<&FlowField>) {
     // println!("FF count: {}", _q.iter().len());
 }
 
+// TODO: Remove. This is just for visualizing the destination radius
+#[derive(Component)]
+pub struct DestinationRadius(pub u32);
+
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub cell_radius: f32,
@@ -41,8 +45,8 @@ impl FlowField {
             cell_radius,
             cell_diameter: cell_radius * 2.0,
             destination_cell: Cell::default(),
-            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0, // TODO: remove (or put into dbg only logic)
-            destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
+            destination_radius: (units.len() as f32 * unit_size).sqrt() * 4.0, // TODO: remove (or put into dbg only logic)
+            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
             grid: Vec::default(),
             size: grid_size,
             steering_map: HashMap::new(),
@@ -159,6 +163,7 @@ fn update_flowfields(
     mut q_flowfields: Query<(Entity, &mut FlowField)>,
     q_transform: Query<&Transform>,
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
+    mut q_destination: Query<&mut Destination>,
 ) {
     for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
         let destination_pos = flowfield.destination_cell.world_pos;
@@ -175,31 +180,36 @@ fn update_flowfields(
                 let cell_diamaeter_squared = flowfield.cell_diameter.squared(); //TODO: May need adjustment
 
                 let radius_squared = flowfield.destination_radius.squared(); // TODO: Remove
-                                                                             // if distance_squared < cell_diamaeter_squared {
-                                                                             //     units_to_remove.push(unit_entity);
-                                                                             // }
 
-                // how to tell if unit_has_arrived and also a unit is in the flowfield.destination_radius?
-                println!("Unit in Radius: {}", distance_squared < radius_squared);
+                // if distance_squared < cell_diamaeter_squared {
+                //     units_to_remove.push(unit_entity);
+                // }
 
                 if distance_squared < cell_diamaeter_squared
                     || (unit_has_arrived && distance_squared < radius_squared)
                 // TODO: Remove?
                 {
+                    if let Ok(mut destination) = q_destination.get_mut(unit_entity) {
+                        destination.is_moving = false;
+                    }
+
                     unit_has_arrived = true;
                     units_to_remove.push(unit_entity);
                 }
             }
         }
 
-        // Remove units from the flowfield
-        for unit in units_to_remove {
-            flowfield.remove_unit(unit, &mut cmds);
+        flowfield.unit_has_arrived = unit_has_arrived;
+
+        // Remove units from the flowfield only once all units are in the destination radius
+        // TODO: potential bug: What if a unit is destroyed before it reaches the destination radius?
+        if units_to_remove.len() == flowfield.units.len() {
+            for unit in units_to_remove {
+                flowfield.remove_unit(unit, &mut cmds);
+            }
         }
 
         if flowfield.units.len() == 0 {
-            println!("Flowfield removed");
-
             // TODO: Remove
             for (ent, d) in q_destination_radius.iter() {
                 if d.0 == flowfield_entity.index() {
@@ -211,10 +221,6 @@ fn update_flowfields(
         }
     }
 }
-
-// TODO: Remove
-#[derive(Component)]
-pub struct DestinationRadius(pub u32);
 
 fn initialize_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
