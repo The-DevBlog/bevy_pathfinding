@@ -67,20 +67,20 @@ impl FlowField {
     }
 
     // pub fn create_integration_field(&mut self, grid: ResMut<Grid>, destination_cell: Cell) {
-    pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_cell: Cell) {
+    // pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_cell: Cell) {
+    pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
         // println!("Start Integration Field Create");
 
         self.grid = grid;
 
         // Initialize the destination cell in the grid
-        let dest_idx = destination_cell.idx;
-        let dest_cell = &mut self.grid[dest_idx.y as usize][dest_idx.x as usize];
+        let dest_cell = &mut self.grid[destination_idx.y as usize][destination_idx.x as usize];
         dest_cell.cost = 0;
         dest_cell.best_cost = 0;
         self.destination_cell = dest_cell.clone();
 
         let mut cells_to_check: VecDeque<IVec2> = VecDeque::new();
-        cells_to_check.push_back(dest_idx);
+        cells_to_check.push_back(destination_idx);
 
         while let Some(cur_idx) = cells_to_check.pop_front() {
             let cur_x = cur_idx.x as usize;
@@ -196,33 +196,43 @@ fn update_flowfields(
                 if distance_squared < radius_squared && !flowfield.is_mini {
                     units_to_remove.push(unit_entity);
 
-                    let mini_grid = build_mini_grid(
+                    let (min, max) = get_min_max(
                         flowfield.destination_radius,
                         flowfield.destination_cell.world_pos,
                         &grid,
                     );
 
+                    // convert original grid idx to the mini grid idx
+                    let new_idx = IVec2::new(
+                        flowfield.destination_cell.idx.x - min.x,
+                        flowfield.destination_cell.idx.y - min.y,
+                    );
+                    // let new_idx_x = flowfield.destination_cell.idx.x - min.x;
+                    // let new_idx_y = flowfield.destination_cell.idx.y - min.y;
+
+                    let mini_grid = build_mini_grid(min.x, min.y, max.x, max.y, &grid);
                     let mini_grid_size =
                         IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
 
                     let mut mini_ff = FlowField::new(
                         flowfield.cell_diameter,
-                        // flowfield.size,
                         mini_grid_size,
                         vec![unit_entity],
                         unit_size.0.x,
                         true,
                     );
 
-                    mini_ff.create_integration_field(mini_grid, flowfield.destination_cell);
+                    mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
 
                     // TODO: Remove
+                    let mut isometry = Isometry3d::from_translation(
+                        flowfield.destination_cell.world_pos
+                            - Vec3::new(flowfield.cell_radius, 0.0, flowfield.cell_radius),
+                    );
+                    isometry.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     let cell_count = UVec2::new(mini_grid_size.x as u32, mini_grid_size.y as u32);
                     let spacing = Vec2::splat(flowfield.cell_diameter);
-                    let mut isometry =
-                        Isometry3d::from_translation(flowfield.destination_cell.world_pos);
-                    isometry.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
                     let color = Color::srgb(1.0, 0.65, 0.0);
                     gizmos.grid(isometry, cell_count, spacing, color);
                 }
@@ -253,7 +263,7 @@ fn update_flowfields(
     }
 }
 
-fn build_mini_grid(radius: f32, center: Vec3, grid: &Grid) -> Vec<Vec<Cell>> {
+fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
     let tl = center + Vec3::new(-radius, 0.0, -radius); // top left
     let tr = center + Vec3::new(radius, 0.0, -radius); // top right
     let bl = center + Vec3::new(-radius, 0.0, radius); // bottom left
@@ -270,6 +280,31 @@ fn build_mini_grid(radius: f32, center: Vec3, grid: &Grid) -> Vec<Vec<Cell>> {
     let max_x = tl.idx.x.max(tr.idx.x).max(bl.idx.x).max(br.idx.x);
     let min_y = tl.idx.y.min(tr.idx.y).min(bl.idx.y).min(br.idx.y);
     let max_y = tl.idx.y.max(tr.idx.y).max(bl.idx.y).max(br.idx.y);
+
+    let min = IVec2::new(min_x, min_y);
+    let max = IVec2::new(max_x, max_y);
+
+    (min, max)
+}
+
+fn build_mini_grid(min_x: i32, min_y: i32, max_x: i32, max_y: i32, grid: &Grid) -> Vec<Vec<Cell>> {
+    // fn build_mini_grid(radius: f32, center: Vec3, grid: &Grid) -> Vec<Vec<Cell>> {
+    // let tl = center + Vec3::new(-radius, 0.0, -radius); // top left
+    // let tr = center + Vec3::new(radius, 0.0, -radius); // top right
+    // let bl = center + Vec3::new(-radius, 0.0, radius); // bottom left
+    // let br = center + Vec3::new(radius, 0.0, radius); // bottom right
+
+    // // find cell positions
+    // let tl = grid.get_cell_from_world_position(tl);
+    // let tr = grid.get_cell_from_world_position(tr);
+    // let bl = grid.get_cell_from_world_position(bl);
+    // let br = grid.get_cell_from_world_position(br);
+
+    // // find the min and max x and y values
+    // let min_x = tl.idx.x.min(tr.idx.x).min(bl.idx.x).min(br.idx.x);
+    // let max_x = tl.idx.x.max(tr.idx.x).max(bl.idx.x).max(br.idx.x);
+    // let min_y = tl.idx.y.min(tr.idx.y).min(bl.idx.y).min(br.idx.y);
+    // let max_y = tl.idx.y.max(tr.idx.y).max(bl.idx.y).max(br.idx.y);
 
     // create a new grid
     let mut mini_grid = Vec::new();
@@ -356,7 +391,7 @@ fn initialize_flowfield(
         unit_positions[0].1.x,
         false,
     );
-    flowfield.create_integration_field(grid.grid.clone(), destination_cell);
+    flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
     flowfield.create_flowfield();
 
     // Spawn the new flowfield
@@ -439,7 +474,7 @@ fn initialize_mini_flowfield(
         unit_positions[0].1.x,
         true,
     );
-    flowfield.create_integration_field(grid.grid.clone(), destination_cell);
+    flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
     flowfield.create_flowfield();
 
     // Spawn the new flowfield
