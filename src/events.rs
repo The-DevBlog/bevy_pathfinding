@@ -6,6 +6,9 @@ use crate::{cell::Cell, flowfield::FlowField};
 pub struct InitializeFlowFieldEv(pub Vec<Entity>);
 
 #[derive(Event)]
+pub struct InitializeMiniFlowFieldEv(pub Entity);
+
+#[derive(Event)]
 pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
 
 #[derive(Event)]

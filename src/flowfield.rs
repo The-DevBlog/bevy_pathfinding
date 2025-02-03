@@ -1,5 +1,6 @@
 use crate::components::*;
 use crate::events::*;
+use crate::grid;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 use bevy::{prelude::*, window::PrimaryWindow};
@@ -18,8 +19,12 @@ impl Plugin for FlowfieldPlugin {
 }
 
 //TODO: remove
-fn print_ff_count(_q: Query<&FlowField>) {
+fn print_ff_count(_q: Query<&FlowField>, _qd: Query<&Destination>) {
+    // println!("Destinationc count: {}", _qd.iter().len());
     // println!("FF count: {}", _q.iter().len());
+    // for f in _q.iter() {
+    //     println!("FF unit count: {}", f.units.len());
+    // }
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -152,6 +157,7 @@ impl FlowField {
 
     pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
         self.units.retain(|&u| u != unit);
+        self.steering_map.retain(|&u, _| u != unit);
         cmds.entity(unit).remove::<Destination>();
     }
 }
@@ -187,6 +193,12 @@ fn update_flowfields(
         // Remove units from the flowfield only once all units are in the destination radius
         // TODO: potential bug: What if a unit is destroyed before it reaches the destination radius?
         for unit in units_to_remove {
+            for (ent, d) in q_destination_radius.iter() {
+                if d.0 == flowfield_entity.index() {
+                    cmds.entity(ent).despawn_recursive();
+                }
+            }
+
             flowfield.remove_unit(unit, &mut cmds);
         }
 
@@ -197,6 +209,107 @@ fn update_flowfields(
 }
 
 fn initialize_flowfield(
+    trigger: Trigger<InitializeFlowFieldEv>,
+    mut cmds: Commands,
+    grid: ResMut<Grid>,
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    q_map_base: Query<&GlobalTransform, With<MapBase>>,
+    q_unit_info: Query<(&Transform, &UnitSize)>,
+    mut q_flowfields: Query<(Entity, &mut FlowField)>,
+    mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
+    mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
+    q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
+) {
+    let Some(mouse_pos) = q_windows.single().cursor_position() else {
+        return;
+    };
+
+    let Ok(cam) = q_cam.get_single() else {
+        return;
+    };
+
+    let Ok(map_base) = q_map_base.get_single() else {
+        return;
+    };
+
+    let units = trigger.event().0.clone();
+    if units.is_empty() {
+        return;
+    }
+
+    // Remove existing flowfields that contain any of the units
+    for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
+        // 1) Filter out any units from `flowfield.units` that are in `units`
+        //    i.e. the ones that are about to be added to the new flowfield.
+        flowfield.units.retain(|ent| !units.contains(ent));
+        flowfield.steering_map.retain(|ent, _| !units.contains(ent));
+
+        // 2) If after removal, the flowfield is now empty, *then* despawn it.
+        if flowfield.units.is_empty() {
+            cmds.entity(flowfield_entity).despawn_recursive();
+
+            // Also remove any "destination radius" entity that references this flowfield
+            // (if that logic still applies)
+            for (ent, d) in q_destination_radius.iter() {
+                if d.0 == flowfield_entity.index() {
+                    cmds.entity(ent).despawn_recursive();
+                }
+            }
+        }
+    }
+    // for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
+    //     // TODO: Remove
+    //     for (ent, d) in q_destination_radius.iter() {
+    //         if d.0 == flowfield_entity.index() {
+    //             cmds.entity(ent).despawn_recursive();
+    //         }
+    //     }
+
+    //     if flowfield.units.iter().any(|unit| units.contains(unit)) {
+    //         cmds.entity(flowfield_entity).despawn_recursive();
+    //     }
+    // }
+
+    // Gather unit positions and sizes
+    let mut unit_positions = Vec::new();
+    for &unit in &units {
+        if let Ok((transform, size)) = q_unit_info.get(unit) {
+            unit_positions.push((transform.translation, size.0));
+        }
+    }
+
+    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
+    let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
+
+    // Create a new flowfield
+    let mut flowfield = FlowField::new(
+        grid.cell_radius,
+        grid.size,
+        units.clone(),
+        unit_positions[0].1.x,
+    );
+    flowfield.create_integration_field(grid, destination_cell);
+    flowfield.create_flowfield();
+
+    // Spawn the new flowfield
+    // cmds.spawn(flowfield.clone()); // TODO: Uncomment
+    let ff = cmds.spawn(flowfield.clone()).id(); // TODO: remove
+
+    // TODO: Remove
+    let mesh = Mesh3d(meshes.add(Cylinder::new(flowfield.destination_radius, 2.0)));
+    let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+    cmds.spawn((
+        DestinationRadius(ff.index()),
+        mesh,
+        material,
+        Transform::from_translation(flowfield.destination_cell.world_pos),
+    ));
+
+    cmds.trigger(SetActiveFlowfieldEv(Some(flowfield)));
+}
+
+fn initialize_mini_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
     grid: ResMut<Grid>,
