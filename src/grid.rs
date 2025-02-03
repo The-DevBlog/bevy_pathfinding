@@ -90,43 +90,43 @@ impl Grid {
         return cell;
     }
 
-    pub fn reset_costs(&mut self, units: Vec<(Vec3, Vec2)>) {
-        for (unit_pos, unit_size) in units.iter() {
-            let hw = unit_size.x;
-            let hh = unit_size.y;
+    // pub fn reset_costs(&mut self, units: Vec<(Vec3, Vec2)>) {
+    //     for (unit_pos, unit_size) in units.iter() {
+    //         let hw = unit_size.x;
+    //         let hh = unit_size.y;
 
-            let min_world = Vec3::new(unit_pos.x - hw, 0.0, unit_pos.y - hh);
-            let max_world = Vec3::new(unit_pos.x + hw, 0.0, unit_pos.y + hh);
+    //         let min_world = Vec3::new(unit_pos.x - hw, 0.0, unit_pos.y - hh);
+    //         let max_world = Vec3::new(unit_pos.x + hw, 0.0, unit_pos.y + hh);
 
-            let min_cell = self.get_cell_from_world_position(min_world);
-            let max_cell = self.get_cell_from_world_position(max_world);
+    //         let min_cell = self.get_cell_from_world_position(min_world);
+    //         let max_cell = self.get_cell_from_world_position(max_world);
 
-            let min_x = min_cell.idx.x.clamp(0, self.size.x as i32 - 1);
-            let max_x = max_cell.idx.x.clamp(0, self.size.x as i32 - 1);
-            let min_y = min_cell.idx.y.clamp(0, self.size.y as i32 - 1);
-            let max_y = max_cell.idx.y.clamp(0, self.size.y as i32 - 1);
+    //         let min_x = min_cell.idx.x.clamp(0, self.size.x as i32 - 1);
+    //         let max_x = max_cell.idx.x.clamp(0, self.size.x as i32 - 1);
+    //         let min_y = min_cell.idx.y.clamp(0, self.size.y as i32 - 1);
+    //         let max_y = max_cell.idx.y.clamp(0, self.size.y as i32 - 1);
 
-            for y in min_y..=max_y {
-                for x in min_x..=max_x {
-                    self.grid[y as usize][x as usize].cost = 1;
-                }
-            }
-        }
-    }
+    //         for y in min_y..=max_y {
+    //             for x in min_x..=max_x {
+    //                 self.grid[y as usize][x as usize].cost = 1;
+    //             }
+    //         }
+    //     }
+    // }
 
-    pub fn update_unit_cell_costs(&mut self, position: Vec3) -> Cell {
-        // Determine which cell the unit occupies
-        let cell = self.get_cell_from_world_position(position);
+    // pub fn update_unit_cell_costs(&mut self, position: Vec3) -> Cell {
+    //     // Determine which cell the unit occupies
+    //     let cell = self.get_cell_from_world_position(position);
 
-        // Set the cost of the cell to 255
-        if cell.idx.y < self.grid.len() as i32
-            && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
-        {
-            self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
-        }
+    //     // Set the cost of the cell to 255
+    //     if cell.idx.y < self.grid.len() as i32
+    //         && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
+    //     {
+    //         self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
+    //     }
 
-        return cell;
-    }
+    //     return cell;
+    // }
 }
 
 // TODO: This is not precise. It does not capture 'every' cell that a unit is currenlty intersecting with.
