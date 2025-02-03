@@ -36,7 +36,6 @@ pub struct FlowField {
     pub size: IVec2,
     pub steering_map: HashMap<Entity, Vec3>,
     pub units: Vec<Entity>,
-    pub unit_has_arrived: bool,
 }
 
 impl FlowField {
@@ -51,7 +50,6 @@ impl FlowField {
             size: grid_size,
             steering_map: HashMap::new(),
             units,
-            unit_has_arrived: false,
         }
     }
 
@@ -170,7 +168,6 @@ fn update_flowfields(
         let mut units_to_remove = Vec::new();
 
         // Identify units that need to be removed
-        let mut unit_has_arrived = flowfield.unit_has_arrived;
         for &unit_entity in flowfield.units.iter() {
             if let Ok(transform) = q_transform.get(unit_entity) {
                 let unit_pos = transform.translation;
@@ -181,42 +178,19 @@ fn update_flowfields(
 
                 let radius_squared = flowfield.destination_radius.squared(); // TODO: Remove
 
-                // if distance_squared < cell_diamaeter_squared {
-                //     units_to_remove.push(unit_entity);
-                // }
-
-                if distance_squared < cell_diamaeter_squared
-                    || (unit_has_arrived && distance_squared < radius_squared)
-                // TODO: Remove?
-                {
-                    if let Ok(mut destination) = q_destination.get_mut(unit_entity) {
-                        destination.is_moving = false;
-                    }
-
-                    unit_has_arrived = true;
+                if distance_squared < cell_diamaeter_squared {
                     units_to_remove.push(unit_entity);
                 }
             }
         }
 
-        flowfield.unit_has_arrived = unit_has_arrived;
-
         // Remove units from the flowfield only once all units are in the destination radius
         // TODO: potential bug: What if a unit is destroyed before it reaches the destination radius?
-        if units_to_remove.len() == flowfield.units.len() {
-            for unit in units_to_remove {
-                flowfield.remove_unit(unit, &mut cmds);
-            }
+        for unit in units_to_remove {
+            flowfield.remove_unit(unit, &mut cmds);
         }
 
         if flowfield.units.len() == 0 {
-            // TODO: Remove
-            for (ent, d) in q_destination_radius.iter() {
-                if d.0 == flowfield_entity.index() {
-                    cmds.entity(ent).despawn_recursive();
-                }
-            }
-
             cmds.entity(flowfield_entity).despawn_recursive();
         }
     }

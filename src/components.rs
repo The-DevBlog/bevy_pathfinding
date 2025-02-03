@@ -7,15 +7,7 @@ pub struct MapBase;
 pub struct GameCamera;
 
 #[derive(Component)]
-pub struct Destination {
-    pub is_moving: bool,
-}
-
-impl Default for Destination {
-    fn default() -> Self {
-        Self { is_moving: true }
-    }
-}
+pub struct Destination;
 
 #[derive(Component)]
 pub struct UnitSize(pub Vec2);
