@@ -1,9 +1,7 @@
 use crate::components::*;
 use crate::events::*;
-use crate::grid;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
-use bevy::math::VectorSpace;
 use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
 use std::collections::HashMap;
@@ -76,29 +74,30 @@ impl FlowField {
     }
 
     /// When querying a cell from world position, use the offset if this is a mini flowfield.
-    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+    pub fn get_cell_from_world_position(&self, position: Vec3) -> Cell {
+        let mut offset = None;
+        let mut position = position;
         if self.is_mini {
-            // Convert the global world_pos into the mini grid's coordinate system
-            let local_world_pos = world_pos - self.offset;
-            // utils::get_cell_from_world_position_helper(
-            //     local_world_pos,
-            //     self.size,
-            //     self.cell_diameter,
-            //     &self.grid,
-            // )
-            utils::get_cell_from_world_position_mini(
-                local_world_pos,
-                self.cell_diameter,
-                &self.grid,
-            )
+            position = position - self.offset;
         } else {
-            utils::get_cell_from_world_position_helper(
-                world_pos,
-                self.size,
-                self.cell_diameter,
-                &self.grid,
-            )
+            // Calculate the offset for the grid's top-left corner
+            let adjusted_x = position.x - (-self.size.x as f32 * self.cell_diameter / 2.0);
+            let adjusted_y = position.z - (-self.size.y as f32 * self.cell_diameter / 2.0);
+
+            // Calculate percentages within the grid
+            let percent_x = adjusted_x / (self.size.x as f32 * self.cell_diameter);
+            let percent_y = adjusted_y / (self.size.y as f32 * self.cell_diameter);
+
+            offset = Some(Vec2::new(percent_x, percent_y));
         }
+
+        utils::get_cell_from_world_position_helper_generic(
+            position,
+            self.size,
+            self.cell_diameter,
+            &self.grid,
+            offset,
+        )
     }
 
     pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
@@ -245,9 +244,9 @@ fn update_flowfields(
                     let mini_grid = build_mini_grid(min.x, min.y, max.x, max.y, &grid);
                     let mini_grid_size =
                         IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
+                    let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
 
                     // This is the global world position of the top-left cell of the mini grid.
-                    let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
                     // println!(
                     //     "Mini grid offset (top-left cell global position): {:?}, actual position: {:?}",
                     //     mini_grid_offset,
@@ -265,8 +264,6 @@ fn update_flowfields(
                     mini_ff.destination_cell = flowfield.destination_cell.clone();
                     mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
-
-                    println!("Destination: {:?}", mini_ff.destination_cell.world_pos);
 
                     // for x in flowfield.steering_map.iter() {
                     //     println!("Steering Map: {:?}", x);

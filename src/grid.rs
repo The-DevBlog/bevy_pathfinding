@@ -79,15 +79,21 @@ impl Grid {
         grid
     }
 
+    // pub fn get_cell_from_world_position(&self, world_pos: Vec3, offset: Option<Vec2>) -> Cell {
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-        let cell = utils::get_cell_from_world_position_helper(
+        utils::get_cell_from_world_position_helper(
             world_pos,
             self.size,
             self.cell_diameter,
             &self.grid,
-        );
-
-        return cell;
+        )
+        // utils::get_cell_from_world_position_helper_generic(
+        //     world_pos,
+        //     self.size,
+        //     self.cell_diameter,
+        //     &self.grid,
+        //     offset,
+        // );
     }
 
     // pub fn reset_costs(&mut self, units: Vec<(Vec3, Vec2)>) {
