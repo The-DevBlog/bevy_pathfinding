@@ -3,6 +3,7 @@ use crate::events::*;
 use crate::grid;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
+use bevy::math::VectorSpace;
 use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
 use std::collections::HashMap;
@@ -42,6 +43,7 @@ pub struct FlowField {
     pub size: IVec2,
     pub steering_map: HashMap<Entity, Vec3>,
     pub units: Vec<Entity>,
+    pub offset: Vec3, // offset of the mini grid's top-left cell in global coordinates
 }
 
 impl FlowField {
@@ -51,6 +53,7 @@ impl FlowField {
         units: Vec<Entity>,
         unit_size: f32,
         is_mini: bool,
+        offset: Vec3,
     ) -> Self {
         let steering_map: HashMap<Entity, Vec3> = units
             .iter()
@@ -68,6 +71,28 @@ impl FlowField {
             size: grid_size,
             steering_map,
             units,
+            offset,
+        }
+    }
+
+    /// When querying a cell from world position, use the offset if this is a mini flowfield.
+    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+        if self.is_mini {
+            // Convert the global world_pos into the mini grid's coordinate system
+            let local_world_pos = world_pos - self.offset;
+            utils::get_cell_from_world_position_helper(
+                local_world_pos,
+                self.size,
+                self.cell_diameter,
+                &self.grid,
+            )
+        } else {
+            utils::get_cell_from_world_position_helper(
+                world_pos,
+                self.size,
+                self.cell_diameter,
+                &self.grid,
+            )
         }
     }
 
@@ -156,21 +181,22 @@ impl FlowField {
         }
     }
 
-    pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-        let cell = utils::get_cell_from_world_position_helper(
-            world_pos,
-            self.size,
-            self.cell_diameter,
-            &self.grid,
-        );
+    // TODO: Remove? This was the original method
+    // pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
+    //     let cell = utils::get_cell_from_world_position_helper(
+    //         world_pos,
+    //         self.size,
+    //         self.cell_diameter,
+    //         &self.grid,
+    //     );
 
-        return cell;
-    }
+    //     return cell;
+    // }
 
     pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
         self.units.retain(|&u| u != unit);
         self.steering_map.retain(|&u, _| u != unit);
-        // cmds.entity(unit).remove::<Destination>();
+        // cmds.entity(unit).remove::<Destination>(); // TODO: Remove?
     }
 }
 
@@ -215,17 +241,27 @@ fn update_flowfields(
                     let mini_grid_size =
                         IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
 
+                    // This is the global world position of the top-left cell of the mini grid.
+                    let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
+                    println!(
+                        "Mini grid offset (top-left cell global position): {:?}, actual position: {:?}",
+                        mini_grid_offset,
+                        grid.grid[min.y as usize][min.x as usize].world_pos
+                    );
                     let mut mini_ff = FlowField::new(
                         flowfield.cell_diameter,
                         mini_grid_size,
                         vec![unit_entity],
                         unit_size.0.x,
                         true,
+                        mini_grid_offset,
                     );
 
                     mini_ff.destination_cell = flowfield.destination_cell.clone();
                     mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
+
+                    println!("Destination: {:?}", mini_ff.destination_cell);
 
                     // for x in flowfield.steering_map.iter() {
                     //     println!("Steering Map: {:?}", x);
@@ -237,13 +273,20 @@ fn update_flowfields(
 
                     // for y in mini_ff.grid.iter() {
                     //     for x in y.iter() {
-                    //         println!("Best Direction: {:?}", x.best_direction.vector());
+                    //         // println!("Best Direction: {:?}", x.best_direction.vector());
+                    //         println!(
+                    //             "Idx: {},{} -  Best Cost: {:?} - Best Direction: {}",
+                    //             x.idx.y,
+                    //             x.idx.x,
+                    //             x.best_cost,
+                    //             x.best_direction.vector(),
+                    //         );
                     //     }
                     // }
 
+                    cmds.spawn(mini_ff.clone());
                     // TODO: Remove: Debugging purposes
-                    cmds.trigger(SetActiveFlowfieldEv(Some(mini_ff.clone())));
-                    cmds.spawn(mini_ff);
+                    cmds.trigger(SetActiveFlowfieldEv(Some(mini_ff)));
 
                     // TODO: Remove
                     let mut isometry = Isometry3d::from_translation(
@@ -308,18 +351,16 @@ fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
 }
 
 fn build_mini_grid(min_x: i32, min_y: i32, max_x: i32, max_y: i32, grid: &Grid) -> Vec<Vec<Cell>> {
-    // create a new grid
     let mut mini_grid = Vec::new();
     for y in min_y..max_y {
         let mut row = Vec::new();
         for x in min_x..max_x {
-            let cell = grid.grid[y as usize][x as usize].clone();
+            let mut cell = grid.grid[y as usize][x as usize].clone();
+            cell.idx = IVec2::new(x - min_x, y - min_y);
             row.push(cell);
         }
         mini_grid.push(row);
     }
-
-    // return the new grid
     mini_grid
 }
 
@@ -392,6 +433,7 @@ fn initialize_flowfield(
         units.clone(),
         unit_positions[0].1.x,
         false,
+        Vec3::ZERO,
     );
     flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
     flowfield.create_flowfield();

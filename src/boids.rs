@@ -6,7 +6,7 @@ pub struct BoidsPlugin;
 
 impl Plugin for BoidsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, calculate_boid_steering);
+        // app.add_systems(Update, calculate_boid_steering);
     }
 }
 
@@ -71,7 +71,6 @@ pub fn calculate_boid_steering(
 
             // Flowfield direction
             let cell = flowfield.get_cell_from_world_position(my_pos.translation);
-            println!("Cell: {:?}", cell);
             let ff_dir_2d = cell.best_direction.vector();
 
             // Convert to 3D
