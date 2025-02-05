@@ -80,9 +80,14 @@ impl FlowField {
         if self.is_mini {
             // Convert the global world_pos into the mini grid's coordinate system
             let local_world_pos = world_pos - self.offset;
-            utils::get_cell_from_world_position_helper(
+            // utils::get_cell_from_world_position_helper(
+            //     local_world_pos,
+            //     self.size,
+            //     self.cell_diameter,
+            //     &self.grid,
+            // )
+            utils::get_cell_from_world_position_mini(
                 local_world_pos,
-                self.size,
                 self.cell_diameter,
                 &self.grid,
             )
@@ -243,11 +248,11 @@ fn update_flowfields(
 
                     // This is the global world position of the top-left cell of the mini grid.
                     let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
-                    println!(
-                        "Mini grid offset (top-left cell global position): {:?}, actual position: {:?}",
-                        mini_grid_offset,
-                        grid.grid[min.y as usize][min.x as usize].world_pos
-                    );
+                    // println!(
+                    //     "Mini grid offset (top-left cell global position): {:?}, actual position: {:?}",
+                    //     mini_grid_offset,
+                    //     grid.grid[min.y as usize][min.x as usize].world_pos
+                    // );
                     let mut mini_ff = FlowField::new(
                         flowfield.cell_diameter,
                         mini_grid_size,
@@ -261,7 +266,7 @@ fn update_flowfields(
                     mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
 
-                    println!("Destination: {:?}", mini_ff.destination_cell);
+                    println!("Destination: {:?}", mini_ff.destination_cell.world_pos);
 
                     // for x in flowfield.steering_map.iter() {
                     //     println!("Steering Map: {:?}", x);

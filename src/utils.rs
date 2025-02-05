@@ -52,3 +52,15 @@ pub fn get_cell_from_world_position_helper(
 
     grid[y][x].clone() // Swap x and y
 }
+
+pub fn get_cell_from_world_position_mini(
+    local_world_pos: Vec3, // already offset (global - mini_offset)
+    cell_diameter: f32,
+    grid: &Vec<Vec<Cell>>,
+) -> Cell {
+    let x = (local_world_pos.x / cell_diameter).floor() as usize;
+    let y = (local_world_pos.z / cell_diameter).floor() as usize;
+    let x = x.min(grid[0].len() - 1);
+    let y = y.min(grid.len() - 1);
+    grid[y][x].clone()
+}
