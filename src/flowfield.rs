@@ -52,6 +52,11 @@ impl FlowField {
         unit_size: f32,
         is_mini: bool,
     ) -> Self {
+        let steering_map: HashMap<Entity, Vec3> = units
+            .iter()
+            .map(|&unit| (unit, Vec3::ZERO)) // or use Vec3::default()
+            .collect();
+
         FlowField {
             cell_radius: cell_diameter / 2.0,
             cell_diameter,
@@ -61,13 +66,11 @@ impl FlowField {
             grid: Vec::default(),
             is_mini,
             size: grid_size,
-            steering_map: HashMap::new(),
+            steering_map,
             units,
         }
     }
 
-    // pub fn create_integration_field(&mut self, grid: ResMut<Grid>, destination_cell: Cell) {
-    // pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_cell: Cell) {
     pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
         // println!("Start Integration Field Create");
 
@@ -167,7 +170,7 @@ impl FlowField {
     pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
         self.units.retain(|&u| u != unit);
         self.steering_map.retain(|&u, _| u != unit);
-        cmds.entity(unit).remove::<Destination>();
+        // cmds.entity(unit).remove::<Destination>();
     }
 }
 
@@ -176,7 +179,7 @@ fn update_flowfields(
     mut q_flowfields: Query<(Entity, &mut FlowField)>,
     q_transform: Query<(&Transform, &UnitSize)>,
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
-    mut q_destination: Query<&mut Destination>,
+    // mut q_destination: Query<&mut Destination>,
     grid: Res<Grid>,
     mut gizmos: Gizmos,
 ) {
@@ -207,8 +210,6 @@ fn update_flowfields(
                         flowfield.destination_cell.idx.x - min.x,
                         flowfield.destination_cell.idx.y - min.y,
                     );
-                    // let new_idx_x = flowfield.destination_cell.idx.x - min.x;
-                    // let new_idx_y = flowfield.destination_cell.idx.y - min.y;
 
                     let mini_grid = build_mini_grid(min.x, min.y, max.x, max.y, &grid);
                     let mini_grid_size =
@@ -222,8 +223,27 @@ fn update_flowfields(
                         true,
                     );
 
+                    mini_ff.destination_cell = flowfield.destination_cell.clone();
                     mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
+
+                    // for x in flowfield.steering_map.iter() {
+                    //     println!("Steering Map: {:?}", x);
+                    // }
+
+                    // for x in mini_ff.steering_map.iter() {
+                    //     println!("Steering Map: {:?}", x);
+                    // }
+
+                    // for y in mini_ff.grid.iter() {
+                    //     for x in y.iter() {
+                    //         println!("Best Direction: {:?}", x.best_direction.vector());
+                    //     }
+                    // }
+
+                    // TODO: Remove: Debugging purposes
+                    cmds.trigger(SetActiveFlowfieldEv(Some(mini_ff.clone())));
+                    cmds.spawn(mini_ff);
 
                     // TODO: Remove
                     let mut isometry = Isometry3d::from_translation(
@@ -288,24 +308,6 @@ fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
 }
 
 fn build_mini_grid(min_x: i32, min_y: i32, max_x: i32, max_y: i32, grid: &Grid) -> Vec<Vec<Cell>> {
-    // fn build_mini_grid(radius: f32, center: Vec3, grid: &Grid) -> Vec<Vec<Cell>> {
-    // let tl = center + Vec3::new(-radius, 0.0, -radius); // top left
-    // let tr = center + Vec3::new(radius, 0.0, -radius); // top right
-    // let bl = center + Vec3::new(-radius, 0.0, radius); // bottom left
-    // let br = center + Vec3::new(radius, 0.0, radius); // bottom right
-
-    // // find cell positions
-    // let tl = grid.get_cell_from_world_position(tl);
-    // let tr = grid.get_cell_from_world_position(tr);
-    // let bl = grid.get_cell_from_world_position(bl);
-    // let br = grid.get_cell_from_world_position(br);
-
-    // // find the min and max x and y values
-    // let min_x = tl.idx.x.min(tr.idx.x).min(bl.idx.x).min(br.idx.x);
-    // let max_x = tl.idx.x.max(tr.idx.x).max(bl.idx.x).max(br.idx.x);
-    // let min_y = tl.idx.y.min(tr.idx.y).min(bl.idx.y).min(br.idx.y);
-    // let max_y = tl.idx.y.max(tr.idx.y).max(bl.idx.y).max(br.idx.y);
-
     // create a new grid
     let mut mini_grid = Vec::new();
     for y in min_y..max_y {
@@ -363,7 +365,7 @@ fn initialize_flowfield(
             cmds.entity(flowfield_entity).despawn_recursive();
 
             // Also remove any "destination radius" entity that references this flowfield
-            // (if that logic still applies)
+            // TODO: Remove
             for (ent, d) in q_destination_radius.iter() {
                 if d.0 == flowfield_entity.index() {
                     cmds.entity(ent).despawn_recursive();
@@ -390,89 +392,6 @@ fn initialize_flowfield(
         units.clone(),
         unit_positions[0].1.x,
         false,
-    );
-    flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
-    flowfield.create_flowfield();
-
-    // Spawn the new flowfield
-    // cmds.spawn(flowfield.clone()); // TODO: Uncomment
-    let ff = cmds.spawn(flowfield.clone()).id(); // TODO: remove
-
-    // TODO: Remove
-    let mesh = Mesh3d(meshes.add(Cylinder::new(flowfield.destination_radius, 2.0)));
-    let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-    cmds.spawn((
-        DestinationRadius(ff.index()),
-        mesh,
-        material,
-        Transform::from_translation(flowfield.destination_cell.world_pos),
-    ));
-
-    cmds.trigger(SetActiveFlowfieldEv(Some(flowfield)));
-}
-
-fn initialize_mini_flowfield(
-    trigger: Trigger<InitializeFlowFieldEv>,
-    mut cmds: Commands,
-    grid: ResMut<Grid>,
-    q_windows: Query<&Window, With<PrimaryWindow>>,
-    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
-    q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_unit_info: Query<(&Transform, &UnitSize)>,
-    q_flowfields: Query<(Entity, &FlowField)>,
-    mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
-    mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
-    q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
-) {
-    let Some(mouse_pos) = q_windows.single().cursor_position() else {
-        return;
-    };
-
-    let Ok(cam) = q_cam.get_single() else {
-        return;
-    };
-
-    let Ok(map_base) = q_map_base.get_single() else {
-        return;
-    };
-
-    let units = trigger.event().0.clone();
-    if units.is_empty() {
-        return;
-    }
-
-    // Remove existing flowfields that contain any of the units
-    for (flowfield_entity, flowfield) in q_flowfields.iter() {
-        // TODO: Remove
-        for (ent, d) in q_destination_radius.iter() {
-            if d.0 == flowfield_entity.index() {
-                cmds.entity(ent).despawn_recursive();
-            }
-        }
-
-        if flowfield.units.iter().any(|unit| units.contains(unit)) {
-            cmds.entity(flowfield_entity).despawn_recursive();
-        }
-    }
-
-    // Gather unit positions and sizes
-    let mut unit_positions = Vec::new();
-    for &unit in &units {
-        if let Ok((transform, size)) = q_unit_info.get(unit) {
-            unit_positions.push((transform.translation, size.0));
-        }
-    }
-
-    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
-    let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
-
-    // Create a new flowfield
-    let mut flowfield = FlowField::new(
-        grid.cell_diameter,
-        grid.size,
-        units.clone(),
-        unit_positions[0].1.x,
-        true,
     );
     flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
     flowfield.create_flowfield();

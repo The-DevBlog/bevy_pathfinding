@@ -403,6 +403,7 @@ fn draw_index(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -414,6 +415,10 @@ fn draw_index(
         return;
     }
 
+    let Some(ff) = &active_dbg_flowfield.0 else {
+        return;
+    };
+
     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::Index);
     let Some(base_offset) = base_offset else {
         return;
@@ -424,7 +429,9 @@ fn draw_index(
     let base_digit_spacing = grid.cell_diameter * 0.275; // Consider moving to a constant
     let mut instances = HashMap::new();
 
-    for cell_row in &grid.grid {
+    // TODO: Uncomment this back
+    // for cell_row in &grid.grid {
+    for cell_row in ff.grid.iter() {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = format!("{}{}", cell.idx.y, cell.idx.x)
                 .chars()

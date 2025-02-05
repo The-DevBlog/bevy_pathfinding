@@ -29,7 +29,6 @@ pub fn calculate_boid_steering(
         // For each boid, build neighbor list and compute boid vectors
         for (ent, pos, boid) in &relevant_boids {
             let my_pos = pos;
-            // let boid = &boid_data.boid;
 
             // Gather neighbor positions
             let mut neighbor_positions = Vec::new();
@@ -72,6 +71,7 @@ pub fn calculate_boid_steering(
 
             // Flowfield direction
             let cell = flowfield.get_cell_from_world_position(my_pos.translation);
+            println!("Cell: {:?}", cell);
             let ff_dir_2d = cell.best_direction.vector();
 
             // Convert to 3D

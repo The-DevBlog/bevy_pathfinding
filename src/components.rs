@@ -19,7 +19,7 @@ pub struct Unit;
 // separation: pushes boids away from each other
 // alignment: aligns boids with their neighbors
 // cohesion: pulls boids towards the center of their neighbors
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Boid {
     pub separation_weight: f32,
     pub alignment_weight: f32,
