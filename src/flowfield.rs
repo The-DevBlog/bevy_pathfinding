@@ -185,18 +185,6 @@ impl FlowField {
         }
     }
 
-    // TODO: Remove? This was the original method
-    // pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
-    //     let cell = utils::get_cell_from_world_position_helper(
-    //         world_pos,
-    //         self.size,
-    //         self.cell_diameter,
-    //         &self.grid,
-    //     );
-
-    //     return cell;
-    // }
-
     pub fn remove_unit(&mut self, unit: Entity, cmds: &mut Commands) {
         self.units.retain(|&u| u != unit);
         self.steering_map.retain(|&u, _| u != unit);
