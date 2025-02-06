@@ -1,11 +1,11 @@
-use crate::components::*;
-use crate::events::*;
-use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
-
 use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+
+use crate::components::*;
+use crate::events::*;
+use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 pub struct FlowfieldPlugin;
 
@@ -91,7 +91,7 @@ impl FlowField {
             offset = Some(Vec2::new(percent_x, percent_y));
         }
 
-        utils::get_cell_from_world_position_helper_generic(
+        utils::get_cell_from_world_position_helper(
             position,
             self.size,
             self.cell_diameter,
