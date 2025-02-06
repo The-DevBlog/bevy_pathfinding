@@ -204,6 +204,7 @@ fn update_flowfields(
     for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
         let destination_pos = flowfield.destination_cell.world_pos;
         let mut units_to_remove = Vec::new();
+        let radius_squared = flowfield.destination_radius.squared(); // TODO: Remove
 
         // Identify units that need to be removed
         for &unit_entity in flowfield.units.iter() {
@@ -212,7 +213,6 @@ fn update_flowfields(
 
                 // Use squared distance for efficiency
                 let distance_squared = (destination_pos - unit_pos).length_squared();
-                let radius_squared = flowfield.destination_radius.squared(); // TODO: Remove
 
                 if distance_squared < radius_squared && !flowfield.is_mini {
                     units_to_remove.push(unit_entity);
