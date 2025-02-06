@@ -199,7 +199,6 @@ fn update_flowfields(
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
     // mut q_destination: Query<&mut Destination>,
     grid: Res<Grid>,
-    mut gizmos: Gizmos,
 ) {
     for (flowfield_entity, mut flowfield) in q_flowfields.iter_mut() {
         let destination_pos = flowfield.destination_cell.world_pos;
@@ -217,50 +216,12 @@ fn update_flowfields(
                 if distance_squared < radius_squared && !flowfield.is_mini {
                     units_to_remove.push(unit_entity);
 
-                    let (min, max) = get_min_max(
-                        flowfield.destination_radius,
-                        flowfield.destination_cell.world_pos,
-                        &grid,
-                    );
-
-                    // convert original grid idx to the mini grid idx
-                    let new_idx = IVec2::new(
-                        flowfield.destination_cell.idx.x - min.x,
-                        flowfield.destination_cell.idx.y - min.y,
-                    );
-
-                    let mini_grid = build_mini_grid(min.x, min.y, max.x, max.y, &grid);
-                    let mini_grid_size =
-                        IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
-                    let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
-
-                    let mut mini_ff = FlowField::new(
-                        flowfield.cell_diameter,
-                        mini_grid_size,
-                        vec![unit_entity],
-                        unit_size.0.x,
-                        true,
-                        mini_grid_offset,
-                    );
-
-                    mini_ff.destination_cell = flowfield.destination_cell.clone();
-                    mini_ff.create_integration_field(mini_grid, new_idx);
-                    mini_ff.create_flowfield();
+                    let units = vec![unit_entity];
+                    let mini_ff = initialize_mini_flowfield(&flowfield, &grid, units, unit_size);
 
                     cmds.spawn(mini_ff.clone());
                     // TODO: Remove: Debugging purposes
                     cmds.trigger(SetActiveFlowfieldEv(Some(mini_ff)));
-
-                    // TODO: Remove
-                    let mut isometry = Isometry3d::from_translation(
-                        flowfield.destination_cell.world_pos
-                            - Vec3::new(flowfield.cell_radius, 0.0, flowfield.cell_radius),
-                    );
-                    isometry.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-                    let cell_count = UVec2::new(mini_grid_size.x as u32, mini_grid_size.y as u32);
-                    let spacing = Vec2::splat(flowfield.cell_diameter);
-                    let color = Color::srgb(1.0, 0.65, 0.0);
-                    gizmos.grid(isometry, cell_count, spacing, color);
                 }
 
                 let cell_diamaeter_squared = flowfield.cell_diameter.squared(); //TODO: May need adjustment
@@ -287,6 +248,45 @@ fn update_flowfields(
             cmds.entity(flowfield_entity).despawn_recursive();
         }
     }
+}
+
+fn initialize_mini_flowfield(
+    parent_flowfield: &FlowField,
+    grid: &Grid,
+    units: Vec<Entity>,
+    unit_size: &UnitSize,
+) -> FlowField {
+    let (min, max) = get_min_max(
+        parent_flowfield.destination_radius,
+        parent_flowfield.destination_cell.world_pos,
+        &grid,
+    );
+
+    // convert original grid idx to the mini grid idx
+    let new_idx = IVec2::new(
+        parent_flowfield.destination_cell.idx.x - min.x,
+        parent_flowfield.destination_cell.idx.y - min.y,
+    );
+
+    let mini_grid = build_mini_grid(min.x, min.y, max.x, max.y, &grid);
+    let mini_grid_size = IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
+    let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
+
+    let mut mini_ff = FlowField::new(
+        parent_flowfield.cell_diameter,
+        mini_grid_size,
+        units,
+        unit_size.0.x,
+        true,
+        mini_grid_offset,
+    );
+
+    mini_ff.destination_cell = parent_flowfield.destination_cell.clone();
+    println!("Creating mini FF");
+    mini_ff.create_integration_field(mini_grid, new_idx);
+    mini_ff.create_flowfield();
+
+    mini_ff
 }
 
 fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
