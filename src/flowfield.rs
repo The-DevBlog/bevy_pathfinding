@@ -234,12 +234,6 @@ fn update_flowfields(
                         IVec2::new(mini_grid[0].len() as i32, mini_grid.len() as i32);
                     let mini_grid_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
 
-                    // This is the global world position of the top-left cell of the mini grid.
-                    // println!(
-                    //     "Mini grid offset (top-left cell global position): {:?}, actual position: {:?}",
-                    //     mini_grid_offset,
-                    //     grid.grid[min.y as usize][min.x as usize].world_pos
-                    // );
                     let mut mini_ff = FlowField::new(
                         flowfield.cell_diameter,
                         mini_grid_size,
@@ -252,27 +246,6 @@ fn update_flowfields(
                     mini_ff.destination_cell = flowfield.destination_cell.clone();
                     mini_ff.create_integration_field(mini_grid, new_idx);
                     mini_ff.create_flowfield();
-
-                    // for x in flowfield.steering_map.iter() {
-                    //     println!("Steering Map: {:?}", x);
-                    // }
-
-                    // for x in mini_ff.steering_map.iter() {
-                    //     println!("Steering Map: {:?}", x);
-                    // }
-
-                    // for y in mini_ff.grid.iter() {
-                    //     for x in y.iter() {
-                    //         // println!("Best Direction: {:?}", x.best_direction.vector());
-                    //         println!(
-                    //             "Idx: {},{} -  Best Cost: {:?} - Best Direction: {}",
-                    //             x.idx.y,
-                    //             x.idx.x,
-                    //             x.best_cost,
-                    //             x.best_direction.vector(),
-                    //         );
-                    //     }
-                    // }
 
                     cmds.spawn(mini_ff.clone());
                     // TODO: Remove: Debugging purposes
@@ -425,6 +398,7 @@ fn initialize_flowfield(
         false,
         Vec3::ZERO,
     );
+
     flowfield.create_integration_field(grid.grid.clone(), destination_cell.idx);
     flowfield.create_flowfield();
 
