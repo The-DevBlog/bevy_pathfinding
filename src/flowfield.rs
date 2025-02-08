@@ -211,13 +211,13 @@ impl FlowField {
 
     /// When querying a cell from world position, use the offset if this is a mini flowfield.
     pub fn get_cell_from_world_position(&self, position: Vec3) -> Cell {
-        let position = position;
+        let pos = position;
         let cell_diameter = self.flowfield_props.cell_diameter;
         let size = self.flowfield_props.size;
 
         // Calculate the offset for the grid's top-left corner
-        let adjusted_x = position.x - (-size.x as f32 * cell_diameter / 2.0);
-        let adjusted_y = position.z - (-size.y as f32 * cell_diameter / 2.0);
+        let adjusted_x = pos.x - (-size.x as f32 * cell_diameter / 2.0);
+        let adjusted_y = pos.z - (-size.y as f32 * cell_diameter / 2.0);
 
         // Calculate percentages within the grid
         let percent_x = adjusted_x / (size.x as f32 * cell_diameter);
@@ -226,7 +226,7 @@ impl FlowField {
         let offset = Some(Vec2::new(percent_x, percent_y));
 
         utils::get_cell_from_world_position_helper(
-            position,
+            pos,
             size,
             cell_diameter,
             &self.flowfield_props.grid,
