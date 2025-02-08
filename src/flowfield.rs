@@ -321,43 +321,6 @@ fn update_flowfields(
     }
 }
 
-fn initialize_destination_flowfield(
-    trigger: Trigger<InitializeDestinationFlowFieldEv>,
-    grid: Res<Grid>,
-    mut q_parent_ff: Query<&mut FlowField>,
-) {
-    let parent_ff_ent = trigger.event().0.clone();
-    let Ok(mut parent_ff) = q_parent_ff.get_mut(parent_ff_ent) else {
-        return;
-    };
-
-    let (min, max) = get_min_max(
-        parent_ff.destination_radius,
-        parent_ff.destination_cell.world_pos,
-        &grid,
-    );
-
-    // convert original grid idx to the mini grid idx
-    let new_idx = IVec2::new(
-        parent_ff.destination_cell.idx.x - min.x,
-        parent_ff.destination_cell.idx.y - min.y,
-    );
-
-    let dest_ff_grid = build_destination_grid(min.x, min.y, max.x, max.y, &grid);
-    let dest_ff_size = IVec2::new(dest_ff_grid[0].len() as i32, dest_ff_grid.len() as i32);
-    let dest_ff_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
-
-    let dest_cell = parent_ff.destination_cell.clone();
-    let dest_ff = &mut parent_ff.destination_flowfield;
-    dest_ff.flowfield_props.grid = dest_ff_grid.clone();
-    dest_ff.flowfield_props.size = dest_ff_size;
-    dest_ff.flowfield_props.offset = dest_ff_offset;
-    dest_ff.destination_cell = dest_cell;
-    dest_ff.create_integration_field(dest_ff_grid, new_idx);
-    dest_ff.flowfield_props.create_flowfield();
-    dest_ff.initialized = true;
-}
-
 fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
     let tl = center + Vec3::new(-radius, 0.0, -radius); // top left
     let tr = center + Vec3::new(radius, 0.0, -radius); // top right
@@ -494,4 +457,41 @@ fn initialize_flowfield(
     ));
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
+}
+
+fn initialize_destination_flowfield(
+    trigger: Trigger<InitializeDestinationFlowFieldEv>,
+    grid: Res<Grid>,
+    mut q_parent_ff: Query<&mut FlowField>,
+) {
+    let parent_ff_ent = trigger.event().0.clone();
+    let Ok(mut parent_ff) = q_parent_ff.get_mut(parent_ff_ent) else {
+        return;
+    };
+
+    let (min, max) = get_min_max(
+        parent_ff.destination_radius,
+        parent_ff.destination_cell.world_pos,
+        &grid,
+    );
+
+    // convert original grid idx to the mini grid idx
+    let new_idx = IVec2::new(
+        parent_ff.destination_cell.idx.x - min.x,
+        parent_ff.destination_cell.idx.y - min.y,
+    );
+
+    let dest_ff_grid = build_destination_grid(min.x, min.y, max.x, max.y, &grid);
+    let dest_ff_size = IVec2::new(dest_ff_grid[0].len() as i32, dest_ff_grid.len() as i32);
+    let dest_ff_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
+
+    let dest_cell = parent_ff.destination_cell.clone();
+    let dest_ff = &mut parent_ff.destination_flowfield;
+    dest_ff.flowfield_props.grid = dest_ff_grid.clone();
+    dest_ff.flowfield_props.size = dest_ff_size;
+    dest_ff.flowfield_props.offset = dest_ff_offset;
+    dest_ff.destination_cell = dest_cell;
+    dest_ff.create_integration_field(dest_ff_grid, new_idx);
+    dest_ff.flowfield_props.create_flowfield();
+    dest_ff.initialized = true;
 }
