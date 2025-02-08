@@ -47,29 +47,27 @@ fn calculate_boid_steering(
 
         // DESTINATION FLOWFIELD
         // Filter down which boids are in this flowfield
-        if !ff.destination_flowfield.initialized {
-            continue;
-        }
+        if ff.destination_flowfield.initialized {
+            let relevant_boids: Vec<_> = boids_data
+                .iter()
+                .filter(|(ent, _, _)| ff.destination_flowfield.flowfield_props.units.contains(ent))
+                .collect();
 
-        let relevant_boids: Vec<_> = boids_data
-            .iter()
-            .filter(|(ent, _, _)| ff.destination_flowfield.flowfield_props.units.contains(ent))
-            .collect();
+            // For each boid, build neighbor list and compute boid vectors
+            for (ent, pos, boid) in &relevant_boids {
+                let dest_ff = &mut ff.destination_flowfield;
+                let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
+                let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
 
-        // For each boid, build neighbor list and compute boid vectors
-        for (ent, pos, boid) in &relevant_boids {
-            let dest_ff = &mut ff.destination_flowfield;
-            let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
-            let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
+                // Flowfield direction
+                let cell = dest_ff.get_cell_from_world_position(pos.translation);
 
-            // Flowfield direction
-            let cell = dest_ff.get_cell_from_world_position(pos.translation);
+                let computed_boids = separation + cohesion + alignment;
+                let steering = compute_steering(cell, computed_boids, boid);
 
-            let computed_boids = separation + cohesion + alignment;
-            let steering = compute_steering(cell, computed_boids, boid);
-
-            // Store in the map so we can apply it later
-            dest_ff.flowfield_props.steering_map.insert(*ent, steering);
+                // Store in the map so we can apply it later
+                dest_ff.flowfield_props.steering_map.insert(*ent, steering);
+            }
         }
     }
 }
@@ -129,7 +127,6 @@ fn gather_neighbors_positions(
     ent: &Entity,
     boid: &Boid,
 ) -> Vec<Vec3> {
-    // Gather neighbor positions
     let mut neighbor_positions = Vec::new();
     for (other_ent, other_pos, _boid) in relevant_boids.iter() {
         if *other_ent == *ent {
