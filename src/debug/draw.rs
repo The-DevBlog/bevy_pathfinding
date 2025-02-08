@@ -34,15 +34,15 @@ fn set_active_dbg_flowfield(
     mut cmds: Commands,
     mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
 ) {
-    if let Some(new_flowfield) = &trigger.event().0 {
-        if let Some(current_flowfield) = &active_dbg_flowfield.0 {
+    if let Some(new_ff) = &trigger.event().0 {
+        if let Some(current_ff) = &active_dbg_flowfield.0 {
             // Skip if the grid is the same
-            if current_flowfield.grid == new_flowfield.grid {
+            if current_ff.flowfield_props.grid == new_ff.flowfield_props.grid {
                 return;
             }
         }
         // Set the new flowfield and trigger debug draw
-        active_dbg_flowfield.0 = Some(new_flowfield.clone());
+        active_dbg_flowfield.0 = Some(new_ff.clone());
         cmds.trigger(DrawAllEv);
     } else {
         // Deactivate if there’s no new flowfield
@@ -155,7 +155,7 @@ pub fn draw_flowfield(
         cmds.entity(arrow_entity).despawn_recursive();
     }
 
-    let Some(active_dbg_flowfield) = &active_dbg_flowfield.0 else {
+    let Some(active_dbg_ff) = &active_dbg_flowfield.0 else {
         return;
     };
 
@@ -167,7 +167,7 @@ pub fn draw_flowfield(
     }
 
     let offset = calculate_offset(
-        active_dbg_flowfield.cell_diameter,
+        active_dbg_ff.flowfield_props.cell_diameter,
         &dbg,
         DrawMode::FlowField,
     );
@@ -180,9 +180,9 @@ pub fn draw_flowfield(
     let mut instances = HashMap::new();
     let color = [1.0, 1.0, 1.0, 1.0];
 
-    for cell_row in active_dbg_flowfield.grid.iter() {
+    for cell_row in active_dbg_ff.flowfield_props.grid.iter() {
         for cell in cell_row.iter() {
-            let is_destination_cell = active_dbg_flowfield.destination_cell.idx == cell.idx;
+            let is_destination_cell = active_dbg_ff.destination_cell.idx == cell.idx;
             let id = cell.idx_to_id(grid.grid.len());
 
             let mut instance_data = Vec::new();
@@ -329,11 +329,15 @@ fn draw_integration_field(
         cmds.entity(cost_entity).despawn_recursive();
     }
 
-    let Some(flowfield) = &active_dbg_flowfield.0 else {
+    let Some(ff) = &active_dbg_flowfield.0 else {
         return;
     };
 
-    let base_offset = calculate_offset(flowfield.cell_diameter, &dbg, DrawMode::IntegrationField);
+    let base_offset = calculate_offset(
+        ff.flowfield_props.cell_diameter,
+        &dbg,
+        DrawMode::IntegrationField,
+    );
     let Some(base_offset) = base_offset else {
         return;
     };
@@ -344,7 +348,7 @@ fn draw_integration_field(
 
     let mut instances = HashMap::new();
 
-    for cell_row in &flowfield.grid {
+    for cell_row in &ff.flowfield_props.grid {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = cell.best_cost_to_vec();
 
@@ -403,7 +407,7 @@ fn draw_index(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_ff: Res<ActiveDebugFlowfield>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -415,7 +419,7 @@ fn draw_index(
         return;
     }
 
-    let Some(ff) = &active_dbg_flowfield.0 else {
+    let Some(ff) = &active_dbg_ff.0 else {
         return;
     };
 
@@ -431,7 +435,7 @@ fn draw_index(
 
     // TODO: Uncomment this back
     // for cell_row in &grid.grid {
-    for cell_row in ff.grid.iter() {
+    for cell_row in ff.flowfield_props.grid.iter() {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = format!("{}{}", cell.idx.y, cell.idx.x)
                 .chars()
