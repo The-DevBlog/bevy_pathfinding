@@ -1,10 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{
-    cell::Cell,
-    components::*,
-    flowfield::{FlowField, FlowFieldProps},
-};
+use crate::{cell::Cell, components::*, flowfield::FlowField};
 
 pub struct BoidsPlugin;
 
