@@ -208,7 +208,7 @@ impl FlowField {
             destinations: Vec::new(),
             destination_grid_size: IVec2::ZERO,
             destination_cell: Cell::default(),
-            destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0,
+            destination_radius: (units.len() as f32 * unit_size).sqrt() * 5.0,
             destination_flowfields: Vec::new(),
             flowfield_props: ff_props,
         }
