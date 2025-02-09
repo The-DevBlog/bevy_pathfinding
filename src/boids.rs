@@ -41,28 +41,27 @@ fn calculate_boid_steering(
             ff.flowfield_props.steering_map.insert(*ent, steering);
         }
 
-        // DESTINATION FLOWFIELD
-        // Filter down which boids are in this flowfield
-        if ff.destination_flowfield.initialized {
+        // DESTINATION FLOWFIELDS
+        for ff in &mut ff.destination_flowfields.iter_mut() {
+            // Filter down which boids are in this flowfield
+            let units = ff.flowfield_props.units.clone();
             let relevant_boids: Vec<_> = boids_data
                 .iter()
-                .filter(|(ent, _, _)| ff.destination_flowfield.flowfield_props.units.contains(ent))
+                .filter(|(ent, _, _)| units.contains(ent))
                 .collect();
 
             // For each boid, build neighbor list and compute boid vectors
             for (ent, pos, boid) in &relevant_boids {
-                let dest_ff = &mut ff.destination_flowfield;
                 let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
                 let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
+                let computed_boids = separation + cohesion + alignment;
 
                 // Flowfield direction
-                let cell = dest_ff.get_cell_from_world_position(pos.translation);
-
-                let computed_boids = separation + cohesion + alignment;
+                let cell = ff.get_cell_from_world_position(pos.translation);
                 let steering = compute_steering(cell, computed_boids, boid);
 
                 // Store in the map so we can apply it later
-                dest_ff.flowfield_props.steering_map.insert(*ent, steering);
+                ff.flowfield_props.steering_map.insert(*ent, steering);
             }
         }
     }
@@ -103,6 +102,7 @@ fn compute_boids(neighbor_pos: Vec<Vec3>, pos: &Transform, boid: &Boid) -> (Vec3
             }
         }
         separation /= neighbor_pos.len() as f32;
+
         separation *= boid.separation_weight;
 
         // Cohesion

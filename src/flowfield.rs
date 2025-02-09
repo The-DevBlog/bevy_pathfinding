@@ -14,17 +14,31 @@ impl Plugin for FlowfieldPlugin {
         app.add_systems(Update, update_flowfields.run_if(resource_exists::<Grid>))
             .add_systems(Update, print_ff_count)
             .add_observer(initialize_flowfield)
-            .add_observer(initialize_destination_flowfield);
+            .add_observer(initialize_destination_flowfields);
     }
 }
 
 //TODO: remove
 fn print_ff_count(_q: Query<&FlowField>, _qd: Query<&Destination>) {
+    for f in _q.iter() {
+        for idx in f.destinations.iter() {
+            // println!("Destination: {}, {}", idx.y, idx.x);
+        }
+
+        if f.destination_flowfields.len() > 0 {
+            for f in f.destination_flowfields.iter() {
+                // println!("destination cell: {:?}", f.destination_cell);
+                // println!("FF unit count: {}", f.flowfield_props.units.len());
+            }
+        }
+    }
+
+    for ff in _q.iter() {
+        // println!("Parent FF unit count: {}", ff.flowfield_props.units.len());
+    }
+
     // println!("Destinationc count: {}", _qd.iter().len());
     // println!("FF count: {}", _q.iter().len());
-    // for f in _q.iter() {
-    //     println!("FF unit count: {}", f.units.len());
-    // }
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -90,11 +104,27 @@ impl FlowFieldProps {
 #[derive(Clone, Default, PartialEq)]
 pub struct DestinationFlowField {
     pub destination_cell: Cell,
-    pub initialized: bool,
     pub flowfield_props: FlowFieldProps,
 }
 
 impl DestinationFlowField {
+    pub fn new(cell_diameter: f32, grid_size: IVec2, offset: Vec3, grid: Vec<Vec<Cell>>) -> Self {
+        let ff_props = FlowFieldProps {
+            cell_radius: cell_diameter / 2.0,
+            cell_diameter,
+            grid,
+            offset,
+            size: grid_size,
+            steering_map: HashMap::new(),
+            units: Vec::new(),
+        };
+
+        DestinationFlowField {
+            destination_cell: Cell::default(),
+            flowfield_props: ff_props,
+        }
+    }
+
     /// When querying a cell from world position, use the offset if this is a mini flowfield.
     pub fn get_cell_from_world_position(&self, mut position: Vec3) -> Cell {
         let cell_diameter = self.flowfield_props.cell_diameter;
@@ -110,10 +140,8 @@ impl DestinationFlowField {
         )
     }
 
-    pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
+    pub fn create_integration_field(&mut self, destination_idx: IVec2) {
         // println!("Start Integration Field Create");
-
-        self.flowfield_props.grid = grid;
 
         // Initialize the destination cell in the grid
         let dest_cell =
@@ -165,9 +193,11 @@ impl DestinationFlowField {
 
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
+    pub destination_flowfields: Vec<DestinationFlowField>,
+    pub destination_grid_size: IVec2,
+    pub destinations: Vec<IVec2>,
     pub destination_cell: Cell,
     pub destination_radius: f32,
-    pub destination_flowfield: DestinationFlowField,
     pub flowfield_props: FlowFieldProps,
 }
 
@@ -177,13 +207,10 @@ impl FlowField {
         grid_size: IVec2,
         units: Vec<Entity>,
         unit_size: f32,
-        // is_mini: bool,
         offset: Vec3,
     ) -> Self {
-        let steering_map: HashMap<Entity, Vec3> = units
-            .iter()
-            .map(|&unit| (unit, Vec3::ZERO)) // or use Vec3::default()
-            .collect();
+        let steering_map: HashMap<Entity, Vec3> =
+            units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
         let ff_props = FlowFieldProps {
             cell_radius: cell_diameter / 2.0,
@@ -202,11 +229,99 @@ impl FlowField {
         destination_ff.flowfield_props.units = Vec::new();
 
         FlowField {
+            destinations: Vec::new(),
+            destination_grid_size: IVec2::ZERO,
             destination_cell: Cell::default(),
-            destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
-            destination_flowfield: destination_ff,
+            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
+            destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0, // TODO: remove (or put into dbg only logic)
+            destination_flowfields: Vec::new(),
             flowfield_props: ff_props,
         }
+    }
+
+    pub fn _print_idx(&self) {
+        for (i, ff) in self.destination_flowfields.iter().enumerate() {
+            println!("\nIndex Field: {}", i);
+            for y in ff.flowfield_props.grid.iter() {
+                for x in y.iter() {
+                    print!("[{},{}], ", x.idx.y, x.idx.x);
+                }
+
+                println!();
+                println!();
+            }
+
+            println!();
+        }
+    }
+
+    pub fn _print_integration_fields(&self) {
+        for (i, ff) in self.destination_flowfields.iter().enumerate() {
+            println!("\nIntegration Field: {}", i);
+            for y in ff.flowfield_props.grid.iter() {
+                for x in y.iter() {
+                    print!("{:>2}, ", x.best_cost);
+                }
+
+                println!();
+            }
+
+            println!();
+        }
+    }
+
+    pub fn _print_costfields(&self) {
+        for (i, ff) in self.destination_flowfields.iter().enumerate() {
+            println!("\nCost Field: {}", i);
+            for y in ff.flowfield_props.grid.iter() {
+                for x in y.iter() {
+                    print!("{:>2}, ", x.cost);
+                }
+
+                println!();
+            }
+
+            println!();
+        }
+    }
+
+    pub fn _print_flowfields(&self) {
+        for (i, ff) in self.destination_flowfields.iter().enumerate() {
+            println!("\nFlow Field: {}", i);
+            for y in ff.flowfield_props.grid.iter() {
+                for x in y.iter() {
+                    x.best_direction.print_short();
+                }
+
+                println!();
+            }
+
+            println!();
+        }
+    }
+
+    pub fn assign_unit_to_destination_flowfield(&mut self, unit: Entity) {
+        for ff in self.destination_flowfields.iter_mut() {
+            // Occupied. Only 1 unit per destination flowfield
+            if ff.flowfield_props.units.len() > 0 {
+                continue;
+            }
+
+            ff.flowfield_props.add_unit(unit);
+            break;
+        }
+
+        self.flowfield_props.remove_unit(unit);
+    }
+
+    pub fn create_destinations(&mut self) {
+        let mut unit_count = self.flowfield_props.units.len();
+        for ff in self.destination_flowfields.iter() {
+            unit_count += ff.flowfield_props.units.len();
+        }
+
+        let destinations = utils::build_destinations(unit_count, self.destination_grid_size);
+        self.destinations = destinations.clone();
     }
 
     /// When querying a cell from world position, use the offset if this is a mini flowfield.
@@ -287,19 +402,15 @@ impl FlowField {
     }
 }
 
-fn update_flowfields(
-    mut cmds: Commands,
-    mut q_ff: Query<(Entity, &mut FlowField)>,
-    q_transform: Query<(&Transform, &UnitSize)>,
-) {
-    for (ff_ent, mut ff) in q_ff.iter_mut() {
+fn update_flowfields(mut q_ff: Query<&mut FlowField>, q_transform: Query<&Transform>) {
+    for mut ff in q_ff.iter_mut() {
         let destination_pos = ff.destination_cell.world_pos;
         let radius_squared = ff.destination_radius.squared();
 
         let mut units_to_transfer: Vec<Entity> = Vec::new();
         // Identify units that need to be moved to the destination flowfield
         for &mut unit_ent in ff.flowfield_props.units.iter_mut() {
-            if let Ok((unit_transform, unit_size)) = q_transform.get(unit_ent) {
+            if let Ok(unit_transform) = q_transform.get(unit_ent) {
                 let unit_pos = unit_transform.translation;
 
                 // If unit is within destination radius, store the unit for FF transfer
@@ -311,12 +422,7 @@ fn update_flowfields(
         }
 
         for unit in units_to_transfer {
-            if !ff.destination_flowfield.initialized {
-                cmds.trigger(InitializeDestinationFlowFieldEv(ff_ent));
-            }
-
-            ff.flowfield_props.remove_unit(unit);
-            ff.destination_flowfield.flowfield_props.add_unit(unit);
+            ff.assign_unit_to_destination_flowfield(unit);
         }
     }
 }
@@ -345,7 +451,6 @@ fn get_min_max(radius: f32, center: Vec3, grid: &Grid) -> (IVec2, IVec2) {
     (min, max)
 }
 
-// TODO: Remove?
 fn build_destination_grid(
     min_x: i32,
     min_y: i32,
@@ -444,7 +549,8 @@ fn initialize_flowfield(
 
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
-    let ff_ent = cmds.spawn(ff.clone()).id(); // TODO: remove
+    let ff_ent = cmds.spawn((ff.clone(), Name::new("ParentFlowField"))).id();
+    cmds.trigger(InitializeDestinationFlowFieldsEv(ff_ent));
 
     // TODO: Remove
     let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
@@ -459,11 +565,13 @@ fn initialize_flowfield(
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
 }
 
-fn initialize_destination_flowfield(
-    trigger: Trigger<InitializeDestinationFlowFieldEv>,
+fn initialize_destination_flowfields(
+    trigger: Trigger<InitializeDestinationFlowFieldsEv>,
     grid: Res<Grid>,
     mut q_parent_ff: Query<&mut FlowField>,
 ) {
+    println!("\ninitialize_destination_flowfields() start");
+
     let parent_ff_ent = trigger.event().0.clone();
     let Ok(mut parent_ff) = q_parent_ff.get_mut(parent_ff_ent) else {
         return;
@@ -475,23 +583,34 @@ fn initialize_destination_flowfield(
         &grid,
     );
 
-    // convert original grid idx to the mini grid idx
-    let new_idx = IVec2::new(
-        parent_ff.destination_cell.idx.x - min.x,
-        parent_ff.destination_cell.idx.y - min.y,
-    );
-
     let dest_ff_grid = build_destination_grid(min.x, min.y, max.x, max.y, &grid);
     let dest_ff_size = IVec2::new(dest_ff_grid[0].len() as i32, dest_ff_grid.len() as i32);
     let dest_ff_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
 
-    let dest_cell = parent_ff.destination_cell.clone();
-    let dest_ff = &mut parent_ff.destination_flowfield;
-    dest_ff.flowfield_props.grid = dest_ff_grid.clone();
-    dest_ff.flowfield_props.size = dest_ff_size;
-    dest_ff.flowfield_props.offset = dest_ff_offset;
-    dest_ff.destination_cell = dest_cell;
-    dest_ff.create_integration_field(dest_ff_grid, new_idx);
-    dest_ff.flowfield_props.create_flowfield();
-    dest_ff.initialized = true;
+    parent_ff.destination_grid_size = dest_ff_size;
+    parent_ff.create_destinations();
+
+    let mut dest_ffs = Vec::new();
+    for dest_idx in parent_ff.destinations.iter() {
+        let mut dest_ff = DestinationFlowField::new(
+            grid.cell_diameter,
+            dest_ff_size,
+            dest_ff_offset,
+            dest_ff_grid.clone(),
+        );
+
+        dest_ff.create_integration_field(*dest_idx);
+        dest_ff.flowfield_props.create_flowfield();
+        dest_ffs.push(dest_ff);
+    }
+
+    parent_ff.destination_flowfields = dest_ffs;
+
+    // Debugging Purposes
+    // parent_ff._print_integration_fields();
+    // parent_ff._print_costfields();
+    // parent_ff._print_flowfields();
+    // parent_ff._print_idx();
+
+    println!("initialize_destination_flowfields() end");
 }
