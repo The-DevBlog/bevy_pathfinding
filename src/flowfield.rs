@@ -12,33 +12,9 @@ pub struct FlowfieldPlugin;
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, update_flowfields.run_if(resource_exists::<Grid>))
-            .add_systems(Update, print_ff_count)
             .add_observer(initialize_flowfield)
             .add_observer(initialize_destination_flowfields);
     }
-}
-
-//TODO: remove
-fn print_ff_count(_q: Query<&FlowField>, _qd: Query<&Destination>) {
-    for f in _q.iter() {
-        for idx in f.destinations.iter() {
-            // println!("Destination: {}, {}", idx.y, idx.x);
-        }
-
-        if f.destination_flowfields.len() > 0 {
-            for f in f.destination_flowfields.iter() {
-                // println!("destination cell: {:?}", f.destination_cell);
-                // println!("FF unit count: {}", f.flowfield_props.units.len());
-            }
-        }
-    }
-
-    for ff in _q.iter() {
-        // println!("Parent FF unit count: {}", ff.flowfield_props.units.len());
-    }
-
-    // println!("Destinationc count: {}", _qd.iter().len());
-    // println!("FF count: {}", _q.iter().len());
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -232,8 +208,7 @@ impl FlowField {
             destinations: Vec::new(),
             destination_grid_size: IVec2::ZERO,
             destination_cell: Cell::default(),
-            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 20.0, // TODO: remove (or put into dbg only logic)
-            destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0, // TODO: remove (or put into dbg only logic)
+            destination_radius: (units.len() as f32 * unit_size).sqrt() * 3.0,
             destination_flowfields: Vec::new(),
             flowfield_props: ff_props,
         }
