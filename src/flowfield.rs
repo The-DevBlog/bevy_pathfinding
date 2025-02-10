@@ -167,6 +167,14 @@ impl DestinationFlowField {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum AvgDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub destination_flowfields: Vec<DestinationFlowField>,
@@ -214,7 +222,7 @@ impl FlowField {
         }
     }
 
-    pub fn _print_idx(&self) {
+    fn _print_idx(&self) {
         for (i, ff) in self.destination_flowfields.iter().enumerate() {
             println!("\nIndex Field: {}", i);
             for y in ff.flowfield_props.grid.iter() {
@@ -230,7 +238,7 @@ impl FlowField {
         }
     }
 
-    pub fn _print_integration_fields(&self) {
+    fn _print_integration_fields(&self) {
         for (i, ff) in self.destination_flowfields.iter().enumerate() {
             println!("\nIntegration Field: {}", i);
             for y in ff.flowfield_props.grid.iter() {
@@ -245,7 +253,7 @@ impl FlowField {
         }
     }
 
-    pub fn _print_costfields(&self) {
+    fn _print_costfields(&self) {
         for (i, ff) in self.destination_flowfields.iter().enumerate() {
             println!("\nCost Field: {}", i);
             for y in ff.flowfield_props.grid.iter() {
@@ -260,7 +268,7 @@ impl FlowField {
         }
     }
 
-    pub fn _print_flowfields(&self) {
+    fn _print_flowfields(&self) {
         for (i, ff) in self.destination_flowfields.iter().enumerate() {
             println!("\nFlow Field: {}", i);
             for y in ff.flowfield_props.grid.iter() {
@@ -275,7 +283,49 @@ impl FlowField {
         }
     }
 
-    pub fn assign_unit_to_destination_flowfield(&mut self, unit: Entity) {
+    /// Get the average direction of all units relative to the parent destination.
+    /// Eg. If most units are to the right of the destination, the average direction will be Right.
+    fn get_avg_direction_from_destination(&self, q_transform: Query<&Transform>) -> AvgDirection {
+        // We'll accumulate the offset of each unit from the parent destination.
+        let mut sum_x = 0.0;
+        let mut sum_z = 0.0;
+        let mut count = 0;
+        let parent_dest = self.destination_cell.world_pos;
+        for &unit in &self.flowfield_props.units {
+            if let Ok(transform) = q_transform.get(unit) {
+                let unit_pos = transform.translation;
+                // Compute the offset along x and z relative to the destination.
+                let offset_x = unit_pos.x - parent_dest.x;
+                let offset_z = unit_pos.z - parent_dest.z;
+                sum_x += offset_x;
+                sum_z += offset_z;
+                count += 1;
+            }
+        }
+
+        // Compute the average offset.
+        let avg_x = sum_x / count as f32;
+        let avg_z = sum_z / count as f32;
+
+        // Compare the absolute averages to determine which axis is dominant.
+        if avg_x.abs() > avg_z.abs() {
+            // Horizontal dominance: decide between left or right.
+            if avg_x < 0.0 {
+                AvgDirection::Left
+            } else {
+                AvgDirection::Right
+            }
+        } else {
+            // Vertical (z axis) dominance: decide between up or down.
+            if avg_z < 0.0 {
+                AvgDirection::Down
+            } else {
+                AvgDirection::Up
+            }
+        }
+    }
+
+    fn assign_unit_to_destination_flowfield(&mut self, unit: Entity) {
         for ff in self.destination_flowfields.iter_mut() {
             // Occupied. Only 1 unit per destination flowfield
             if ff.flowfield_props.units.len() > 0 {
@@ -289,17 +339,18 @@ impl FlowField {
         self.flowfield_props.remove_unit(unit);
     }
 
-    pub fn create_destinations(&mut self) {
+    fn create_destinations(&mut self, avg_direction: AvgDirection) {
         let mut unit_count = self.flowfield_props.units.len();
         for ff in self.destination_flowfields.iter() {
             unit_count += ff.flowfield_props.units.len();
         }
 
-        let destinations = utils::build_destinations(unit_count, self.destination_grid_size);
+        let destinations =
+            utils::build_destinations(unit_count, self.destination_grid_size, avg_direction);
         self.destinations = destinations.clone();
     }
 
-    /// When querying a cell from world position, use the offset if this is a mini flowfield.
+    /// Gets the Cell at the given world position.
     pub fn get_cell_from_world_position(&self, position: Vec3) -> Cell {
         let pos = position;
         let cell_diameter = self.flowfield_props.cell_diameter;
@@ -324,7 +375,7 @@ impl FlowField {
         )
     }
 
-    pub fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
+    fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
         // println!("Start Integration Field Create");
 
         self.flowfield_props.grid = grid;
@@ -544,6 +595,7 @@ fn initialize_destination_flowfields(
     trigger: Trigger<InitializeDestinationFlowFieldsEv>,
     grid: Res<Grid>,
     mut q_parent_ff: Query<&mut FlowField>,
+    q_transform: Query<&Transform>,
 ) {
     println!("\ninitialize_destination_flowfields() start");
 
@@ -563,7 +615,8 @@ fn initialize_destination_flowfields(
     let dest_ff_offset = grid.grid[min.y as usize][min.x as usize].world_pos;
 
     parent_ff.destination_grid_size = dest_ff_size;
-    parent_ff.create_destinations();
+    let avg_direction = parent_ff.get_avg_direction_from_destination(q_transform);
+    parent_ff.create_destinations(avg_direction);
 
     let mut dest_ffs = Vec::new();
     for dest_idx in parent_ff.destinations.iter() {

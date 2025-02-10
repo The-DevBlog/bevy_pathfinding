@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::cell::Cell;
+use crate::{cell::Cell, flowfield::AvgDirection};
 
 pub fn get_world_pos(
     map_base_trans: &GlobalTransform,
@@ -48,7 +48,7 @@ pub fn get_cell_from_world_position_helper(
 }
 
 // pub fn build_destinations(x: usize, grid: Vec<Vec<i32>>) -> Vec<IVec2> {
-pub fn build_destinations(x: usize, grid: IVec2) -> Vec<IVec2> {
+pub fn build_destinations(x: usize, grid: IVec2, avg_direction: AvgDirection) -> Vec<IVec2> {
     let rows = grid.x as usize;
     let cols = grid.y as usize;
     let total = rows * cols;
@@ -107,21 +107,27 @@ pub fn build_destinations(x: usize, grid: IVec2) -> Vec<IVec2> {
         chosen.push(chosen_cell);
     }
 
-    let mut destinations = Vec::new();
+    // Convert chosen cells to IVec2.
+    let mut destinations: Vec<IVec2> = chosen
+        .into_iter()
+        .map(|(r, c)| IVec2::new(r as i32, c as i32))
+        .collect();
 
-    // Mark the chosen positions with 1's in the result grid.
-    for (r, c) in chosen {
-        destinations.push(IVec2::new(r as i32, c as i32)); // TODO: may need to swap r and c
-        result[r][c] = 1;
+    // Sort the occupied cells according to the specified fill direction.
+    match avg_direction {
+        AvgDirection::Right => destinations.sort_by(|a, b| a.x.cmp(&b.x).then(a.y.cmp(&b.y))),
+        AvgDirection::Left => destinations.sort_by(|a, b| b.x.cmp(&a.x).then(a.y.cmp(&b.y))),
+        AvgDirection::Down => destinations.sort_by(|a, b| b.y.cmp(&a.y).then(a.x.cmp(&b.x))),
+        AvgDirection::Up => destinations.sort_by(|a, b| a.y.cmp(&b.y).then(a.x.cmp(&b.x))),
     }
 
-    destinations.sort_by(|a, b| {
-        if a.x == b.x {
-            a.y.cmp(&b.y)
-        } else {
-            a.x.cmp(&b.x)
-        }
-    });
+    // Now mark the chosen positions in the result grid in the sorted order.
+    // The printed numbers will reflect the fill order.
+    for (i, cell) in destinations.iter().enumerate() {
+        let r = cell.x as usize;
+        let c = cell.y as usize;
+        result[r][c] = i + 1;
+    }
 
     destinations
 }
