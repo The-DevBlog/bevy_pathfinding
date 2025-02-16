@@ -29,7 +29,7 @@ impl Default for Boid {
         Self {
             separation_weight: 50.0,
             alignment_weight: 25.0,
-            cohesion_weight: 0.5,
+            cohesion_weight: 0.75,
             max_speed: 4.0,
             neighbor_radius: 30.0,
         }
