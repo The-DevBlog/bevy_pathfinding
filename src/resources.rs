@@ -1,32 +1,33 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use bevy::prelude::*;
 
-use crate::{flowfield::FlowField, grid::Grid};
+use crate::flowfield::FlowField;
 
 pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ActiveDebugFlowfield>()
-            .init_resource::<CostMap>()
-            .add_systems(
-                Update,
-                init_costfield_map.run_if(resource_exists::<Grid>.and(run_once)),
-            );
+        app.init_resource::<ActiveDebugFlowfield>();
+        // .init_resource::<CostMap>()
+        // .add_systems(
+        //     Update,
+        //     init_costfield_map.run_if(resource_exists::<Grid>.and(run_once)),
+        // );
     }
 }
 
 #[derive(Resource, Default, Clone)]
 pub struct ActiveDebugFlowfield(pub Option<FlowField>);
 
+// TODO: Remove? I dont think im using this costmap anymore
 // Holds the original costs for every cell in the grid
-#[derive(Resource, Default)]
-pub struct CostMap(pub HashMap<i32, u8>);
+// #[derive(Resource, Default)]
+// pub struct CostMap(pub HashMap<i32, u8>);
 
-fn init_costfield_map(grid: Res<Grid>, mut costmap: ResMut<CostMap>) {
-    for cell_row in grid.grid.iter() {
-        for cell in cell_row.iter() {
-            costmap.0.insert(cell.idx_to_id(grid.grid.len()), cell.cost);
-        }
-    }
-}
+// fn init_costfield_map(grid: Res<Grid>, mut costmap: ResMut<CostMap>) {
+//     for cell_row in grid.grid.iter() {
+//         for cell in cell_row.iter() {
+//             costmap.0.insert(cell.idx_to_id(grid.grid.len()), cell.cost);
+//         }
+//     }
+// }

@@ -1,4 +1,5 @@
 {
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 200
+    // "files.autoSave": "afterDelay",
+    // "files.autoSaveDelay": 200
+    "workbench.action.files.save": "ctrl+s"
 }

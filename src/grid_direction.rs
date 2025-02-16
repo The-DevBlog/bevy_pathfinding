@@ -43,6 +43,20 @@ impl GridDirection {
         }
     }
 
+    pub fn print_short(&self) {
+        match self {
+            GridDirection::None => print!("X , "),
+            GridDirection::North => print!("N , "),
+            GridDirection::South => print!("S , "),
+            GridDirection::East => print!("E , "),
+            GridDirection::West => print!("W , "),
+            GridDirection::NorthEast => print!("NE, "),
+            GridDirection::NorthWest => print!("NW, "),
+            GridDirection::SouthEast => print!("SE, "),
+            GridDirection::SouthWest => print!("SW, "),
+        }
+    }
+
     /// Get the direction from a given vector
     pub fn from_vector2(vector: IVec2) -> Option<GridDirection> {
         DIRECTIONS.iter().find(|&&d| d.vector() == vector).copied()
