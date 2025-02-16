@@ -12,10 +12,6 @@ pub struct Destination;
 #[derive(Component)]
 pub struct UnitSize(pub Vec2);
 
-#[derive(Component)]
-#[require(Boid)]
-pub struct Unit;
-
 // separation: pushes boids away from each other
 // alignment: aligns boids with their neighbors
 // cohesion: pulls boids towards the center of their neighbors
