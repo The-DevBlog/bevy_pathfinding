@@ -11,10 +11,32 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, update_flowfields.run_if(resource_exists::<Grid>))
-            .add_observer(initialize_flowfield)
-            .add_observer(initialize_destination_flowfields);
+        app.add_systems(
+            Update,
+            (
+                transfer_to_destination_flowfield.run_if(resource_exists::<Grid>),
+                remove_flowfields,
+            ),
+        )
+        .add_systems(Update, count)
+        .add_observer(initialize_flowfield)
+        .add_observer(initialize_destination_flowfields);
     }
+}
+
+fn count(q_ff: Query<&FlowField>, q_d: Query<&Destination>) {
+    // println!("Destinations: {}", q_d.iter().len());
+
+    let mut dest_ffs = 0;
+    for ff in q_ff.iter() {
+        dest_ffs += ff.destination_flowfields.len();
+    }
+
+    // println!(
+    //     "FF Count: {}, Dest FF Count: {}",
+    //     q_ff.iter().count(),
+    //     dest_ffs
+    // );
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -428,7 +450,10 @@ impl FlowField {
     }
 }
 
-fn update_flowfields(mut q_ff: Query<&mut FlowField>, q_transform: Query<&Transform>) {
+fn transfer_to_destination_flowfield(
+    mut q_ff: Query<&mut FlowField>,
+    q_transform: Query<&Transform>,
+) {
     for mut ff in q_ff.iter_mut() {
         let destination_pos = ff.destination_cell.world_pos;
         let radius_squared = ff.destination_radius.squared();
@@ -449,6 +474,46 @@ fn update_flowfields(mut q_ff: Query<&mut FlowField>, q_transform: Query<&Transf
 
         for unit in units_to_transfer {
             ff.assign_unit_to_destination_flowfield(unit);
+        }
+    }
+}
+
+fn remove_flowfields(
+    mut cmds: Commands,
+    mut q_ff: Query<(Entity, &mut FlowField)>,
+    q_transform: Query<&Transform>,
+) {
+    for (ff_ent, mut ff) in q_ff.iter_mut() {
+        let mut dest_ff_to_remove = Vec::new();
+        for (dest_ff_idx, dest_ff) in ff.destination_flowfields.iter_mut().enumerate() {
+            if dest_ff.flowfield_props.units.len() == 0 {
+                continue;
+            }
+
+            let unit_ent = dest_ff.flowfield_props.units[0];
+            if let Ok(unit_transform) = q_transform.get(unit_ent) {
+                let unit_pos = unit_transform.translation;
+                let cell_diamter_squared = dest_ff.flowfield_props.cell_diameter.powi(2);
+                let distance_squared =
+                    (dest_ff.destination_cell.world_pos - unit_pos).length_squared();
+
+                if distance_squared < cell_diamter_squared {
+                    println!("Removing unit from dest FF");
+                    cmds.entity(unit_ent).remove::<Destination>();
+                    dest_ff_to_remove.push(dest_ff_idx);
+                }
+            }
+        }
+
+        // Remove destiantion flowfields that are marked from above
+        for idx in dest_ff_to_remove.iter() {
+            ff.destination_flowfields.remove(*idx);
+        }
+
+        // if the flowfield has no destination flowfields, remove it
+        if ff.destination_flowfields.is_empty() {
+            println!("Revmoing FlowField");
+            cmds.entity(ff_ent).despawn_recursive();
         }
     }
 }
