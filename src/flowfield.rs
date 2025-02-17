@@ -11,6 +11,8 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(Update, destination_movement_system);
+
         app.add_systems(
             Update,
             (
