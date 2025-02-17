@@ -18,13 +18,15 @@ impl Plugin for FlowfieldPlugin {
                 remove_flowfields,
             ),
         )
-        .add_systems(Update, count_ffs)
+        .add_systems(Update, count)
         .add_observer(initialize_flowfield)
         .add_observer(initialize_destination_flowfields);
     }
 }
 
-fn count_ffs(q_ff: Query<&FlowField>) {
+fn count(q_ff: Query<&FlowField>, q_d: Query<&Destination>) {
+    // println!("Destinations: {}", q_d.iter().len());
+
     let mut dest_ffs = 0;
     for ff in q_ff.iter() {
         dest_ffs += ff.destination_flowfields.len();
@@ -482,43 +484,37 @@ fn remove_flowfields(
     q_transform: Query<&Transform>,
 ) {
     for (ff_ent, mut ff) in q_ff.iter_mut() {
-        let mut unit_count = ff.flowfield_props.units.len();
-        for dest_ff in ff.destination_flowfields.iter_mut() {
+        let mut dest_ff_to_remove = Vec::new();
+        for (dest_ff_idx, dest_ff) in ff.destination_flowfields.iter_mut().enumerate() {
             if dest_ff.flowfield_props.units.len() == 0 {
                 continue;
             }
 
             let unit_ent = dest_ff.flowfield_props.units[0];
             if let Ok(unit_transform) = q_transform.get(unit_ent) {
-                println!("Made it");
-                // let unit_pos = unit_transform.translation;
-                // let distance_squared =
-                //     (dest_ff.destination_cell.world_pos - unit_pos).length_squared();
+                let unit_pos = unit_transform.translation;
+                let cell_diamter_squared = dest_ff.flowfield_props.cell_diameter.powi(2);
+                let distance_squared =
+                    (dest_ff.destination_cell.world_pos - unit_pos).length_squared();
 
-                // println!(
-                //     "Distance: {}, cell diameter squared: {}",
-                //     distance_squared,
-                //     dest_ff.flowfield_props.cell_diameter.powi(2)
-                // );
-                // if distance_squared > dest_ff.flowfield_props.cell_diameter.powi(2) {
-                //     println!("Removing unit from dest FF");
-                //     dest_ff.flowfield_props.units.clear();
-                // }
+                if distance_squared < cell_diamter_squared {
+                    println!("Removing unit from dest FF");
+                    cmds.entity(unit_ent).remove::<Destination>();
+                    dest_ff_to_remove.push(dest_ff_idx);
+                }
             }
-
-            // unit_count += dest_ff.flowfield_props.units.len();
         }
 
-        // remove any destination flowfields that no longer have a unit assigned to them
-        // ff.destination_flowfields
-        //     .retain(|dest_ff| !dest_ff.flowfield_props.units.is_empty());
+        // Remove destiantion flowfields that are marked from above
+        for idx in dest_ff_to_remove.iter() {
+            ff.destination_flowfields.remove(*idx);
+        }
 
         // if the flowfield has no destination flowfields, remove it
-        // if ff.destination_flowfields.is_empty() {
-        // if unit_count == 0 {
-        //     println!("Revmoing FlowField");
-        //     cmds.entity(ff_ent).despawn_recursive();
-        // }
+        if ff.destination_flowfields.is_empty() {
+            println!("Revmoing FlowField");
+            cmds.entity(ff_ent).despawn_recursive();
+        }
     }
 }
 
