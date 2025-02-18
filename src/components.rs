@@ -10,7 +10,14 @@ pub struct GameCamera;
 pub struct Destination;
 
 #[derive(Component)]
-pub struct UnitSize(pub Vec2);
+pub struct RtsObjSize(pub Vec2);
+
+#[derive(Component, Default)]
+#[require(Boid)]
+pub struct RtsDynamicObj;
+
+#[derive(Component)]
+pub struct RtsStaticObj;
 
 // separation: pushes boids away from each other
 // alignment: aligns boids with their neighbors

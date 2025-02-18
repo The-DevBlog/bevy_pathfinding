@@ -11,8 +11,6 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, destination_movement_system);
-
         app.add_systems(
             Update,
             (
@@ -500,7 +498,6 @@ fn remove_flowfields(
                     (dest_ff.destination_cell.world_pos - unit_pos).length_squared();
 
                 if distance_squared < cell_diamter_squared {
-                    println!("Removing unit from dest FF");
                     cmds.entity(unit_ent).remove::<Destination>();
                     dest_ff_to_remove.push(dest_ff_idx);
                 }
@@ -514,7 +511,6 @@ fn remove_flowfields(
 
         // if the flowfield has no destination flowfields, remove it
         if ff.destination_flowfields.is_empty() {
-            println!("Revmoing FlowField");
             cmds.entity(ff_ent).despawn_recursive();
         }
     }
@@ -571,7 +567,7 @@ fn initialize_flowfield(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_unit_info: Query<(&Transform, &UnitSize)>,
+    q_unit_info: Query<(&Transform, &RtsObjSize)>,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
     mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove

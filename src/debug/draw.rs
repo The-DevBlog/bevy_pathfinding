@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use super::components::*;
 use super::events::*;
 use super::resources::*;
+use super::shader::InstanceMaterialData;
 use crate::*;
 // use debug::shader::InstanceMaterialData;
 use grid::Grid;
@@ -20,7 +21,7 @@ impl Plugin for DrawPlugin {
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
-            // .add_observer(update_flowfield)
+            .add_observer(update_flowfield)
             .add_observer(draw_integration_field)
             .add_observer(draw_index);
     }
@@ -495,44 +496,50 @@ fn draw_index(
     dbg.print("draw_index() end");
 }
 
-// fn update_flowfield(
-//     trigger: Trigger<UpdateCostEv>,
-//     grid: Res<Grid>,
-//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-//     mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
-// ) {
-//     let Some(active_flowfield) = &active_dbg_flowfield.0 else {
-//         return;
-//     };
+fn update_flowfield(
+    trigger: Trigger<UpdateCostEv>,
+    dbg: Res<DebugOptions>,
+    grid: Res<Grid>,
+    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
+) {
+    dbg.print("update_flowfield() start");
 
-//     let cell_data = trigger.cell;
-//     let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
-//     cell.cost = cell_data.cost;
+    let Some(active_flowfield) = &active_dbg_flowfield.0 else {
+        return;
+    };
 
-//     let id = cell.idx_to_id(grid.grid.len());
+    let cell_data = trigger.cell;
+    let mut cell =
+        active_flowfield.flowfield_props.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+    cell.cost = cell_data.cost;
 
-//     let Ok(mut instance) = q_instance.get_single_mut() else {
-//         return;
-//     };
+    let id = cell.idx_to_id(grid.grid.len());
 
-//     let Some(instance_data) = instance.0.get_mut(&id) else {
-//         return;
-//     };
+    let Ok(mut instance) = q_instance.get_single_mut() else {
+        return;
+    };
 
-//     let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-//     let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-//     let rotation = flatten * heading;
+    let Some(instance_data) = instance.0.get_mut(&id) else {
+        return;
+    };
 
-//     for instance in instance_data.iter_mut() {
-//         if cell.cost == u8::MAX {
-//             instance.texture = -2;
-//             instance.rotation = flatten.into();
-//         } else {
-//             instance.texture = -1;
-//             instance.rotation = rotation.into();
-//         }
-//     }
-// }
+    let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+    let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+    let rotation = flatten * heading;
+
+    for instance in instance_data.iter_mut() {
+        if cell.cost == u8::MAX {
+            instance.texture = -2;
+            instance.rotation = flatten.into();
+        } else {
+            instance.texture = -1;
+            instance.rotation = rotation.into();
+        }
+    }
+
+    dbg.print("update_flowfield() end");
+}
 
 // fn update_costfield(
 //     trigger: Trigger<UpdateCostEv>,

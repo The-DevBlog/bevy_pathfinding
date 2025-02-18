@@ -1,2 +1,2 @@
-- [ ] Remove Destination Flowfields and Parent Flowfields dynamically
+- Boids do not consider boids in other FF's, only their own.
 - [ ] Look into partitioning the grid. This will drastically cut down expenses with the boid separation logic.
