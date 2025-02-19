@@ -3,16 +3,18 @@ use bevy::{prelude::*, render::primitives::Aabb};
 use crate::{
     cell::Cell,
     components::{RtsDynamicObj, RtsObjSize, RtsStaticObj},
-    utils, UpdateCostEv,
+    events::{DrawAllEv, UpdateCostEv},
+    utils,
 };
 
 pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<Grid>().add_event::<UpdateCostEv>();
-        app.add_systems(PostStartup, initialize_costfield);
-        // app.add_systems(Update, update_costfield);
+        app.register_type::<Grid>()
+            // .add_event::<UpdateCostEv>()
+            .add_systems(PostStartup, initialize_costfield)
+            .add_systems(Update, update_costfield);
     }
 }
 
@@ -91,62 +93,57 @@ impl Grid {
 
         return cell;
     }
-}
 
-// update this so that it gets the aabb of the entity and checks if it intersects with the cell
-fn initialize_costfield(
-    mut cmds: Commands,
-    mut grid: ResMut<Grid>,
-    q_obstacles: Query<(&Transform, &RtsObjSize), With<RtsStaticObj>>,
-) {
-    println!("Static obstacle count: {}", q_obstacles.iter().len());
+    fn update_cell_costs(&mut self, objects: Vec<(&Transform, &RtsObjSize)>) {
+        // Grid cell size (assumed uniform square grid)
+        let cell_size = self.cell_diameter;
 
-    // Grid cell size (assumed uniform square grid)
-    let cell_size = grid.cell_diameter;
+        // Calculate the grid offset (world position of the grid's origin)
+        let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
+        let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
 
-    // Calculate the grid offset (world position of the grid's origin)
-    let grid_offset_x = -grid.size.x as f32 * cell_size / 2.0;
-    let grid_offset_y = -grid.size.y as f32 * cell_size / 2.0;
+        // Mark cells occupied by units
+        for (unit_transform, unit_size) in objects.iter() {
+            let unit_pos = unit_transform.translation;
 
-    // Mark cells occupied by units
-    for (unit_transform, unit_size) in q_obstacles.iter() {
-        let unit_pos = unit_transform.translation;
+            // Construct an Aabb for the unit
+            let half_extent = unit_size.0 / 2.0; // Half size of the unit
+            let aabb = Aabb::from_min_max(
+                Vec3::new(
+                    unit_pos.x - half_extent.x,
+                    unit_pos.y - half_extent.y,
+                    unit_pos.z - half_extent.y,
+                ),
+                Vec3::new(
+                    unit_pos.x + half_extent.x,
+                    unit_pos.y + half_extent.y,
+                    unit_pos.z + half_extent.y,
+                ),
+            );
 
-        // Construct an Aabb for the unit
-        let half_extent = unit_size.0 / 2.0; // Half size of the unit
-        let aabb = Aabb::from_min_max(
-            Vec3::new(
-                unit_pos.x - half_extent.x,
-                unit_pos.y - half_extent.y,
-                unit_pos.z - half_extent.y,
-            ),
-            Vec3::new(
-                unit_pos.x + half_extent.x,
-                unit_pos.y + half_extent.y,
-                unit_pos.z + half_extent.y,
-            ),
-        );
+            // Map AABB to grid coordinates
+            let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
+            let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
+            let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
+            let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
 
-        // Map AABB to grid coordinates
-        let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
-        let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
-        let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
-        let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
+            // Iterate over all cells the unit intersects
+            for y in grid_min_y..=grid_max_y {
+                for x in grid_min_x..=grid_max_x {
+                    if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
+                        self.update_unit_cell_costs(Vec3::new(
+                            x as f32 * cell_size + grid_offset_x,
+                            0.0,
+                            y as f32 * cell_size + grid_offset_y,
+                        ));
+                        // let cell = self.update_unit_cell_costs(Vec3::new(
+                        //     x as f32 * cell_size + grid_offset_x,
+                        //     0.0,
+                        //     y as f32 * cell_size + grid_offset_y,
+                        // ));
 
-        // Iterate over all cells the unit intersects
-        // let mut idxs = Vec::new();
-        println!("updating cells");
-        for y in grid_min_y..=grid_max_y {
-            for x in grid_min_x..=grid_max_x {
-                println!("y: {}, x: {}", y, x);
-                if x >= 0 && x < grid.size.x as isize && y >= 0 && y < grid.size.y as isize {
-                    let cell = grid.update_unit_cell_costs(Vec3::new(
-                        x as f32 * cell_size + grid_offset_x,
-                        0.0,
-                        y as f32 * cell_size + grid_offset_y,
-                    ));
-
-                    cmds.trigger(UpdateCostEv::new(cell));
+                        // cmds.trigger(UpdateCostEv::new(cell)); // TODO: This should only need to be called once
+                    }
                 }
             }
         }
@@ -154,7 +151,32 @@ fn initialize_costfield(
 }
 
 // update this so that it gets the aabb of the entity and checks if it intersects with the cell
+fn initialize_costfield(
+    mut grid: ResMut<Grid>,
+    q_objects: Query<(&Transform, &RtsObjSize), With<RtsStaticObj>>,
+) {
+    let objects = q_objects.iter().collect::<Vec<_>>();
+    grid.update_cell_costs(objects);
+}
+
+// detects if a new static object has been added and updates the costfield
 fn update_costfield(
+    mut cmds: Commands,
+    mut grid: ResMut<Grid>,
+    q_objects: Query<(&Transform, &RtsObjSize), Added<RtsStaticObj>>,
+) {
+    let objects = q_objects.iter().collect::<Vec<_>>();
+    if objects.is_empty() {
+        return;
+    }
+
+    grid.update_cell_costs(objects);
+    cmds.trigger(UpdateCostEv);
+}
+
+// TODO: remove?
+// update this so that it gets the aabb of the entity and checks if it intersects with the cell
+fn update_costfield_og(
     mut cmds: Commands,
     grid: Res<Grid>,
     q: Query<(&Transform, Entity), Added<RtsDynamicObj>>,
@@ -195,7 +217,7 @@ fn update_costfield(
                     && entity_max.y >= cell_min.y
                 {
                     println!("Updating cost for cell {:?}", cell.idx);
-                    cmds.trigger(UpdateCostEv::new(*cell));
+                    // cmds.trigger(UpdateCostEv::new(*cell));
                 }
             }
         }

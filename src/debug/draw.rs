@@ -1,11 +1,11 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use super::components::*;
-use super::events::*;
 use super::resources::*;
 use super::shader::InstanceMaterialData;
 use crate::*;
-// use debug::shader::InstanceMaterialData;
+use bevy::time::common_conditions::once_after_delay;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -21,9 +21,14 @@ impl Plugin for DrawPlugin {
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
-            .add_observer(update_flowfield)
+            // .add_observer(update_flowfield_cell)
             .add_observer(draw_integration_field)
             .add_observer(draw_index);
+
+        app.add_systems(
+            Update,
+            draw_flowfield2.run_if(once_after_delay(Duration::from_secs(5))),
+        );
     }
 }
 
@@ -33,14 +38,16 @@ struct GridLine;
 fn set_active_dbg_flowfield(
     trigger: Trigger<SetActiveFlowfieldEv>,
     mut cmds: Commands,
-    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
+    mut active_dbg_flowfield: ResMut<ActiveDbgFlowfield>,
 ) {
     if let Some(new_ff) = &trigger.event().0 {
-        if let Some(current_ff) = &active_dbg_flowfield.0 {
+        if let Some(_current_ff) = &active_dbg_flowfield.0 {
             // Skip if the grid is the same
-            if current_ff.flowfield_props.grid == new_ff.flowfield_props.grid {
-                return;
-            }
+
+            // TODO: Remove? This techinically would save a bit on performance, but it's not necessary and its causing causing the dbg flowfield to not render dynamically
+            // if current_ff.flowfield_props.grid == new_ff.flowfield_props.grid {
+            // return;
+            // }
         }
         // Set the new flowfield and trigger debug draw
         active_dbg_flowfield.0 = Some(new_ff.clone());
@@ -54,11 +61,15 @@ fn set_active_dbg_flowfield(
     }
 }
 
-fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands) {
+fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<DebugOptions>) {
+    dbg.print("\ntrigger_events() start");
+
     cmds.trigger(DrawGridEv);
     cmds.trigger(DrawCostFieldEv);
     cmds.trigger(DrawFlowFieldEv);
     cmds.trigger(DrawIntegrationFieldEv);
+
+    dbg.print("trigger_events() end");
 }
 
 fn draw_grid(
@@ -142,11 +153,35 @@ fn draw_grid(
     dbg.print("draw_grid() end");
 }
 
+pub fn draw_flowfield2(
+    // _trigger: Trigger<DrawFlowFieldEv>,
+    dbg: Res<DebugOptions>,
+    grid: Res<Grid>,
+    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
+    q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
+    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    // println!("UPDATE FF TEST");
+    // for mut instance in q_instance.iter_mut() {
+    //     // instance.texture = -2;
+    //     // println!("instnace count: {}", instance.0.len());
+    //     for (_id, instance_data) in &mut instance.0 {
+    //         for data in instance_data.iter_mut() {
+    //             data.texture = -2;
+    //         }
+    //     }
+    // }
+
+    // dbg.print("draw_flowfield() end");
+}
+
 pub fn draw_flowfield(
     _trigger: Trigger<DrawFlowFieldEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -319,7 +354,7 @@ fn draw_costfield(
 fn draw_integration_field(
     _trigger: Trigger<DrawIntegrationFieldEv>,
     dbg: Res<DebugOptions>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
     q_cost: Query<Entity, With<BestCostMarker>>,
     grid: Res<Grid>,
@@ -408,7 +443,7 @@ fn draw_index(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
-    active_dbg_ff: Res<ActiveDebugFlowfield>,
+    active_dbg_ff: Res<ActiveDbgFlowfield>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -496,50 +531,46 @@ fn draw_index(
     dbg.print("draw_index() end");
 }
 
-fn update_flowfield(
-    trigger: Trigger<UpdateCostEv>,
-    dbg: Res<DebugOptions>,
-    grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
-    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
-) {
-    dbg.print("update_flowfield() start");
+// fn update_flowfield_cell(
+//     trigger: Trigger<UpdateCostEv>,
+//     dbg: Res<DebugOptions>,
+//     grid: Res<Grid>,
+//     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+//     mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
+// ) {
+//     let Some(active_flowfield) = &active_dbg_flowfield.0 else {
+//         return;
+//     };
 
-    let Some(active_flowfield) = &active_dbg_flowfield.0 else {
-        return;
-    };
+//     let cell_data = trigger.cell;
+//     let mut cell =
+//         active_flowfield.flowfield_props.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+//     cell.cost = cell_data.cost;
 
-    let cell_data = trigger.cell;
-    let mut cell =
-        active_flowfield.flowfield_props.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
-    cell.cost = cell_data.cost;
+//     let id = cell.idx_to_id(grid.grid.len());
 
-    let id = cell.idx_to_id(grid.grid.len());
+//     let Ok(mut instance) = q_instance.get_single_mut() else {
+//         return;
+//     };
 
-    let Ok(mut instance) = q_instance.get_single_mut() else {
-        return;
-    };
+//     let Some(instance_data) = instance.0.get_mut(&id) else {
+//         return;
+//     };
 
-    let Some(instance_data) = instance.0.get_mut(&id) else {
-        return;
-    };
+//     let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
+//     let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
+//     let rotation = flatten * heading;
 
-    let flatten = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
-    let heading = Quat::from_rotation_z(cell.best_direction.to_angle());
-    let rotation = flatten * heading;
-
-    for instance in instance_data.iter_mut() {
-        if cell.cost == u8::MAX {
-            instance.texture = -2;
-            instance.rotation = flatten.into();
-        } else {
-            instance.texture = -1;
-            instance.rotation = rotation.into();
-        }
-    }
-
-    dbg.print("update_flowfield() end");
-}
+//     for instance in instance_data.iter_mut() {
+//         if cell.cost == u8::MAX {
+//             instance.texture = -2;
+//             instance.rotation = flatten.into();
+//         } else {
+//             instance.texture = -1;
+//             instance.rotation = rotation.into();
+//         }
+//     }
+// }
 
 // fn update_costfield(
 //     trigger: Trigger<UpdateCostEv>,

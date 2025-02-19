@@ -7,7 +7,7 @@ pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ActiveDebugFlowfield>();
+        app.init_resource::<ActiveDbgFlowfield>();
         // .init_resource::<CostMap>()
         // .add_systems(
         //     Update,
@@ -17,7 +17,7 @@ impl Plugin for ResourcesPlugin {
 }
 
 #[derive(Resource, Default, Clone)]
-pub struct ActiveDebugFlowfield(pub Option<FlowField>);
+pub struct ActiveDbgFlowfield(pub Option<FlowField>);
 
 // TODO: Remove? I dont think im using this costmap anymore
 // Holds the original costs for every cell in the grid

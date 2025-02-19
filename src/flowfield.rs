@@ -5,6 +5,7 @@ use std::collections::VecDeque;
 
 use crate::components::*;
 use crate::events::*;
+use crate::resources::ActiveDbgFlowfield;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 pub struct FlowfieldPlugin;
@@ -19,6 +20,7 @@ impl Plugin for FlowfieldPlugin {
             ),
         )
         .add_systems(Update, count)
+        .add_observer(update_fields)
         .add_observer(initialize_flowfield)
         .add_observer(initialize_destination_flowfields);
     }
@@ -704,4 +706,30 @@ fn initialize_destination_flowfields(
     // parent_ff._print_idx();
 
     println!("initialize_destination_flowfields() end");
+}
+
+fn update_fields(
+    _trigger: Trigger<UpdateCostEv>,
+    mut cmds: Commands,
+    mut q_ff: Query<&mut FlowField>,
+    grid: Res<Grid>,
+    mut active_dbg_ff: ResMut<ActiveDbgFlowfield>,
+) {
+    for mut ff in q_ff.iter_mut() {
+        let dest_idx = ff.destination_cell.idx;
+        ff.create_integration_field(grid.grid.clone(), dest_idx);
+        ff.flowfield_props.create_flowfield();
+
+        for dest_ff in ff.destination_flowfields.iter_mut() {
+            let dest_idx = dest_ff.destination_cell.idx;
+            dest_ff.create_integration_field(dest_idx);
+            dest_ff.flowfield_props.create_flowfield();
+        }
+    }
+
+    if let Some(ref mut active_ff) = active_dbg_ff.0 {
+        active_ff.create_integration_field(grid.grid.clone(), active_ff.destination_cell.idx);
+        active_ff.flowfield_props.create_flowfield();
+        cmds.trigger(SetActiveFlowfieldEv(Some(active_ff.clone())));
+    }
 }

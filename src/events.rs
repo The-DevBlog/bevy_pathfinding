@@ -14,16 +14,28 @@ pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
 #[derive(Event)]
 pub struct DrawCostFieldEv;
 
+// #[derive(Event)]
+// pub struct UpdateCostEv {
+//     pub cell: Cell,
+// }
+
 #[derive(Event)]
-pub struct UpdateCostEv {
-    pub cell: Cell,
-}
+pub struct UpdateCostEv;
+
+#[derive(Event)]
+pub struct DrawAllEv;
+
+#[derive(Event)]
+pub struct DrawGridEv;
+
+#[derive(Event)]
+pub struct DrawIntegrationFieldEv;
 
 #[derive(Event)]
 pub struct DrawFlowFieldEv;
 
-impl UpdateCostEv {
-    pub fn new(cell: Cell) -> Self {
-        Self { cell }
-    }
-}
+// impl UpdateCostEv {
+//     pub fn new(cell: Cell) -> Self {
+//         Self { cell }
+//     }
+// }
