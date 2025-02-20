@@ -3,7 +3,7 @@ use bevy::{prelude::*, render::primitives::Aabb};
 use crate::{
     cell::Cell,
     components::{RtsDynamicObj, RtsObjSize, RtsStaticObj},
-    events::{DrawAllEv, UpdateCostEv},
+    events::UpdateCostEv,
     utils,
 };
 
@@ -12,9 +12,11 @@ pub struct GridPlugin;
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
-            // .add_event::<UpdateCostEv>()
             .add_systems(PostStartup, initialize_costfield)
-            .add_systems(Update, update_costfield);
+            .add_systems(
+                Update,
+                (update_costfield_on_add, update_costfield_on_remove),
+            );
     }
 }
 
@@ -136,13 +138,6 @@ impl Grid {
                             0.0,
                             y as f32 * cell_size + grid_offset_y,
                         ));
-                        // let cell = self.update_unit_cell_costs(Vec3::new(
-                        //     x as f32 * cell_size + grid_offset_x,
-                        //     0.0,
-                        //     y as f32 * cell_size + grid_offset_y,
-                        // ));
-
-                        // cmds.trigger(UpdateCostEv::new(cell)); // TODO: This should only need to be called once
                     }
                 }
             }
@@ -160,7 +155,7 @@ fn initialize_costfield(
 }
 
 // detects if a new static object has been added and updates the costfield
-fn update_costfield(
+fn update_costfield_on_add(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
     q_objects: Query<(&Transform, &RtsObjSize), Added<RtsStaticObj>>,
@@ -171,6 +166,33 @@ fn update_costfield(
     }
 
     grid.update_cell_costs(objects);
+    cmds.trigger(UpdateCostEv);
+}
+
+fn update_costfield_on_remove(
+    mut cmds: Commands,
+    mut grid: ResMut<Grid>,
+    q_info: Query<&Transform>,
+    // q_info: Query<(&Transform, &RtsObjSize)>,
+    mut removed: RemovedComponents<RtsStaticObj>,
+) {
+    if removed.is_empty() {
+        return;
+    }
+    // let mut objects = Vec::new();
+    for ent in removed.read().into_iter() {
+        if let Ok(transform) = q_info.get(ent) {
+            // if let Ok((transform, size)) = q_info.get(ent) {
+            // objects.push((transform, size));
+            println!("Static object removed");
+        }
+    }
+
+    // if objects.is_empty() {
+    //     return;
+    // }
+
+    // grid.update_cell_costs(objects);
     cmds.trigger(UpdateCostEv);
 }
 

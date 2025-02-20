@@ -708,13 +708,14 @@ fn initialize_destination_flowfields(
     println!("initialize_destination_flowfields() end");
 }
 
+// Updates integration fields and flowfields whenever a cost field is updated
 fn update_fields(
     _trigger: Trigger<UpdateCostEv>,
     mut cmds: Commands,
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
-    mut active_dbg_ff: ResMut<ActiveDbgFlowfield>,
 ) {
+    let mut active_ff = None;
     for mut ff in q_ff.iter_mut() {
         let dest_idx = ff.destination_cell.idx;
         ff.create_integration_field(grid.grid.clone(), dest_idx);
@@ -725,11 +726,10 @@ fn update_fields(
             dest_ff.create_integration_field(dest_idx);
             dest_ff.flowfield_props.create_flowfield();
         }
+
+        active_ff = Some(ff.clone());
     }
 
-    if let Some(ref mut active_ff) = active_dbg_ff.0 {
-        active_ff.create_integration_field(grid.grid.clone(), active_ff.destination_cell.idx);
-        active_ff.flowfield_props.create_flowfield();
-        cmds.trigger(SetActiveFlowfieldEv(Some(active_ff.clone())));
-    }
+    // TODO: This does not work perfectly. It will set the last flowfield as the active one.
+    cmds.trigger(SetActiveFlowfieldEv(active_ff));
 }
