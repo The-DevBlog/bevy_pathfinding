@@ -184,7 +184,7 @@ fn update_costfield_on_remove(
         if let Ok(transform) = q_info.get(ent) {
             // if let Ok((transform, size)) = q_info.get(ent) {
             // objects.push((transform, size));
-            println!("Static object removed");
+            println!("Static object removed"); // NOT WORKING
         }
     }
 
