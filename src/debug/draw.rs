@@ -409,7 +409,6 @@ fn draw_index(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
-    active_dbg_ff: Res<ActiveDbgFlowfield>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -421,10 +420,6 @@ fn draw_index(
         return;
     }
 
-    let Some(ff) = &active_dbg_ff.0 else {
-        return;
-    };
-
     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::Index);
     let Some(base_offset) = base_offset else {
         return;
@@ -432,12 +427,10 @@ fn draw_index(
 
     dbg.print("\ndraw_index() start");
 
-    let base_digit_spacing = grid.cell_diameter * 0.275; // Consider moving to a constant
+    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO: Consider moving to a constant
     let mut instances = HashMap::new();
 
-    // TODO: Uncomment this back
-    // for cell_row in &grid.grid {
-    for cell_row in ff.flowfield_props.grid.iter() {
+    for cell_row in grid.grid.iter() {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = format!("{}{}", cell.idx.y, cell.idx.x)
                 .chars()
@@ -489,6 +482,7 @@ fn draw_index(
     }
 
     cmds.spawn((
+        // TODO: Remove (debugging purposes)
         IndexMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
