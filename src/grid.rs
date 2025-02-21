@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::primitives::Aabb};
 
 use crate::{
     cell::Cell,
-    components::{RtsDynamicObj, RtsObjSize, RtsStaticObj},
+    components::{Destination, RtsDynamicObj, RtsObj, RtsObjSize},
     events::UpdateCostEv,
     utils,
 };
@@ -13,8 +13,9 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
             .add_systems(PostStartup, initialize_costfield)
-            .add_systems(Update, update_costfield_on_add)
-            .add_observer(update_costfield_on_remove);
+            .add_systems(Update, (update_costfield_on_add, add))
+            .add_observer(update_costfield_on_remove)
+            .add_observer(remove);
     }
 }
 
@@ -79,23 +80,23 @@ impl Grid {
         )
     }
 
-    pub fn update_cell_costs(&mut self, unit_transform: &Transform, unit_size: &RtsObjSize) {
-        self.for_each_cell_in_unit(unit_transform, unit_size, |grid, pos| {
+    pub fn update_cell_costs(&mut self, obj_transform: &Transform, obj_size: &RtsObjSize) {
+        self.for_each_cell_in_obj(obj_transform, obj_size, |grid, pos| {
             grid.update_cell_cost_helper(pos);
         });
     }
 
-    pub fn reset_cell_costs(&mut self, unit_transform: &Transform, unit_size: &RtsObjSize) {
-        self.for_each_cell_in_unit(unit_transform, unit_size, |grid, pos| {
+    pub fn reset_cell_costs(&mut self, obj_transform: &Transform, obj_size: &RtsObjSize) {
+        self.for_each_cell_in_obj(obj_transform, obj_size, |grid, pos| {
             grid.reset_cell_cost_helper(pos);
         });
     }
 
     // Iterates over all grid cell positions that intersect with the unit’s AABB.
-    fn for_each_cell_in_unit<F>(
+    fn for_each_cell_in_obj<F>(
         &mut self,
-        unit_transform: &Transform,
-        unit_size: &RtsObjSize,
+        obj_transform: &Transform,
+        obj_size: &RtsObjSize,
         mut callback: F,
     ) where
         F: FnMut(&mut Self, Vec3),
@@ -104,18 +105,18 @@ impl Grid {
         let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
         let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
 
-        let unit_pos = unit_transform.translation;
-        let half_extent = unit_size.0 / 2.0;
+        let obj_pos = obj_transform.translation;
+        let half_extent = obj_size.0 / 2.0;
         let aabb = Aabb::from_min_max(
             Vec3::new(
-                unit_pos.x - half_extent.x,
-                unit_pos.y - half_extent.y,
-                unit_pos.z - half_extent.y,
+                obj_pos.x - half_extent.x,
+                obj_pos.y - half_extent.y,
+                obj_pos.z - half_extent.y,
             ),
             Vec3::new(
-                unit_pos.x + half_extent.x,
-                unit_pos.y + half_extent.y,
-                unit_pos.z + half_extent.y,
+                obj_pos.x + half_extent.x,
+                obj_pos.y + half_extent.y,
+                obj_pos.z + half_extent.y,
             ),
         );
 
@@ -160,7 +161,7 @@ impl Grid {
 // update this so that it gets the aabb of the entity and checks if it intersects with the cell
 fn initialize_costfield(
     mut grid: ResMut<Grid>,
-    q_objects: Query<(&Transform, &RtsObjSize), With<RtsStaticObj>>,
+    q_objects: Query<(&Transform, &RtsObjSize), With<RtsObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
 
@@ -173,7 +174,7 @@ fn initialize_costfield(
 fn update_costfield_on_add(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_objects: Query<(&Transform, &RtsObjSize), Added<RtsStaticObj>>,
+    q_objects: Query<(&Transform, &RtsObjSize), Added<RtsObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
     if objects.is_empty() {
@@ -188,7 +189,42 @@ fn update_costfield_on_add(
 }
 
 fn update_costfield_on_remove(
-    trigger: Trigger<OnRemove, RtsStaticObj>,
+    trigger: Trigger<OnRemove, RtsObj>,
+    mut cmds: Commands,
+    mut grid: ResMut<Grid>,
+    q_transform: Query<(&Transform, &RtsObjSize)>,
+) {
+    let ent = trigger.entity();
+    if let Ok((transform, size)) = q_transform.get(ent) {
+        println!("{:?}", size.0);
+        grid.reset_cell_costs(transform, size);
+    } else {
+        return;
+    }
+
+    cmds.trigger(UpdateCostEv);
+}
+
+fn add(
+    mut cmds: Commands,
+    mut grid: ResMut<Grid>,
+    q_units: Query<(Entity, &Transform, &RtsObjSize), Added<Destination>>,
+) {
+    let units = q_units.iter().collect::<Vec<_>>();
+    if units.is_empty() {
+        return;
+    }
+
+    for (ent, transform, size) in units.iter() {
+        grid.update_cell_costs(transform, size);
+        cmds.entity(*ent).remove::<RtsObj>();
+    }
+
+    cmds.trigger(UpdateCostEv);
+}
+
+fn remove(
+    trigger: Trigger<OnRemove, Destination>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
     q_transform: Query<(&Transform, &RtsObjSize)>,
@@ -196,6 +232,7 @@ fn update_costfield_on_remove(
     let ent = trigger.entity();
     if let Ok((transform, size)) = q_transform.get(ent) {
         grid.reset_cell_costs(transform, size);
+        cmds.entity(ent).insert(RtsObj);
     } else {
         return;
     }

@@ -16,8 +16,8 @@ pub struct RtsObjSize(pub Vec2);
 #[require(Boid)]
 pub struct RtsDynamicObj;
 
-#[derive(Component)]
-pub struct RtsStaticObj;
+#[derive(Component, Default)]
+pub struct RtsObj;
 
 // separation: pushes boids away from each other
 // alignment: aligns boids with their neighbors
