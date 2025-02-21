@@ -640,18 +640,29 @@ fn initialize_flowfield(
 
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
-    let ff_ent = cmds.spawn((ff.clone(), Name::new("ParentFlowField"))).id();
+    let ff_ent = cmds
+        .spawn((
+            ff.clone(),
+            Name::new("ParentFlowField"),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
     cmds.trigger(InitializeDestinationFlowFieldsEv(ff_ent));
 
-    // TODO: Remove
-    let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
-    let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-    cmds.spawn((
-        DestinationRadius(ff_ent.index()),
-        mesh,
-        material,
-        Transform::from_translation(ff.destination_cell.world_pos),
-    ));
+    // TODO: Remove (debugging purposes)
+    {
+        let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
+        let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+        cmds.entity(ff_ent).with_children(|parent| {
+            parent.spawn((
+                DestinationRadius(ff_ent.index()),
+                mesh,
+                material,
+                Transform::from_translation(ff.destination_cell.world_pos),
+            ));
+        });
+    }
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
 }
