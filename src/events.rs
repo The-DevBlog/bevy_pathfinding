@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::flowfield::FlowField;
+use crate::{cell::Cell, flowfield::FlowField};
 
 #[derive(Event)]
 pub struct InitializeFlowFieldEv(pub Vec<Entity>);

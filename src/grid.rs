@@ -153,6 +153,9 @@ impl Grid {
     // something else? Like different terrain (mud, snow)? Maybe we need to store the original costfield in a hashmap or something
     fn reset_cell_cost_helper(&mut self, position: Vec3) -> Cell {
         let cell = self.get_cell_from_world_position(position);
+        // println!();
+        // println!("cell idx: {},{}", cell.idx.y, cell.idx.x);
+        // println!();
         self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
         cell
     }
@@ -196,7 +199,6 @@ fn update_costfield_on_remove(
 ) {
     let ent = trigger.entity();
     if let Ok((transform, size)) = q_transform.get(ent) {
-        println!("{:?}", size.0);
         grid.reset_cell_costs(transform, size);
     } else {
         return;
@@ -249,7 +251,6 @@ fn _update_costfield_og(
 ) {
     // For each newly added dynamic object, compute an AABB in the XZ plane.
     for (transform, _entity) in q.iter() {
-        println!("Checking");
         // Assume a default half-extent for the entity's AABB; adjust as needed.
         let half_extent = 0.5;
         let entity_min = Vec2::new(
@@ -266,7 +267,6 @@ fn _update_costfield_og(
         // with half size grid.cell_radius.
         for row in grid.grid.iter() {
             for cell in row.iter() {
-                println!("checking cell");
                 let cell_min = Vec2::new(
                     cell.world_pos.x - grid.cell_radius,
                     cell.world_pos.z - grid.cell_radius,
@@ -282,7 +282,6 @@ fn _update_costfield_og(
                     && entity_min.y <= cell_max.y
                     && entity_max.y >= cell_min.y
                 {
-                    println!("Updating cost for cell {:?}", cell.idx);
                     // cmds.trigger(UpdateCostEv::new(*cell));
                 }
             }

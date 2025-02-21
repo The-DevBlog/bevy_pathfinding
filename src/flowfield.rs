@@ -726,6 +726,12 @@ fn update_fields(
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
 ) {
+    // if there is not FF, then we still want to draw the cost field
+    if q_ff.is_empty() {
+        cmds.trigger(DrawCostFieldEv);
+        return;
+    }
+
     let mut active_ff = None;
     for mut ff in q_ff.iter_mut() {
         let dest_idx = ff.destination_cell.idx;
