@@ -13,10 +13,8 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
             .add_systems(PostStartup, initialize_costfield)
-            .add_systems(
-                Update,
-                (update_costfield_on_add, update_costfield_on_remove),
-            );
+            .add_systems(Update, update_costfield_on_add)
+            .add_observer(update_costfield_on_remove);
     }
 }
 
@@ -61,7 +59,6 @@ impl Grid {
         grid
     }
 
-    // pub fn get_cell_from_world_position(&self, world_pos: Vec3, offset: Option<Vec2>) -> Cell {
     pub fn get_cell_from_world_position(&self, world_pos: Vec3) -> Cell {
         // Calculate the offset for the grid's top-left corner
         let adjusted_x = world_pos.x - (-self.size.x as f32 * self.cell_diameter / 2.0);
@@ -82,66 +79,81 @@ impl Grid {
         )
     }
 
-    pub fn update_unit_cell_costs(&mut self, position: Vec3) -> Cell {
-        // Determine which cell the unit occupies
-        let cell = self.get_cell_from_world_position(position);
+    pub fn update_cell_costs(&mut self, unit_transform: &Transform, unit_size: &RtsObjSize) {
+        self.for_each_cell_in_unit(unit_transform, unit_size, |grid, pos| {
+            grid.update_cell_cost_helper(pos);
+        });
+    }
 
-        // Set the cost of the cell to 255
+    pub fn reset_cell_costs(&mut self, unit_transform: &Transform, unit_size: &RtsObjSize) {
+        self.for_each_cell_in_unit(unit_transform, unit_size, |grid, pos| {
+            grid.reset_cell_cost_helper(pos);
+        });
+    }
+
+    // Iterates over all grid cell positions that intersect with the unit’s AABB.
+    fn for_each_cell_in_unit<F>(
+        &mut self,
+        unit_transform: &Transform,
+        unit_size: &RtsObjSize,
+        mut callback: F,
+    ) where
+        F: FnMut(&mut Self, Vec3),
+    {
+        let cell_size = self.cell_diameter;
+        let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
+        let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
+
+        let unit_pos = unit_transform.translation;
+        let half_extent = unit_size.0 / 2.0;
+        let aabb = Aabb::from_min_max(
+            Vec3::new(
+                unit_pos.x - half_extent.x,
+                unit_pos.y - half_extent.y,
+                unit_pos.z - half_extent.y,
+            ),
+            Vec3::new(
+                unit_pos.x + half_extent.x,
+                unit_pos.y + half_extent.y,
+                unit_pos.z + half_extent.y,
+            ),
+        );
+
+        let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
+        let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
+        let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
+        let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
+
+        for y in grid_min_y..=grid_max_y {
+            for x in grid_min_x..=grid_max_x {
+                if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
+                    let cell_pos = Vec3::new(
+                        x as f32 * cell_size + grid_offset_x,
+                        0.0,
+                        y as f32 * cell_size + grid_offset_y,
+                    );
+                    callback(self, cell_pos);
+                }
+            }
+        }
+    }
+
+    fn update_cell_cost_helper(&mut self, position: Vec3) -> Cell {
+        let cell = self.get_cell_from_world_position(position);
         if cell.idx.y < self.grid.len() as i32
             && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
         {
             self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
         }
-
-        return cell;
+        cell
     }
 
-    fn update_cell_costs(&mut self, objects: Vec<(&Transform, &RtsObjSize)>) {
-        // Grid cell size (assumed uniform square grid)
-        let cell_size = self.cell_diameter;
-
-        // Calculate the grid offset (world position of the grid's origin)
-        let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
-        let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
-
-        // Mark cells occupied by units
-        for (unit_transform, unit_size) in objects.iter() {
-            let unit_pos = unit_transform.translation;
-
-            // Construct an Aabb for the unit
-            let half_extent = unit_size.0 / 2.0; // Half size of the unit
-            let aabb = Aabb::from_min_max(
-                Vec3::new(
-                    unit_pos.x - half_extent.x,
-                    unit_pos.y - half_extent.y,
-                    unit_pos.z - half_extent.y,
-                ),
-                Vec3::new(
-                    unit_pos.x + half_extent.x,
-                    unit_pos.y + half_extent.y,
-                    unit_pos.z + half_extent.y,
-                ),
-            );
-
-            // Map AABB to grid coordinates
-            let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
-            let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
-            let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
-            let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
-
-            // Iterate over all cells the unit intersects
-            for y in grid_min_y..=grid_max_y {
-                for x in grid_min_x..=grid_max_x {
-                    if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
-                        self.update_unit_cell_costs(Vec3::new(
-                            x as f32 * cell_size + grid_offset_x,
-                            0.0,
-                            y as f32 * cell_size + grid_offset_y,
-                        ));
-                    }
-                }
-            }
-        }
+    // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally
+    // something else? Like different terrain (mud, snow)? Maybe we need to store the original costfield in a hashmap or something
+    fn reset_cell_cost_helper(&mut self, position: Vec3) -> Cell {
+        let cell = self.get_cell_from_world_position(position);
+        self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
+        cell
     }
 }
 
@@ -151,7 +163,10 @@ fn initialize_costfield(
     q_objects: Query<(&Transform, &RtsObjSize), With<RtsStaticObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
-    grid.update_cell_costs(objects);
+
+    for (transform, size) in objects {
+        grid.update_cell_costs(transform, size);
+    }
 }
 
 // detects if a new static object has been added and updates the costfield
@@ -165,34 +180,26 @@ fn update_costfield_on_add(
         return;
     }
 
-    grid.update_cell_costs(objects);
+    for (transform, size) in objects.iter() {
+        grid.update_cell_costs(transform, size);
+    }
+
     cmds.trigger(UpdateCostEv);
 }
 
 fn update_costfield_on_remove(
+    trigger: Trigger<OnRemove, RtsStaticObj>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_info: Query<&Transform>,
-    // q_info: Query<(&Transform, &RtsObjSize)>,
-    mut removed: RemovedComponents<RtsStaticObj>,
+    q_transform: Query<(&Transform, &RtsObjSize)>,
 ) {
-    if removed.is_empty() {
+    let ent = trigger.entity();
+    if let Ok((transform, size)) = q_transform.get(ent) {
+        grid.reset_cell_costs(transform, size);
+    } else {
         return;
     }
-    // let mut objects = Vec::new();
-    for ent in removed.read().into_iter() {
-        if let Ok(transform) = q_info.get(ent) {
-            // if let Ok((transform, size)) = q_info.get(ent) {
-            // objects.push((transform, size));
-            println!("Static object removed"); // NOT WORKING
-        }
-    }
 
-    // if objects.is_empty() {
-    //     return;
-    // }
-
-    // grid.update_cell_costs(objects);
     cmds.trigger(UpdateCostEv);
 }
 
@@ -245,97 +252,3 @@ fn update_costfield_og(
         }
     }
 }
-// fn update_costfield(q: Query<Entity, Added<RtsDynamicObj>>) {
-//     for _e in q.iter() {
-//         println!("component added");
-//     }
-// }
-
-// TODO: This is not precise. It does not capture 'every' cell that a unit is currenlty intersecting with.
-// pub fn update_costs(
-//     mut occupied_cells: ResMut<OccupiedCells>,
-//     mut grid: ResMut<Grid>,
-//     mut cmds: Commands,
-//     q_units: Query<(&Transform, &RtsObjSize), With<Unit>>,
-//     costmap: Res<CostMap>,
-// ) {
-//     if q_units.is_empty() {
-//         return;
-//     }
-
-//     let mut current_occupied = HashSet::new();
-
-//     // Grid cell size (assumed uniform square grid)
-//     let cell_size = grid.cell_diameter;
-
-//     // Calculate the grid offset (world position of the grid's origin)
-//     let grid_offset_x = -grid.size.x as f32 * cell_size / 2.0;
-//     let grid_offset_y = -grid.size.y as f32 * cell_size / 2.0;
-
-//     // Mark cells occupied by units
-//     for (unit_transform, unit_size) in q_units.iter() {
-//         let unit_pos = unit_transform.translation;
-
-//         // Construct an Aabb for the unit
-//         let half_extent = unit_size.0 / 2.0; // Half size of the unit
-//         let aabb = Aabb::from_min_max(
-//             Vec3::new(
-//                 unit_pos.x - half_extent.x,
-//                 unit_pos.y - half_extent.y,
-//                 unit_pos.z - half_extent.y,
-//             ),
-//             Vec3::new(
-//                 unit_pos.x + half_extent.x,
-//                 unit_pos.y + half_extent.y,
-//                 unit_pos.z + half_extent.y,
-//             ),
-//         );
-
-//         // Map AABB to grid coordinates
-//         let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
-//         let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
-//         let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
-//         let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
-
-//         // Iterate over all cells the unit intersects
-//         // let mut idxs = Vec::new();
-//         for y in grid_min_y..=grid_max_y {
-//             for x in grid_min_x..=grid_max_x {
-//                 if x >= 0 && x < grid.size.x as isize && y >= 0 && y < grid.size.y as isize {
-//                     let cell = grid.update_unit_cell_costs(Vec3::new(
-//                         x as f32 * cell_size + grid_offset_x,
-//                         0.0,
-//                         y as f32 * cell_size + grid_offset_y,
-//                     ));
-
-//                     // idxs.push(cell.idx);
-
-//                     cmds.trigger(UpdateCostEv::new(cell));
-//                     current_occupied.insert(cell.idx);
-//                 }
-//             }
-//         }
-
-//         // print!("Unit occupying cells:");
-//         // for i in idxs.iter() {
-//         //     print!(" {},{} -", i.y, i.x);
-//         // }
-//         // println!();
-//     }
-
-//     // Reset previously occupied cells that are no longer occupied
-//     let columns = grid.grid.len();
-//     for idx in occupied_cells.0.difference(&current_occupied) {
-//         if idx.y >= 0 && idx.y < grid.size.y && idx.x >= 0 && idx.x < grid.size.x {
-//             let cell = &mut grid.grid[idx.y as usize][idx.x as usize];
-//             if let Some(cost) = costmap.0.get(&cell.idx_to_id(columns)) {
-//                 cell.cost = *cost;
-//             }
-
-//             cmds.trigger(UpdateCostEv::new(*cell));
-//         }
-//     }
-
-//     // Update the occupied cells set
-//     occupied_cells.0 = current_occupied;
-// }
