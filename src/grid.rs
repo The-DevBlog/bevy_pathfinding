@@ -205,8 +205,8 @@ fn update_costfield_on_remove(
 
 // TODO: remove?
 // update this so that it gets the aabb of the entity and checks if it intersects with the cell
-fn update_costfield_og(
-    mut cmds: Commands,
+fn _update_costfield_og(
+    // mut cmds: Commands,
     grid: Res<Grid>,
     q: Query<(&Transform, Entity), Added<RtsDynamicObj>>,
 ) {

@@ -5,7 +5,6 @@ use std::collections::VecDeque;
 
 use crate::components::*;
 use crate::events::*;
-use crate::resources::ActiveDbgFlowfield;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 pub struct FlowfieldPlugin;
@@ -26,13 +25,14 @@ impl Plugin for FlowfieldPlugin {
     }
 }
 
-fn count(q_ff: Query<&FlowField>, q_d: Query<&Destination>) {
+// TODO: Remove
+fn count(_q_ff: Query<&FlowField>, _q_d: Query<&Destination>) {
     // println!("Destinations: {}", q_d.iter().len());
 
-    let mut dest_ffs = 0;
-    for ff in q_ff.iter() {
-        dest_ffs += ff.destination_flowfields.len();
-    }
+    // let mut dest_ffs = 0;
+    // for ff in q_ff.iter() {
+    //     dest_ffs += ff.destination_flowfields.len();
+    // }
 
     // println!(
     //     "FF Count: {}, Dest FF Count: {}",

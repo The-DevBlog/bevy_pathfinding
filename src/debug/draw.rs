@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use super::components::*;
 use super::resources::*;
-use super::shader::InstanceMaterialData;
 use crate::*;
-use bevy::time::common_conditions::once_after_delay;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -16,19 +13,12 @@ impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, detect_debug_change.run_if(resource_exists::<Grid>))
             .add_observer(trigger_events)
-            // .add_observer(update_costfield)
             .add_observer(draw_grid)
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
-            // .add_observer(update_flowfield_cell)
             .add_observer(draw_integration_field)
             .add_observer(draw_index);
-
-        app.add_systems(
-            Update,
-            draw_flowfield2.run_if(once_after_delay(Duration::from_secs(5))),
-        );
     }
 }
 
@@ -151,30 +141,6 @@ fn draw_grid(
     ));
 
     dbg.print("draw_grid() end");
-}
-
-pub fn draw_flowfield2(
-    // _trigger: Trigger<DrawFlowFieldEv>,
-    dbg: Res<DebugOptions>,
-    grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
-    q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
-    mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
-    mut cmds: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-) {
-    // println!("UPDATE FF TEST");
-    // for mut instance in q_instance.iter_mut() {
-    //     // instance.texture = -2;
-    //     // println!("instnace count: {}", instance.0.len());
-    //     for (_id, instance_data) in &mut instance.0 {
-    //         for data in instance_data.iter_mut() {
-    //             data.texture = -2;
-    //         }
-    //     }
-    // }
-
-    // dbg.print("draw_flowfield() end");
 }
 
 pub fn draw_flowfield(
