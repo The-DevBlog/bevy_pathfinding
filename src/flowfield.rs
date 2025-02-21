@@ -27,7 +27,7 @@ impl Plugin for FlowfieldPlugin {
 
 // TODO: Remove
 fn count(_q_ff: Query<&FlowField>, _q_d: Query<&Destination>) {
-    // println!("Destinations: {}", q_d.iter().len());
+    // println!("Destinations: {}", _q_d.iter().len());
 
     // let mut dest_ffs = 0;
     // for ff in q_ff.iter() {
