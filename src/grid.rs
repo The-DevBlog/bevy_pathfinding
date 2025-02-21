@@ -120,13 +120,13 @@ impl Grid {
             ),
         );
 
-        let grid_min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
-        let grid_max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
-        let grid_min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
-        let grid_max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
+        let min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
+        let max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
+        let min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
+        let max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
 
-        for y in grid_min_y..=grid_max_y {
-            for x in grid_min_x..=grid_max_x {
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
                 if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
                     let cell_pos = Vec3::new(
                         x as f32 * cell_size + grid_offset_x,
