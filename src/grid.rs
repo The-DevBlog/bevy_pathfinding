@@ -161,15 +161,15 @@ impl Grid {
 }
 
 // update this so that it gets the aabb of the entity and checks if it intersects with the cell
-fn initialize_costfield(
-    mut grid: ResMut<Grid>,
-    q_objects: Query<(Entity, &Transform, &RtsObjSize), With<RtsObj>>,
+// TODO: REmove?
+fn initialize_costfield(// mut grid: ResMut<Grid>,
+    // q_objects: Query<(Entity, &Transform, &RtsObjSize), With<RtsObj>>,
 ) {
-    let objects = q_objects.iter().collect::<Vec<_>>();
+    // let objects = q_objects.iter().collect::<Vec<_>>();
 
-    for (ent, transform, size) in objects {
-        grid.update_cell_costs(ent.index(), transform, size);
-    }
+    // for (ent, transform, size) in objects {
+    //     grid.update_cell_costs(ent.index(), transform, size);
+    // }
 }
 
 // detects if a new static object has been added and updates the costfield
@@ -208,7 +208,7 @@ fn update_costfield_on_remove(
 
 fn add(
     mut cmds: Commands,
-    mut grid: ResMut<Grid>,
+    // mut grid: ResMut<Grid>,
     q_units: Query<(Entity, &Transform, &RtsObjSize), Added<Destination>>,
 ) {
     let units = q_units.iter().collect::<Vec<_>>();
@@ -217,73 +217,28 @@ fn add(
     }
 
     for (ent, transform, size) in units.iter() {
-        grid.update_cell_costs(ent.index(), transform, size);
+        // grid.update_cell_costs(ent.index(), transform, size);
         cmds.entity(*ent).remove::<RtsObj>();
     }
 
-    cmds.trigger(UpdateCostEv);
+    // cmds.trigger(UpdateCostEv);
 }
 
 fn remove(
     trigger: Trigger<OnRemove, Destination>,
     mut cmds: Commands,
-    mut grid: ResMut<Grid>,
+    // mut grid: ResMut<Grid>,
     q_transform: Query<Entity>,
 ) {
     let ent = trigger.entity();
     if let Ok(ent) = q_transform.get(ent) {
-        grid.reset_cell_costs(ent.index());
+        println!("Removing destination");
+        // grid.reset_cell_costs(ent.index());
         cmds.entity(ent).insert(RtsObj);
-    } else {
-        return;
     }
+    // else {
+    //     return;
+    // }
 
-    cmds.trigger(UpdateCostEv);
-}
-
-// TODO: remove?
-// update this so that it gets the aabb of the entity and checks if it intersects with the cell
-fn _update_costfield_og(
-    // mut cmds: Commands,
-    grid: Res<Grid>,
-    q: Query<(&Transform, Entity), Added<RtsDynamicObj>>,
-) {
-    // For each newly added dynamic object, compute an AABB in the XZ plane.
-    for (transform, _entity) in q.iter() {
-        // Assume a default half-extent for the entity's AABB; adjust as needed.
-        let half_extent = 0.5;
-        let entity_min = Vec2::new(
-            transform.translation.x - half_extent,
-            transform.translation.z - half_extent,
-        );
-        let entity_max = Vec2::new(
-            transform.translation.x + half_extent,
-            transform.translation.z + half_extent,
-        );
-
-        // Iterate through all grid cells.
-        // Each cell is assumed to be a square centered at its world_pos,
-        // with half size grid.cell_radius.
-        for row in grid.grid.iter() {
-            for cell in row.iter() {
-                let cell_min = Vec2::new(
-                    cell.world_pos.x - grid.cell_radius,
-                    cell.world_pos.z - grid.cell_radius,
-                );
-                let cell_max = Vec2::new(
-                    cell.world_pos.x + grid.cell_radius,
-                    cell.world_pos.z + grid.cell_radius,
-                );
-
-                // Check if the entity's AABB intersects with the cell's AABB.
-                if entity_min.x <= cell_max.x
-                    && entity_max.x >= cell_min.x
-                    && entity_min.y <= cell_max.y
-                    && entity_max.y >= cell_min.y
-                {
-                    // cmds.trigger(UpdateCostEv::new(*cell));
-                }
-            }
-        }
-    }
+    // cmds.trigger(UpdateCostEv);
 }
