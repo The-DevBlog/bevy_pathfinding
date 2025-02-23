@@ -18,16 +18,19 @@ impl Plugin for GridPlugin {
             .add_observer(update_costfield_on_remove)
             .add_observer(remove);
 
-        app.add_systems(Update, print_occupied_cells.run_if(resource_exists::<Grid>));
+        app.add_systems(Update, print.run_if(resource_exists::<Grid>));
     }
 }
 
-fn print_occupied_cells(grid: Res<Grid>) {
-    for (_ent, cells) in grid.occupied_cells.iter() {
-        for cell in cells.iter() {
-            // print!("-{},{}", cell.y, cell.x);
-        }
-    }
+// TODO: Remove
+fn print(_grid: Res<Grid>, _q_objects: Query<&RtsObj>) {
+    // println!("Objects: {}", _q_objects.iter().len());
+    // for (_ent, cells) in grid.occupied_cells.iter() {
+    // println!("occupying {} cells", cells.len());
+    // for cell in cells.iter() {
+    // print!("-{},{}", cell.y, cell.x);
+    // }
+    // }
 
     // println!();
 }
@@ -101,32 +104,6 @@ impl Grid {
         obj_transform: &Transform,
         obj_size: &RtsObjSize,
     ) {
-        self.for_each_cell_in_obj(entity_id, obj_transform, obj_size, |grid, pos, cells| {
-            grid.update_cell_cost_helper(pos, cells);
-        });
-    }
-
-    pub fn reset_cell_costs(
-        &mut self,
-        entity_id: u32,
-        obj_transform: &Transform,
-        obj_size: &RtsObjSize,
-    ) {
-        self.for_each_cell_in_obj(entity_id, obj_transform, obj_size, |grid, pos, cells| {
-            grid.reset_cell_cost_helper(pos, cells);
-        });
-    }
-
-    // Iterates over all grid cell positions that intersect with the unit’s AABB.
-    fn for_each_cell_in_obj<F>(
-        &mut self,
-        entity_id: u32,
-        obj_transform: &Transform,
-        obj_size: &RtsObjSize,
-        mut callback: F,
-    ) where
-        F: FnMut(&mut Self, Vec3, Vec<IVec2>),
-    {
         let cell_size = self.cell_diameter;
         let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
         let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
@@ -158,45 +135,28 @@ impl Grid {
                 if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
                     occupied_cells.push(IVec2::new(x as i32, y as i32));
 
-                    let cell_pos = Vec3::new(
-                        x as f32 * cell_size + grid_offset_x,
-                        0.0,
-                        y as f32 * cell_size + grid_offset_y,
-                    );
+                    self.grid[y as usize][x as usize].cost = 255;
                 }
             }
         }
 
-        callback(self, Vec3::ZERO, occupied_cells);
+        // callback(self, Vec3::ZERO, occupied_cells);
+
+        self.occupied_cells
+            .entry(entity_id)
+            .and_modify(|cells| cells.extend(occupied_cells.iter().cloned()))
+            .or_insert(occupied_cells);
+
         // self.occupied_cells.insert(entity_id, occupied_cells);
     }
 
-    fn update_cell_cost_helper(&mut self, position: Vec3, cells: Vec<IVec2>) -> Cell {
-        let cell = self.get_cell_from_world_position(position);
-
-        for cell in cells.iter() {
-            self.grid[cell.y as usize][cell.x as usize].cost = 255;
-        }
-
-        // if cell.idx.y < self.grid.len() as i32
-        //     && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
-        // {
-        //     self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
-        // }
-        cell
-    }
-
     // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally
-    // something else? Like different terrain (mud, snow)? Maybe we need to store the original costfield in a hashmap or something
-    fn reset_cell_cost_helper(&mut self, position: Vec3, cells: Vec<IVec2>) -> Cell {
-        let cell = self.get_cell_from_world_position(position);
-
-        for cell in cells.iter() {
-            self.grid[cell.y as usize][cell.x as usize].cost = 1;
+    pub fn reset_cell_costs(&mut self, entity_id: u32) {
+        if let Some(occupied_cells) = self.occupied_cells.remove(&entity_id) {
+            for cell in occupied_cells.iter() {
+                self.grid[cell.y as usize][cell.x as usize].cost = 1;
+            }
         }
-
-        // self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
-        cell
     }
 }
 
@@ -234,11 +194,11 @@ fn update_costfield_on_remove(
     trigger: Trigger<OnRemove, RtsObj>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_transform: Query<(Entity, &Transform, &RtsObjSize)>,
+    q_transform: Query<Entity>,
 ) {
     let ent = trigger.entity();
-    if let Ok((ent, transform, size)) = q_transform.get(ent) {
-        grid.reset_cell_costs(ent.index(), transform, size);
+    if let Ok(ent) = q_transform.get(ent) {
+        grid.reset_cell_costs(ent.index());
     } else {
         return;
     }
@@ -268,11 +228,11 @@ fn remove(
     trigger: Trigger<OnRemove, Destination>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_transform: Query<(Entity, &Transform, &RtsObjSize)>,
+    q_transform: Query<Entity>,
 ) {
     let ent = trigger.entity();
-    if let Ok((ent, transform, size)) = q_transform.get(ent) {
-        grid.reset_cell_costs(ent.index(), transform, size);
+    if let Ok(ent) = q_transform.get(ent) {
+        grid.reset_cell_costs(ent.index());
         cmds.entity(ent).insert(RtsObj);
     } else {
         return;
