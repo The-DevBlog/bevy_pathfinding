@@ -1,4 +1,5 @@
 use bevy::{prelude::*, render::primitives::Aabb};
+use std::collections::HashMap;
 
 use crate::{
     cell::Cell,
@@ -16,16 +17,29 @@ impl Plugin for GridPlugin {
             .add_systems(Update, (update_costfield_on_add, add))
             .add_observer(update_costfield_on_remove)
             .add_observer(remove);
+
+        app.add_systems(Update, print_occupied_cells.run_if(resource_exists::<Grid>));
     }
+}
+
+fn print_occupied_cells(grid: Res<Grid>) {
+    for (_ent, cells) in grid.occupied_cells.iter() {
+        for cell in cells.iter() {
+            // print!("-{},{}", cell.y, cell.x);
+        }
+    }
+
+    // println!();
 }
 
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct Grid {
-    pub size: IVec2, // 'x' represents rows, 'y' represents columns
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
+    pub size: IVec2, // 'x' represents rows, 'y' represents columns
+    pub occupied_cells: HashMap<u32, Vec<IVec2>>,
 }
 
 impl Grid {
@@ -33,10 +47,11 @@ impl Grid {
     // all flowfields will share the same costfield
     pub fn new(size: IVec2, cell_diameter: f32) -> Self {
         let mut grid = Grid {
-            size,
             cell_diameter,
             cell_radius: cell_diameter / 2.0,
             grid: Vec::default(),
+            size,
+            occupied_cells: HashMap::default(),
         };
 
         // Calculate offsets for top-left alignment
@@ -80,26 +95,37 @@ impl Grid {
         )
     }
 
-    pub fn update_cell_costs(&mut self, obj_transform: &Transform, obj_size: &RtsObjSize) {
-        self.for_each_cell_in_obj(obj_transform, obj_size, |grid, pos| {
-            grid.update_cell_cost_helper(pos);
+    pub fn update_cell_costs(
+        &mut self,
+        entity_id: u32,
+        obj_transform: &Transform,
+        obj_size: &RtsObjSize,
+    ) {
+        self.for_each_cell_in_obj(entity_id, obj_transform, obj_size, |grid, pos, cells| {
+            grid.update_cell_cost_helper(pos, cells);
         });
     }
 
-    pub fn reset_cell_costs(&mut self, obj_transform: &Transform, obj_size: &RtsObjSize) {
-        self.for_each_cell_in_obj(obj_transform, obj_size, |grid, pos| {
-            grid.reset_cell_cost_helper(pos);
+    pub fn reset_cell_costs(
+        &mut self,
+        entity_id: u32,
+        obj_transform: &Transform,
+        obj_size: &RtsObjSize,
+    ) {
+        self.for_each_cell_in_obj(entity_id, obj_transform, obj_size, |grid, pos, cells| {
+            grid.reset_cell_cost_helper(pos, cells);
         });
     }
 
     // Iterates over all grid cell positions that intersect with the unit’s AABB.
     fn for_each_cell_in_obj<F>(
         &mut self,
+        entity_id: u32,
         obj_transform: &Transform,
         obj_size: &RtsObjSize,
         mut callback: F,
     ) where
-        F: FnMut(&mut Self, Vec3),
+        F: FnMut(&mut Self, Vec3, Vec<IVec2>),
     {
         let cell_size = self.cell_diameter;
         let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
@@ -126,35 +152,50 @@ impl Grid {
         let min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
         let max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
 
+        let mut occupied_cells = Vec::new();
         for y in min_y..=max_y {
             for x in min_x..=max_x {
                 if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
+                    occupied_cells.push(IVec2::new(x as i32, y as i32));
+
                     let cell_pos = Vec3::new(
                         x as f32 * cell_size + grid_offset_x,
                         0.0,
                         y as f32 * cell_size + grid_offset_y,
                     );
-                    callback(self, cell_pos);
                 }
             }
         }
+
+        callback(self, Vec3::ZERO, occupied_cells);
+        // self.occupied_cells.insert(entity_id, occupied_cells);
     }
 
-    fn update_cell_cost_helper(&mut self, position: Vec3) -> Cell {
+    fn update_cell_cost_helper(&mut self, position: Vec3, cells: Vec<IVec2>) -> Cell {
         let cell = self.get_cell_from_world_position(position);
-        if cell.idx.y < self.grid.len() as i32
-            && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
-        {
-            self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
+
+        for cell in cells.iter() {
+            self.grid[cell.y as usize][cell.x as usize].cost = 255;
         }
+
+        // if cell.idx.y < self.grid.len() as i32
+        //     && cell.idx.x < self.grid[cell.idx.y as usize].len() as i32
+        // {
+        //     self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 255;
+        // }
         cell
     }
 
     // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally
     // something else? Like different terrain (mud, snow)? Maybe we need to store the original costfield in a hashmap or something
-    fn reset_cell_cost_helper(&mut self, position: Vec3) -> Cell {
+    fn reset_cell_cost_helper(&mut self, position: Vec3, cells: Vec<IVec2>) -> Cell {
         let cell = self.get_cell_from_world_position(position);
-        self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
+
+        for cell in cells.iter() {
+            self.grid[cell.y as usize][cell.x as usize].cost = 1;
+        }
+
+        // self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
         cell
     }
 }
@@ -162,12 +203,12 @@ impl Grid {
 // update this so that it gets the aabb of the entity and checks if it intersects with the cell
 fn initialize_costfield(
     mut grid: ResMut<Grid>,
-    q_objects: Query<(&Transform, &RtsObjSize), With<RtsObj>>,
+    q_objects: Query<(Entity, &Transform, &RtsObjSize), With<RtsObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
 
-    for (transform, size) in objects {
-        grid.update_cell_costs(transform, size);
+    for (ent, transform, size) in objects {
+        grid.update_cell_costs(ent.index(), transform, size);
     }
 }
 
@@ -175,16 +216,15 @@ fn initialize_costfield(
 fn update_costfield_on_add(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_objects: Query<(&Transform, &RtsObjSize), Added<RtsObj>>,
+    q_objects: Query<(Entity, &Transform, &RtsObjSize), Added<RtsObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
     if objects.is_empty() {
         return;
     }
 
-    for (transform, size) in objects.iter() {
-        println!("Object added!: {:?}", size.0);
-        grid.update_cell_costs(transform, size);
+    for (ent, transform, size) in objects.iter() {
+        grid.update_cell_costs(ent.index(), transform, size);
     }
 
     cmds.trigger(UpdateCostEv);
@@ -194,11 +234,11 @@ fn update_costfield_on_remove(
     trigger: Trigger<OnRemove, RtsObj>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_transform: Query<(&Transform, &RtsObjSize)>,
+    q_transform: Query<(Entity, &Transform, &RtsObjSize)>,
 ) {
     let ent = trigger.entity();
-    if let Ok((transform, size)) = q_transform.get(ent) {
-        grid.reset_cell_costs(transform, size);
+    if let Ok((ent, transform, size)) = q_transform.get(ent) {
+        grid.reset_cell_costs(ent.index(), transform, size);
     } else {
         return;
     }
@@ -217,7 +257,7 @@ fn add(
     }
 
     for (ent, transform, size) in units.iter() {
-        grid.update_cell_costs(transform, size);
+        grid.update_cell_costs(ent.index(), transform, size);
         cmds.entity(*ent).remove::<RtsObj>();
     }
 
@@ -228,11 +268,11 @@ fn remove(
     trigger: Trigger<OnRemove, Destination>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_transform: Query<(&Transform, &RtsObjSize)>,
+    q_transform: Query<(Entity, &Transform, &RtsObjSize)>,
 ) {
     let ent = trigger.entity();
-    if let Ok((transform, size)) = q_transform.get(ent) {
-        grid.reset_cell_costs(transform, size);
+    if let Ok((ent, transform, size)) = q_transform.get(ent) {
+        grid.reset_cell_costs(ent.index(), transform, size);
         cmds.entity(ent).insert(RtsObj);
     } else {
         return;
