@@ -107,6 +107,7 @@ impl Grid {
 
         let obj_pos = obj_transform.translation;
         let half_extent = obj_size.0 / 2.0;
+
         let aabb = Aabb::from_min_max(
             Vec3::new(
                 obj_pos.x - half_extent.x,
@@ -153,9 +154,6 @@ impl Grid {
     // something else? Like different terrain (mud, snow)? Maybe we need to store the original costfield in a hashmap or something
     fn reset_cell_cost_helper(&mut self, position: Vec3) -> Cell {
         let cell = self.get_cell_from_world_position(position);
-        // println!();
-        // println!("cell idx: {},{}", cell.idx.y, cell.idx.x);
-        // println!();
         self.grid[cell.idx.y as usize][cell.idx.x as usize].cost = 1;
         cell
     }
@@ -185,6 +183,7 @@ fn update_costfield_on_add(
     }
 
     for (transform, size) in objects.iter() {
+        println!("Object added!: {:?}", size.0);
         grid.update_cell_costs(transform, size);
     }
 
