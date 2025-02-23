@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use super::components::*;
 use super::resources::*;
-use super::shader::InstanceMaterialData;
 use crate::*;
 use grid::Grid;
 
