@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     cell::Cell,
-    components::{Destination, RtsDynamicObj, RtsObj, RtsObjSize},
+    components::{Destination, RtsObj, RtsObjSize},
     events::UpdateCostEv,
     utils,
 };
@@ -13,7 +13,6 @@ pub struct GridPlugin;
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
-            .add_systems(PostStartup, initialize_costfield)
             .add_systems(Update, (update_costfield_on_add, remove_rts_obj))
             .add_observer(update_costfield_on_remove);
 
@@ -158,18 +157,6 @@ impl Grid {
             }
         }
     }
-}
-
-// update this so that it gets the aabb of the entity and checks if it intersects with the cell
-// TODO: REmove?
-fn initialize_costfield(// mut grid: ResMut<Grid>,
-    // q_objects: Query<(Entity, &Transform, &RtsObjSize), With<RtsObj>>,
-) {
-    // let objects = q_objects.iter().collect::<Vec<_>>();
-
-    // for (ent, transform, size) in objects {
-    //     grid.update_cell_costs(ent.index(), transform, size);
-    // }
 }
 
 // detects if a new static object has been added and updates the costfield
