@@ -150,6 +150,7 @@ impl Grid {
     }
 
     // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally
+    // something different like rough terrain?
     pub fn reset_cell_costs(&mut self, entity_id: u32) {
         if let Some(occupied_cells) = self.occupied_cells.remove(&entity_id) {
             for cell in occupied_cells.iter() {
