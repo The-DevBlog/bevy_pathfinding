@@ -138,14 +138,10 @@ impl Grid {
             }
         }
 
-        // callback(self, Vec3::ZERO, occupied_cells);
-
         self.occupied_cells
             .entry(entity_id)
             .and_modify(|cells| cells.extend(occupied_cells.iter().cloned()))
             .or_insert(occupied_cells);
-
-        // self.occupied_cells.insert(entity_id, occupied_cells);
     }
 
     // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally

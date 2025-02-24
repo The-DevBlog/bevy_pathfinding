@@ -13,6 +13,7 @@ pub struct Destination;
 pub struct RtsObjSize(pub Vec2);
 
 #[derive(Component, Default)]
+#[require(Boid)]
 pub struct RtsObj;
 
 // separation: pushes boids away from each other
