@@ -189,6 +189,7 @@ fn update_costfield_on_add(
     cmds.trigger(UpdateCostEv);
 }
 
+// detects if a static object has been removed and updates the costfield
 fn update_costfield_on_remove(
     trigger: Trigger<OnRemove, RtsObj>,
     mut cmds: Commands,
