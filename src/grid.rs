@@ -14,9 +14,8 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>()
             .add_systems(PostStartup, initialize_costfield)
-            .add_systems(Update, (update_costfield_on_add, add))
-            .add_observer(update_costfield_on_remove)
-            .add_observer(remove);
+            .add_systems(Update, (update_costfield_on_add, remove_rts_obj))
+            .add_observer(update_costfield_on_remove);
 
         app.add_systems(Update, print.run_if(resource_exists::<Grid>));
     }
@@ -206,39 +205,13 @@ fn update_costfield_on_remove(
     cmds.trigger(UpdateCostEv);
 }
 
-fn add(
-    mut cmds: Commands,
-    // mut grid: ResMut<Grid>,
-    q_units: Query<(Entity, &Transform, &RtsObjSize), Added<Destination>>,
-) {
+fn remove_rts_obj(mut cmds: Commands, q_units: Query<Entity, Added<Destination>>) {
     let units = q_units.iter().collect::<Vec<_>>();
     if units.is_empty() {
         return;
     }
 
-    for (ent, transform, size) in units.iter() {
-        // grid.update_cell_costs(ent.index(), transform, size);
+    for ent in units.iter() {
         cmds.entity(*ent).remove::<RtsObj>();
     }
-
-    // cmds.trigger(UpdateCostEv);
-}
-
-fn remove(
-    trigger: Trigger<OnRemove, Destination>,
-    mut cmds: Commands,
-    // mut grid: ResMut<Grid>,
-    q_transform: Query<Entity>,
-) {
-    let ent = trigger.entity();
-    if let Ok(ent) = q_transform.get(ent) {
-        println!("Removing destination");
-        // grid.reset_cell_costs(ent.index());
-        cmds.entity(ent).insert(RtsObj);
-    }
-    // else {
-    //     return;
-    // }
-
-    // cmds.trigger(UpdateCostEv);
 }

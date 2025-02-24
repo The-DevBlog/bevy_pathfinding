@@ -501,6 +501,7 @@ fn remove_flowfields(
 
                 if distance_squared < cell_diamter_squared {
                     cmds.entity(unit_ent).remove::<Destination>();
+                    cmds.entity(unit_ent).insert(RtsObj);
                     dest_ff_to_remove.push(dest_ff_idx);
                 }
             }
