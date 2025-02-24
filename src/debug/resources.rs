@@ -34,7 +34,7 @@ impl Default for DebugOptions {
             draw_grid: true,
             print_statements: true,
             draw_mode_1: DrawMode::None,
-            draw_mode_2: DrawMode::FlowField,
+            draw_mode_2: DrawMode::CostField,
         }
     }
 }

@@ -19,18 +19,20 @@ impl Plugin for FlowfieldPlugin {
             ),
         )
         .add_systems(Update, count)
+        .add_observer(update_fields)
         .add_observer(initialize_flowfield)
         .add_observer(initialize_destination_flowfields);
     }
 }
 
-fn count(q_ff: Query<&FlowField>, q_d: Query<&Destination>) {
-    // println!("Destinations: {}", q_d.iter().len());
+// TODO: Remove
+fn count(_q_ff: Query<&FlowField>, _q_d: Query<&Destination>) {
+    // println!("Destinations: {}", _q_d.iter().len());
 
-    let mut dest_ffs = 0;
-    for ff in q_ff.iter() {
-        dest_ffs += ff.destination_flowfields.len();
-    }
+    // let mut dest_ffs = 0;
+    // for ff in q_ff.iter() {
+    //     dest_ffs += ff.destination_flowfields.len();
+    // }
 
     // println!(
     //     "FF Count: {}, Dest FF Count: {}",
@@ -498,8 +500,8 @@ fn remove_flowfields(
                     (dest_ff.destination_cell.world_pos - unit_pos).length_squared();
 
                 if distance_squared < cell_diamter_squared {
-                    println!("Removing unit from dest FF");
                     cmds.entity(unit_ent).remove::<Destination>();
+                    cmds.entity(unit_ent).insert(RtsObj);
                     dest_ff_to_remove.push(dest_ff_idx);
                 }
             }
@@ -512,7 +514,6 @@ fn remove_flowfields(
 
         // if the flowfield has no destination flowfields, remove it
         if ff.destination_flowfields.is_empty() {
-            println!("Revmoing FlowField");
             cmds.entity(ff_ent).despawn_recursive();
         }
     }
@@ -569,7 +570,7 @@ fn initialize_flowfield(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_unit_info: Query<(&Transform, &UnitSize)>,
+    q_unit_info: Query<(&Transform, &RtsObjSize)>,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
     mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
@@ -640,18 +641,29 @@ fn initialize_flowfield(
 
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
-    let ff_ent = cmds.spawn((ff.clone(), Name::new("ParentFlowField"))).id();
+    let ff_ent = cmds
+        .spawn((
+            ff.clone(),
+            Name::new("ParentFlowField"),
+            Transform::default(),
+            GlobalTransform::default(),
+        ))
+        .id();
     cmds.trigger(InitializeDestinationFlowFieldsEv(ff_ent));
 
-    // TODO: Remove
-    let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
-    let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-    cmds.spawn((
-        DestinationRadius(ff_ent.index()),
-        mesh,
-        material,
-        Transform::from_translation(ff.destination_cell.world_pos),
-    ));
+    // TODO: Remove (debugging purposes)
+    {
+        let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
+        let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+        cmds.entity(ff_ent).with_children(|parent| {
+            parent.spawn((
+                DestinationRadius(ff_ent.index()),
+                mesh,
+                material,
+                Transform::from_translation(ff.destination_cell.world_pos),
+            ));
+        });
+    }
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
 }
@@ -706,4 +718,36 @@ fn initialize_destination_flowfields(
     // parent_ff._print_idx();
 
     println!("initialize_destination_flowfields() end");
+}
+
+// Updates integration fields and flowfields whenever a cost field is updated
+fn update_fields(
+    _trigger: Trigger<UpdateCostEv>,
+    mut cmds: Commands,
+    mut q_ff: Query<&mut FlowField>,
+    grid: Res<Grid>,
+) {
+    // if there is not FF, then we still want to draw the cost field
+    if q_ff.is_empty() {
+        cmds.trigger(DrawCostFieldEv);
+        return;
+    }
+
+    let mut active_ff = None;
+    for mut ff in q_ff.iter_mut() {
+        let dest_idx = ff.destination_cell.idx;
+        ff.create_integration_field(grid.grid.clone(), dest_idx);
+        ff.flowfield_props.create_flowfield();
+
+        for dest_ff in ff.destination_flowfields.iter_mut() {
+            let dest_idx = dest_ff.destination_cell.idx;
+            dest_ff.create_integration_field(dest_idx);
+            dest_ff.flowfield_props.create_flowfield();
+        }
+
+        active_ff = Some(ff.clone());
+    }
+
+    // TODO: This does not work perfectly. It will set the last flowfield as the active one.
+    cmds.trigger(SetActiveFlowfieldEv(active_ff));
 }

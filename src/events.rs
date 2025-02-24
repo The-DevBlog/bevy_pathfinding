@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{cell::Cell, flowfield::FlowField};
+use crate::flowfield::FlowField;
 
 #[derive(Event)]
 pub struct InitializeFlowFieldEv(pub Vec<Entity>);
@@ -15,15 +15,16 @@ pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
 pub struct DrawCostFieldEv;
 
 #[derive(Event)]
-pub struct UpdateCostEv {
-    pub cell: Cell,
-}
+pub struct UpdateCostEv;
+
+#[derive(Event)]
+pub struct DrawAllEv;
+
+#[derive(Event)]
+pub struct DrawGridEv;
+
+#[derive(Event)]
+pub struct DrawIntegrationFieldEv;
 
 #[derive(Event)]
 pub struct DrawFlowFieldEv;
-
-impl UpdateCostEv {
-    pub fn new(cell: Cell) -> Self {
-        Self { cell }
-    }
-}

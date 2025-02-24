@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
 use super::components::*;
-use super::events::*;
 use super::resources::*;
 use crate::*;
-// use debug::shader::InstanceMaterialData;
 use grid::Grid;
 
 const BASE_SCALE: f32 = 0.2;
@@ -15,12 +13,10 @@ impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, detect_debug_change.run_if(resource_exists::<Grid>))
             .add_observer(trigger_events)
-            // .add_observer(update_costfield)
             .add_observer(draw_grid)
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
             .add_observer(draw_flowfield)
-            // .add_observer(update_flowfield)
             .add_observer(draw_integration_field)
             .add_observer(draw_index);
     }
@@ -32,14 +28,16 @@ struct GridLine;
 fn set_active_dbg_flowfield(
     trigger: Trigger<SetActiveFlowfieldEv>,
     mut cmds: Commands,
-    mut active_dbg_flowfield: ResMut<ActiveDebugFlowfield>,
+    mut active_dbg_flowfield: ResMut<ActiveDbgFlowfield>,
 ) {
     if let Some(new_ff) = &trigger.event().0 {
-        if let Some(current_ff) = &active_dbg_flowfield.0 {
+        if let Some(_current_ff) = &active_dbg_flowfield.0 {
             // Skip if the grid is the same
-            if current_ff.flowfield_props.grid == new_ff.flowfield_props.grid {
-                return;
-            }
+
+            // TODO: Remove? This techinically would save a bit on performance, but it's not necessary and its causing causing the dbg flowfield to not render dynamically
+            // if current_ff.flowfield_props.grid == new_ff.flowfield_props.grid {
+            // return;
+            // }
         }
         // Set the new flowfield and trigger debug draw
         active_dbg_flowfield.0 = Some(new_ff.clone());
@@ -53,11 +51,15 @@ fn set_active_dbg_flowfield(
     }
 }
 
-fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands) {
+fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<DebugOptions>) {
+    dbg.print("\ntrigger_events() start");
+
     cmds.trigger(DrawGridEv);
     cmds.trigger(DrawCostFieldEv);
     cmds.trigger(DrawFlowFieldEv);
     cmds.trigger(DrawIntegrationFieldEv);
+
+    dbg.print("trigger_events() end");
 }
 
 fn draw_grid(
@@ -145,7 +147,7 @@ pub fn draw_flowfield(
     _trigger: Trigger<DrawFlowFieldEv>,
     dbg: Res<DebugOptions>,
     grid: Res<Grid>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -318,7 +320,7 @@ fn draw_costfield(
 fn draw_integration_field(
     _trigger: Trigger<DrawIntegrationFieldEv>,
     dbg: Res<DebugOptions>,
-    active_dbg_flowfield: Res<ActiveDebugFlowfield>,
+    active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
     q_cost: Query<Entity, With<BestCostMarker>>,
     grid: Res<Grid>,
@@ -407,7 +409,6 @@ fn draw_index(
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
-    active_dbg_ff: Res<ActiveDebugFlowfield>,
     mut cmds: Commands,
 ) {
     // Remove current index entities before rendering new ones
@@ -419,10 +420,6 @@ fn draw_index(
         return;
     }
 
-    let Some(ff) = &active_dbg_ff.0 else {
-        return;
-    };
-
     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::Index);
     let Some(base_offset) = base_offset else {
         return;
@@ -430,12 +427,10 @@ fn draw_index(
 
     dbg.print("\ndraw_index() start");
 
-    let base_digit_spacing = grid.cell_diameter * 0.275; // Consider moving to a constant
+    let base_digit_spacing = grid.cell_diameter * 0.275; // TODO: Consider moving to a constant
     let mut instances = HashMap::new();
 
-    // TODO: Uncomment this back
-    // for cell_row in &grid.grid {
-    for cell_row in ff.flowfield_props.grid.iter() {
+    for cell_row in grid.grid.iter() {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = format!("{}{}", cell.idx.y, cell.idx.x)
                 .chars()
@@ -487,6 +482,7 @@ fn draw_index(
     }
 
     cmds.spawn((
+        // TODO: Remove?
         IndexMarker,
         Mesh3d(meshes.add(Rectangle::new(grid.cell_diameter, grid.cell_diameter))),
         debug::shader::InstanceMaterialData(instances),
@@ -495,8 +491,9 @@ fn draw_index(
     dbg.print("draw_index() end");
 }
 
-// fn update_flowfield(
+// fn update_flowfield_cell(
 //     trigger: Trigger<UpdateCostEv>,
+//     dbg: Res<DebugOptions>,
 //     grid: Res<Grid>,
 //     active_dbg_flowfield: Res<ActiveDebugFlowfield>,
 //     mut q_instance: Query<&mut InstanceMaterialData, With<FlowFieldMarker>>,
@@ -506,7 +503,8 @@ fn draw_index(
 //     };
 
 //     let cell_data = trigger.cell;
-//     let mut cell = active_flowfield.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
+//     let mut cell =
+//         active_flowfield.flowfield_props.grid[cell_data.idx.y as usize][cell_data.idx.x as usize];
 //     cell.cost = cell_data.cost;
 
 //     let id = cell.idx_to_id(grid.grid.len());
