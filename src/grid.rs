@@ -12,9 +12,14 @@ pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<Grid>()
-            .add_systems(Update, (update_costfield_on_add, remove_rts_obj))
-            .add_observer(update_costfield_on_remove);
+        app.register_type::<Grid>().add_systems(
+            Update,
+            (
+                update_costfield_on_add,
+                update_costfield_on_remove,
+                remove_rts_obj,
+            ),
+        );
 
         app.add_systems(Update, print.run_if(resource_exists::<Grid>));
     }
@@ -146,10 +151,12 @@ impl Grid {
 
     // TODO: Will eventually need rework. This is setting the cell cost back to 1. What if the cost was originally
     // something different like rough terrain?
-    pub fn reset_cell_costs(&mut self, entity_id: u32) {
-        if let Some(occupied_cells) = self.occupied_cells.remove(&entity_id) {
-            for cell in occupied_cells.iter() {
-                self.grid[cell.y as usize][cell.x as usize].cost = 1;
+    pub fn reset_cell_costs(&mut self, entities: Vec<Entity>) {
+        for ent in entities.iter() {
+            if let Some(occupied_cells) = self.occupied_cells.remove(&ent.index()) {
+                for cell in occupied_cells.iter() {
+                    self.grid[cell.y as usize][cell.x as usize].cost = 1;
+                }
             }
         }
     }
@@ -175,19 +182,17 @@ fn update_costfield_on_add(
 
 // detects if a static object has been removed and updates the costfield
 fn update_costfield_on_remove(
-    trigger: Trigger<OnRemove, RtsObj>,
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_transform: Query<Entity>,
+    mut removed: RemovedComponents<RtsObj>,
 ) {
-    let ent = trigger.entity();
-    if let Ok(ent) = q_transform.get(ent) {
-        grid.reset_cell_costs(ent.index());
-    } else {
-        return;
-    }
+    let objs: Vec<Entity> = removed.read().collect();
 
-    cmds.trigger(UpdateCostEv);
+    if !objs.is_empty() {
+        println!("Removing {} objs", objs.len());
+        grid.reset_cell_costs(objs);
+        cmds.trigger(UpdateCostEv);
+    }
 }
 
 fn remove_rts_obj(mut cmds: Commands, q_units: Query<Entity, Added<Destination>>) {

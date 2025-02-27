@@ -2,6 +2,7 @@ use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::time::Instant;
 
 use crate::components::*;
 use crate::events::*;
@@ -720,6 +721,7 @@ fn initialize_destination_flowfields(
     println!("initialize_destination_flowfields() end");
 }
 
+// TODO: Causes huge performance dip
 // Updates integration fields and flowfields whenever a cost field is updated
 fn update_fields(
     _trigger: Trigger<UpdateCostEv>,
@@ -728,6 +730,7 @@ fn update_fields(
     grid: Res<Grid>,
 ) {
     // if there is not FF, then we still want to draw the cost field
+    // debug feature only
     if q_ff.is_empty() {
         cmds.trigger(DrawCostFieldEv);
         return;
@@ -749,5 +752,6 @@ fn update_fields(
     }
 
     // TODO: This does not work perfectly. It will set the last flowfield as the active one.
+    // debug feature only
     cmds.trigger(SetActiveFlowfieldEv(active_ff));
 }
