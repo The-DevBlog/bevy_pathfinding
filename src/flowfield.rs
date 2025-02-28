@@ -2,7 +2,6 @@ use bevy::{prelude::*, window::PrimaryWindow};
 use ops::FloatPow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::time::Instant;
 
 use crate::components::*;
 use crate::events::*;
