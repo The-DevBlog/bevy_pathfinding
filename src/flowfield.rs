@@ -729,6 +729,7 @@ fn update_fields(
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
 ) {
+    println!("update fields");
     // if there is not FF, then we still want to draw the cost field
     // debug feature only
     if q_ff.is_empty() {
