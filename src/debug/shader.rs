@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use sync_world::MainEntity;
 use texture::GpuImage;
 
-use super::resources::DebugOptions;
+use super::resources::DbgOptions;
 
 const DIGIT_ATLAS: &[u8] = include_bytes!("../../assets/imgs/digit_atlas.png");
 const ARROW_IMG: &[u8] = include_bytes!("../../assets/imgs/arrow.png");
@@ -109,7 +109,7 @@ impl Plugin for CustomShaderPlugin {
 }
 
 pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
-    let Some(dbg) = world.get_resource::<DebugOptions>() else {
+    let Some(dbg) = world.get_resource::<DbgOptions>() else {
         return;
     };
 
@@ -126,7 +126,7 @@ pub fn sync_data_from_main_app(mut cmds: Commands, world: ResMut<MainWorld>) {
 fn load_textures(
     mut images: ResMut<Assets<Image>>,
     mut assets: ResMut<MyAssets>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
 ) {
     dbg.print("\nload_textures() start");
 
@@ -213,7 +213,7 @@ fn load_textures(
 
     // DESTINATION IMG
     let img = image::load_from_memory_with_format(DESTINATION_IMG, ImageFormat::Png)
-    .expect("Failed to load destination image");
+        .expect("Failed to load destination image");
     let rgba_image = img.to_rgba8();
     let (width, height) = rgba_image.dimensions();
 

@@ -7,9 +7,9 @@ pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<DebugOptions>()
+        app.init_resource::<DbgOptions>()
             .init_resource::<DbgIcon>()
-            .register_type::<DebugOptions>()
+            .register_type::<DbgOptions>()
             .add_systems(Startup, load_dbg_icon);
     }
 }
@@ -19,7 +19,7 @@ pub struct DbgIcon(pub Handle<Image>);
 
 #[derive(Reflect, Resource, Clone, Copy)]
 #[reflect(Resource)]
-pub struct DebugOptions {
+pub struct DbgOptions {
     pub hide: bool,
     pub draw_grid: bool,
     pub print_statements: bool,
@@ -27,9 +27,9 @@ pub struct DebugOptions {
     pub draw_mode_2: DrawMode,
 }
 
-impl Default for DebugOptions {
+impl Default for DbgOptions {
     fn default() -> Self {
-        DebugOptions {
+        DbgOptions {
             hide: false,
             draw_grid: true,
             print_statements: true,
@@ -39,7 +39,7 @@ impl Default for DebugOptions {
     }
 }
 
-impl DebugOptions {
+impl DbgOptions {
     pub fn draw_mode_to_string(mode: DrawMode) -> String {
         match mode {
             DrawMode::None => String::from("None"),

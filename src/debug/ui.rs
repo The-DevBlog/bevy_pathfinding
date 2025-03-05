@@ -101,7 +101,7 @@ fn handle_drawmode_option_interaction(
         (&Interaction, &SetActiveOption, &mut BackgroundColor),
         Changed<Interaction>,
     >,
-    mut dbg: ResMut<DebugOptions>,
+    mut dbg: ResMut<DbgOptions>,
 ) {
     for (interaction, option, mut background) in q_option.iter_mut() {
         match interaction {
@@ -125,7 +125,7 @@ fn handle_draw_grid_interaction(
         (Changed<Interaction>, With<DrawGridBtn>),
     >,
     mut q_txt: Query<&mut Text, With<DrawGridTxt>>,
-    mut dbg: ResMut<DebugOptions>,
+    mut dbg: ResMut<DbgOptions>,
 ) {
     for (interaction, mut background) in q_draw_grid.iter_mut() {
         match interaction {
@@ -147,7 +147,7 @@ fn handle_hide_dbg_interaction(
         (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<HideDbgBtn>),
     >,
-    mut dbg: ResMut<DebugOptions>,
+    mut dbg: ResMut<DbgOptions>,
     mut cmds: Commands,
 ) {
     for (interaction, mut background) in q_hide_dbg.iter_mut() {
@@ -196,7 +196,7 @@ fn hide_options(
 
 fn update_active_dropdown_option(
     _trigger: Trigger<UpdateDropdownOptionEv>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
     mut q_txt: Query<(&mut Text, &OptionBox)>,
 ) {
     for (mut txt, options) in q_txt.iter_mut() {
@@ -294,7 +294,7 @@ fn toggle_dropdown_visibility(
     }
 }
 
-fn draw_ui_box(mut cmds: Commands, dbg: Res<DebugOptions>, dbg_icon: Res<DbgIcon>) {
+fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>) {
     let root_ctr = (
         RootCtr,
         Node {

@@ -51,7 +51,7 @@ fn set_active_dbg_flowfield(
     }
 }
 
-fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<DebugOptions>) {
+fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<DbgOptions>) {
     dbg.print("\ntrigger_events() start");
 
     cmds.trigger(DrawGridEv);
@@ -68,7 +68,7 @@ fn draw_grid(
     mut meshes: ResMut<Assets<Mesh>>,
     q_grid_lines: Query<Entity, With<GridLine>>,
     grid: Res<Grid>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
 ) {
     // Remove old grid lines before re-drawing
     for line_entity in &q_grid_lines {
@@ -145,7 +145,7 @@ fn draw_grid(
 
 pub fn draw_flowfield(
     _trigger: Trigger<DrawFlowFieldEv>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     q_flowfield_arrow: Query<Entity, With<FlowFieldMarker>>,
@@ -242,7 +242,7 @@ pub fn draw_flowfield(
 
 fn draw_costfield(
     _trigger: Trigger<DrawCostFieldEv>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     mut cmds: Commands,
@@ -319,7 +319,7 @@ fn draw_costfield(
 
 fn draw_integration_field(
     _trigger: Trigger<DrawIntegrationFieldEv>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
     active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
     q_cost: Query<Entity, With<BestCostMarker>>,
@@ -405,7 +405,7 @@ fn draw_integration_field(
 
 fn draw_index(
     _trigger: Trigger<DrawAllEv>,
-    dbg: Res<DebugOptions>,
+    dbg: Res<DbgOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
     q_idx: Query<Entity, With<IndexMarker>>,
@@ -594,7 +594,7 @@ fn draw_index(
 
 fn calculate_offset(
     cell_diameter: f32,
-    dbg: &Res<DebugOptions>,
+    dbg: &Res<DbgOptions>,
     draw_mode: DrawMode,
 ) -> Option<Vec3> {
     let mode = if dbg.draw_mode_1 == draw_mode {
@@ -651,7 +651,7 @@ fn calculate_digit_spacing_and_scale(
     }
 }
 
-fn detect_debug_change(mut cmds: Commands, debug: Res<DebugOptions>) {
+fn detect_debug_change(mut cmds: Commands, debug: Res<DbgOptions>) {
     if debug.is_changed() {
         cmds.trigger(DrawAllEv);
     }
