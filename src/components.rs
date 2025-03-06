@@ -10,7 +10,7 @@ pub struct GameCamera;
 pub struct Destination;
 
 #[derive(Component)]
-pub struct RtsObjSize(pub Vec2);
+pub struct RtsObjSize(pub Vec3);
 
 #[derive(Component, Default)]
 #[require(Boid)]

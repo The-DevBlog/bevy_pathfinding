@@ -621,7 +621,7 @@ fn initialize_flowfield(
     let mut unit_positions = Vec::new();
     for &unit in &units {
         if let Ok((transform, size)) = q_unit_info.get(unit) {
-            unit_positions.push((transform.translation, size.0));
+            unit_positions.push((transform.translation, size.0)); // TODO: size.0 is assuming the unit is the same side in all dimensions
         }
     }
 

@@ -112,7 +112,7 @@ impl Grid {
         let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
 
         let obj_pos = obj_transform.translation;
-        let half_extent = obj_size.0 / 2.0;
+        let half_extent = obj_size.0 / 2.0; // TODO: this is assuming the object is a cube
 
         let aabb = Aabb::from_min_max(
             Vec3::new(
