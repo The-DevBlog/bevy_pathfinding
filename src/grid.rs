@@ -189,7 +189,6 @@ fn update_costfield_on_remove(
     let objs: Vec<Entity> = removed.read().collect();
 
     if !objs.is_empty() {
-        println!("Removing {} objs", objs.len());
         grid.reset_cell_costs(objs);
         cmds.trigger(UpdateCostEv);
     }
