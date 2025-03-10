@@ -114,30 +114,35 @@ impl Grid {
         let obj_pos = obj_transform.translation;
         let half_extent = obj_size.0 / 2.0;
 
-        let aabb = Aabb::from_min_max(
-            Vec3::new(
-                obj_pos.x - half_extent.x,
-                obj_pos.y - half_extent.y,
-                obj_pos.z - half_extent.z,
-            ),
-            Vec3::new(
-                obj_pos.x + half_extent.x,
-                obj_pos.y + half_extent.y,
-                obj_pos.z + half_extent.z,
-            ),
+        // Obtain the rotation matrix from the object's rotation.
+        let rotation = Mat3::from_quat(obj_transform.rotation);
+
+        // Compute the absolute value of each column of the rotation matrix.
+        // This effectively gives the scaling of the half extents in world space.
+        let abs_rotation = Mat3::from_cols(
+            rotation.x_axis.abs(),
+            rotation.y_axis.abs(),
+            rotation.z_axis.abs(),
         );
 
-        let min_x = ((aabb.min().x - grid_offset_x) / cell_size).floor() as isize;
-        let max_x = ((aabb.max().x - grid_offset_x) / cell_size).floor() as isize;
-        let min_y = ((aabb.min().z - grid_offset_y) / cell_size).floor() as isize;
-        let max_y = ((aabb.max().z - grid_offset_y) / cell_size).floor() as isize;
+        // Compute the world-space half extents by multiplying with the local half extents.
+        let world_half_extent = abs_rotation * half_extent;
+
+        // Compute the axis aligned bounding box that encloses the rotated object.
+        let aabb_min = obj_pos - world_half_extent;
+        let aabb_max = obj_pos + world_half_extent;
+
+        // Calculate grid cell indices based on the object's AABB in the xz-plane.
+        let min_x = ((aabb_min.x - grid_offset_x) / cell_size).floor() as isize;
+        let max_x = ((aabb_max.x - grid_offset_x) / cell_size).floor() as isize;
+        let min_y = ((aabb_min.z - grid_offset_y) / cell_size).floor() as isize;
+        let max_y = ((aabb_max.z - grid_offset_y) / cell_size).floor() as isize;
 
         let mut occupied_cells = Vec::new();
         for y in min_y..=max_y {
             for x in min_x..=max_x {
                 if x >= 0 && x < self.size.x as isize && y >= 0 && y < self.size.y as isize {
                     occupied_cells.push(IVec2::new(x as i32, y as i32));
-
                     self.grid[y as usize][x as usize].cost = 255;
                 }
             }
