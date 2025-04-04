@@ -508,8 +508,13 @@ fn remove_flowfields(
         }
 
         // Remove destiantion flowfields that are marked from above
-        for idx in dest_ff_to_remove.iter() {
-            ff.destination_flowfields.remove(*idx);
+        // First, sort the indices in descending order.
+        dest_ff_to_remove.sort_unstable_by(|a, b| b.cmp(a));
+        for &idx in dest_ff_to_remove.iter() {
+            // Check that the index is within the bounds of the vector.
+            if idx < ff.destination_flowfields.len() {
+                ff.destination_flowfields.remove(idx);
+            }
         }
 
         // if the flowfield has no destination flowfields, remove it
@@ -655,14 +660,14 @@ fn initialize_flowfield(
     {
         let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
         let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-        cmds.entity(ff_ent).with_children(|parent| {
-            parent.spawn((
-                DestinationRadius(ff_ent.index()),
-                mesh,
-                material,
-                Transform::from_translation(ff.destination_cell.world_pos),
-            ));
-        });
+        // cmds.entity(ff_ent).with_children(|parent| {
+        //     parent.spawn((
+        //         DestinationRadius(ff_ent.index()),
+        //         mesh,
+        //         material,
+        //         Transform::from_translation(ff.destination_cell.world_pos),
+        //     ));
+        // });
     }
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
