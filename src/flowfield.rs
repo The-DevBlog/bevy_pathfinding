@@ -14,32 +14,16 @@ impl Plugin for FlowfieldPlugin {
         app.add_systems(
             Update,
             (
-                remove_units_from_flowfield.run_if(resource_exists::<Grid>),
+                mark_unit_arrived.run_if(resource_exists::<Grid>),
+                remove_units_from_flowfield,
                 // transfer_to_destination_flowfield.run_if(resource_exists::<Grid>),
                 remove_flowfields,
             ),
         )
-        .add_systems(Update, count)
         .add_observer(update_fields)
         .add_observer(initialize_flowfield)
         .add_observer(initialize_destination_flowfields);
     }
-}
-
-// TODO: Remove
-fn count(_q_ff: Query<&FlowField>, _q_d: Query<&Destination>) {
-    // println!("Destinations: {}", _q_d.iter().len());
-
-    // let mut dest_ffs = 0;
-    // for ff in q_ff.iter() {
-    //     dest_ffs += ff.destination_flowfields.len();
-    // }
-
-    // println!(
-    //     "FF Count: {}, Dest FF Count: {}",
-    //     q_ff.iter().count(),
-    //     dest_ffs
-    // );
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -204,10 +188,11 @@ pub enum AvgDirection {
 pub struct FlowField {
     // pub destination_flowfields: Vec<DestinationFlowField>,
     pub destination_grid_size: IVec2,
-    pub destinations: Vec<IVec2>,
+    // pub destinations: Vec<IVec2>,
     pub destination_cell: Cell,
     pub destination_radius: f32,
     pub flowfield_props: FlowFieldProps,
+    pub unit_has_arrived: bool, // if true, the first unit has arrived at the destination
 }
 
 impl FlowField {
@@ -215,7 +200,7 @@ impl FlowField {
         cell_diameter: f32,
         grid_size: IVec2,
         units: Vec<Entity>,
-        unit_size: f32,
+        unit_count: f32,
         offset: Vec3,
     ) -> Self {
         let steering_map: HashMap<Entity, Vec3> =
@@ -238,12 +223,14 @@ impl FlowField {
         // destination_ff.flowfield_props.units = Vec::new();
 
         FlowField {
-            destinations: Vec::new(),
+            // destinations: Vec::new(),
             destination_grid_size: IVec2::ZERO,
             destination_cell: Cell::default(),
-            destination_radius: (units.len() as f32 * unit_size).sqrt() * 5.0,
+            destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
+            // destination_radius: (units.len() as f32 * unit_size).sqrt() * 5.0,
             // destination_flowfields: Vec::new(),
             flowfield_props: ff_props,
+            unit_has_arrived: false,
         }
     }
 
@@ -453,8 +440,38 @@ impl FlowField {
     }
 }
 
+// marks if a unit has arrived at the destination cell (not to be confused with the destination radius)
+fn mark_unit_arrived(
+    mut q_ff: Query<&mut FlowField>,
+    q_transform: Query<&Transform>,
+    grid: Res<Grid>,
+) {
+    for mut ff in q_ff.iter_mut() {
+        if ff.unit_has_arrived {
+            continue;
+        }
+
+        // Check if any unit is within the cell radius
+        for &unit in &ff.flowfield_props.units {
+            if let Ok(transform) = q_transform.get(unit) {
+                let unit_pos = transform.translation;
+                let distance_squared = (ff.destination_cell.world_pos - unit_pos).length_squared();
+                if distance_squared < grid.cell_radius.squared() {
+                    ff.unit_has_arrived = true;
+                    println!("First unit arrived!");
+                    break;
+                }
+            }
+        }
+    }
+}
+
 fn remove_units_from_flowfield(mut q_ff: Query<&mut FlowField>, q_transform: Query<&Transform>) {
     for mut ff in q_ff.iter_mut() {
+        if !ff.unit_has_arrived {
+            continue;
+        }
+
         let destination_pos = ff.destination_cell.world_pos;
         let radius_squared = ff.destination_radius.squared();
 
@@ -602,7 +619,7 @@ fn initialize_flowfield(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_map_base: Query<&GlobalTransform, With<MapBase>>,
-    q_unit_info: Query<(&Transform, &RtsObjSize)>,
+    q_unit_info: Query<&Transform>,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     mut meshes: ResMut<Assets<Mesh>>,                // TODO: Remove
     mut materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
@@ -650,12 +667,12 @@ fn initialize_flowfield(
     }
 
     // Gather unit positions and sizes
-    let mut unit_positions = Vec::new();
-    for &unit in &units {
-        if let Ok((transform, size)) = q_unit_info.get(unit) {
-            unit_positions.push((transform.translation, size.0)); // TODO: size.0 is assuming the unit is the same side in all dimensions
-        }
-    }
+    // let mut unit_positions = Vec::new();
+    // for &unit in &units {
+    //     if let Ok((transform, size)) = q_unit_info.get(unit) {
+    //         unit_positions.push((transform.translation, size.0)); // TODO: size.0 is assuming the unit is the same side in all dimensions
+    //     }
+    // }
 
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
@@ -664,7 +681,7 @@ fn initialize_flowfield(
         grid.cell_diameter,
         grid.size,
         units.clone(),
-        unit_positions[0].1.x,
+        units.len() as f32,
         Vec3::ZERO,
     );
 
