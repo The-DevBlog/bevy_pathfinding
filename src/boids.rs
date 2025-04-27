@@ -40,30 +40,6 @@ fn calculate_boid_steering(
             // Store in the map so we can apply it later
             ff.flowfield_props.steering_map.insert(*ent, steering);
         }
-
-        // DESTINATION FLOWFIELDS
-        // for ff in &mut ff.destination_flowfields.iter_mut() {
-        //     // Filter down which boids are in this flowfield
-        //     let units = ff.flowfield_props.units.clone();
-        //     let relevant_boids: Vec<_> = boids_data
-        //         .iter()
-        //         .filter(|(ent, _, _)| units.contains(ent))
-        //         .collect();
-
-        //     // For each boid, build neighbor list and compute boid vectors
-        //     for (ent, pos, boid) in &relevant_boids {
-        //         let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
-        //         let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
-        //         let computed_boids = separation + cohesion + alignment;
-
-        //         // Flowfield direction
-        //         let cell = ff.get_cell_from_world_position(pos.translation);
-        //         let steering = compute_steering(cell, computed_boids, boid);
-
-        //         // Store in the map so we can apply it later
-        //         ff.flowfield_props.steering_map.insert(*ent, steering);
-        //     }
-        // }
     }
 }
 
