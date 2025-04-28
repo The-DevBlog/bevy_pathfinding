@@ -16,26 +16,28 @@ pub struct RtsObjSize(pub Vec3);
 #[require(Boid)]
 pub struct RtsObj;
 
-// separation: pushes boids away from each other
-// alignment: aligns boids with their neighbors
-// cohesion: pulls boids towards the center of their neighbors
 #[derive(Component, Debug)]
 pub struct Boid {
-    pub separation_weight: f32,
-    pub alignment_weight: f32,
-    pub cohesion_weight: f32,
-    pub max_speed: f32,
-    pub neighbor_radius: f32,
+    pub velocity: Vec3,         // start at rest
+    pub max_force: f32,         // how quickly you can turn
+    pub separation_weight: f32, // push apart
+    pub alignment_weight: f32,  // match heading
+    pub cohesion_weight: f32,   // pull toward center
+    pub max_speed: f32,         // top movement speed
+    pub neighbor_radius: f32,   // how far you “see” neighbors
 }
 
 impl Default for Boid {
     fn default() -> Self {
+        let max_speed = 4.0;
         Self {
-            separation_weight: 50.0,
-            alignment_weight: 25.0,
-            cohesion_weight: 0.75,
-            max_speed: 4.0,
-            neighbor_radius: 30.0,
+            velocity: Vec3::ZERO,
+            max_force: max_speed * 0.1, // ~0.4 units/sec² of turn acceleration
+            separation_weight: 1.5,     // strongest urge to avoid collisions
+            alignment_weight: 1.0,      // medium urge to line up
+            cohesion_weight: 1.0,       // medium urge to stay together
+            max_speed,                  // units per second
+            neighbor_radius: 30.0,      // in world‐units (tweak to taste)
         }
     }
 }

@@ -25,7 +25,7 @@ impl Plugin for FlowfieldPlugin {
 }
 
 fn p(q: Query<&FlowField>) {
-    println!("FlowField count: {}", q.iter().len());
+    // println!("FlowField count: {}", q.iter().len());
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -156,6 +156,68 @@ impl FlowField {
             &self.flowfield_props.grid,
             offset,
         )
+    }
+
+    /// Smoothly sample the best_direction at an arbitrary world-space point
+    /// by bilinearly interpolating between the four enclosing cells.
+    pub fn sample_direction(&self, world_pos: Vec3) -> Vec2 {
+        // 1) Map world -> [0..1] uv over the grid
+        let (u, v) = self.world_to_uv(world_pos);
+
+        // 2) Scale uv to your discrete grid indices in float-space
+        let cols = self.flowfield_props.size.x as f32;
+        let rows = self.flowfield_props.size.y as f32;
+        let fx = u * (cols - 1.0);
+        let fy = v * (rows - 1.0);
+
+        // 3) Corners
+        let x0 = fx.floor() as usize;
+        let y0 = fy.floor() as usize;
+        let x1 = (x0 + 1).min(self.flowfield_props.size.x as usize - 1);
+        let y1 = (y0 + 1).min(self.flowfield_props.size.y as usize - 1);
+
+        let sx = fx - x0 as f32;
+        let sy = fy - y0 as f32;
+
+        // 4) Pull the four best_direction vectors (Vec2)
+        let d00 = self.flowfield_props.grid[y0][x0]
+            .best_direction
+            .vector()
+            .as_vec2();
+        let d10 = self.flowfield_props.grid[y0][x1]
+            .best_direction
+            .vector()
+            .as_vec2();
+        let d01 = self.flowfield_props.grid[y1][x0]
+            .best_direction
+            .vector()
+            .as_vec2();
+        let d11 = self.flowfield_props.grid[y1][x1]
+            .best_direction
+            .vector()
+            .as_vec2();
+
+        // 5) Bilinear lerp
+        let lerp = |a: Vec2, b: Vec2, t: f32| a * (1.0 - t) + b * t;
+        let d0 = lerp(d00, d10, sx);
+        let d1 = lerp(d01, d11, sx);
+        let smooth = lerp(d0, d1, sy).normalize_or_zero();
+
+        smooth.normalize_or_zero()
+    }
+
+    /// Convert a world-space position into UV [0..1] over the grid.
+    fn world_to_uv(&self, world_pos: Vec3) -> (f32, f32) {
+        // Offset so (0,0) is top-left of your grid
+        let local = world_pos - self.flowfield_props.offset;
+        let cell_d = self.flowfield_props.cell_diameter;
+        let cols = self.flowfield_props.size.x as f32;
+        let rows = self.flowfield_props.size.y as f32;
+
+        let u = (local.x + (cols * cell_d * 0.5)) / (cols * cell_d);
+        let v = (local.z + (rows * cell_d * 0.5)) / (rows * cell_d);
+
+        (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
     }
 
     fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
