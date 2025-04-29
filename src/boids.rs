@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy::prelude::*;
 
 use crate::{cell::Cell, components::*, flowfield::FlowField};
@@ -39,22 +41,37 @@ fn calculate_boid_steering(
             }
 
             // Build neighbor‐position list from our snapshot
-            // let neighbor_pos: Vec<Vec3> = boid_positions
-            //     .iter()
-            //     .filter(|(other_ent, pos)| {
-            //         *other_ent != ent && transform.translation.distance(*pos) < boid.neighbor_radius
-            //     })
-            //     .map(|(_, pos)| *pos)
-            //     .collect();
+            // Prepare new empty set for this frame
+            let mut current_neighbors = HashSet::new();
 
+            let enter_r2 = boid.neighbor_radius * boid.neighbor_radius;
+            let exit_r2 = boid.neighbor_exit_radius * boid.neighbor_exit_radius;
+
+            // Filter snapshots with hysteresis
             let neighbor_pos: Vec<(Vec3, Vec3)> = boid_positions
                 .iter()
-                .filter(|(other_ent, other_pos, _)| {
-                    *other_ent != ent
-                        && transform.translation.distance(*other_pos) < boid.neighbor_radius
+                .filter_map(|(other_ent, pos, vel)| {
+                    let dist2 = transform.translation.distance_squared(*pos);
+                    let was_neighbor = boid.prev_neighbors.contains(other_ent);
+
+                    // either newly inside enter radius, or still inside exit radius
+                    if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
+                        current_neighbors.insert(*other_ent);
+                        Some((*pos, *vel))
+                    } else {
+                        None
+                    }
                 })
-                .map(|(_, pos, vel)| (*pos, *vel))
                 .collect();
+
+            // let neighbor_pos: Vec<(Vec3, Vec3)> = boid_positions
+            //     .iter()
+            //     .filter(|(other_ent, other_pos, _)| {
+            //         *other_ent != ent
+            //             && transform.translation.distance(*other_pos) < boid.neighbor_radius
+            //     })
+            //     .map(|(_, pos, vel)| (*pos, *vel))
+            //     .collect();
 
             // Compute classic boid forces
             // let (sep, ali, coh) = compute_boids(neighbor_pos, &*transform, &*boid);
