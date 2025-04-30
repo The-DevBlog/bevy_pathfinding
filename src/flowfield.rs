@@ -312,7 +312,6 @@ fn remove_units_from_flowfield(
         let radius_squared = ff.destination_radius.squared();
 
         let mut units_to_remove: Vec<Entity> = Vec::new();
-        // Identify units that need to be moved to the destination flowfield
         for &mut unit_ent in ff.flowfield_props.units.iter_mut() {
             if let Ok(unit_transform) = q_transform.get(unit_ent) {
                 let unit_pos = unit_transform.translation;
@@ -327,6 +326,7 @@ fn remove_units_from_flowfield(
 
         // Remove units from the flowfield
         for unit in units_to_remove {
+            cmds.entity(unit).remove::<Destination>();
             ff.flowfield_props.remove_unit(unit);
         }
 
