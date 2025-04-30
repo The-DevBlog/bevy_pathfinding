@@ -291,7 +291,6 @@ fn mark_unit_arrived(
                 let distance_squared = (ff.destination_cell.world_pos - unit_pos).length_squared();
                 if distance_squared < grid.cell_radius.squared() {
                     ff.unit_has_arrived = true;
-                    println!("First unit arrived!");
                     break;
                 }
             }
