@@ -1,11 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bevy::prelude::*;
 
-use crate::{
-    components::*,
-    flowfield::{FlowField, FlowFieldProps},
-};
+use crate::{components::*, flowfield::FlowField};
 
 pub struct BoidsPlugin;
 
@@ -133,33 +130,6 @@ fn calculate_boid_steering(
             tf.translation += boid.velocity * dt;
         }
     }
-
-    // // ——— 1) GLOBAL SEPARATION (push-away) ———
-    // for (ent, mut tf, mut boid) in q_boids.iter_mut() {
-    //     let mut sep_force = Vec3::ZERO;
-    //     let r2 = boid.neighbor_radius * boid.neighbor_radius;
-
-    //     for (other_ent, pos, _vel) in &boid_snapshot {
-    //         if *other_ent == ent {
-    //             continue;
-    //         }
-    //         let delta = tf.translation - *pos;
-    //         let dist2 = delta.length_squared();
-    //         if dist2 < r2 {
-    //             // simple inverse-distance repulsion
-    //             sep_force += delta.normalize() / dist2.sqrt();
-    //         }
-    //     }
-
-    //     if sep_force != Vec3::ZERO {
-    //         let desired = sep_force.normalize() * boid.max_speed;
-    //         let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
-
-    //         boid.velocity += steer * dt;
-    //         boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
-    //         tf.translation += boid.velocity * dt;
-    //     }
-    // }
 
     // ——— 2) FLOW-FIELD + ALI/COH (optional) ———
     for mut ff in q_ff.iter_mut() {
