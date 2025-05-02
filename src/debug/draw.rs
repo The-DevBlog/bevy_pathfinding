@@ -168,11 +168,7 @@ pub fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let offset = calculate_offset(
-        active_dbg_ff.flowfield_props.cell_diameter,
-        &dbg,
-        DrawMode::FlowField,
-    );
+    let offset = calculate_offset(active_dbg_ff.cell_diameter, &dbg, DrawMode::FlowField);
     let Some(offset) = offset else {
         return;
     };
@@ -182,7 +178,7 @@ pub fn draw_flowfield(
     let mut instances = HashMap::new();
     let color = [1.0, 1.0, 1.0, 1.0];
 
-    for cell_row in active_dbg_ff.flowfield_props.grid.iter() {
+    for cell_row in active_dbg_ff.grid.iter() {
         for cell in cell_row.iter() {
             let is_destination_cell = active_dbg_ff.destination_cell.idx == cell.idx;
             let id = cell.idx_to_id(grid.grid.len());
@@ -335,11 +331,7 @@ fn draw_integration_field(
         return;
     };
 
-    let base_offset = calculate_offset(
-        ff.flowfield_props.cell_diameter,
-        &dbg,
-        DrawMode::IntegrationField,
-    );
+    let base_offset = calculate_offset(ff.cell_diameter, &dbg, DrawMode::IntegrationField);
     let Some(base_offset) = base_offset else {
         return;
     };
@@ -350,7 +342,7 @@ fn draw_integration_field(
 
     let mut instances = HashMap::new();
 
-    for cell_row in &ff.flowfield_props.grid {
+    for cell_row in &ff.grid {
         for cell in cell_row.iter() {
             let digits_vec: Vec<u32> = cell.best_cost_to_vec();
 

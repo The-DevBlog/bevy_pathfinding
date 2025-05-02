@@ -100,7 +100,7 @@ fn calculate_boid_steering(
     // 0.5) build set of all units in all flow-fields
     let mut ff_units = HashSet::new();
     for mut ff in q_ff.iter_mut() {
-        ff_units.extend(ff.flowfield_props.units.iter().copied());
+        ff_units.extend(ff.units.iter().copied());
     }
 
     // 1) GLOBAL SEPARATION — skip any that are in a flowfield
@@ -137,7 +137,7 @@ fn calculate_boid_steering(
         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
         // for &unit in &ff.flowfield_props.units {
-        for &unit in &ff.flowfield_props.units {
+        for &unit in &ff.units {
             if let Ok((_ent, mut tf, mut boid)) = q_boids.get_mut(unit) {
                 // rebuild neighbors with hysteresis and compute ali/coh
                 let enter_r2 = boid.neighbor_radius.powi(2);
@@ -179,7 +179,7 @@ fn calculate_boid_steering(
 
         // 3) now that the immutable borrow of `units` is done, do one mutable borrow
         for (unit, steer) in pending {
-            ff.flowfield_props.steering_map.insert(unit, steer);
+            ff.steering_map.insert(unit, steer);
         }
     }
 }

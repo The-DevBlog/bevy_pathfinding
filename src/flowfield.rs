@@ -32,8 +32,74 @@ fn p(q: Query<&FlowField>) {
 #[derive(Component)]
 pub struct DestinationRadius(pub u32);
 
-#[derive(Clone, Default, PartialEq)]
-pub struct FlowFieldProps {
+// #[derive(Clone, Default, PartialEq)]
+// pub struct FlowFieldProps {
+//     pub cell_radius: f32,
+//     pub cell_diameter: f32,
+//     pub grid: Vec<Vec<Cell>>,
+//     pub offset: Vec3,
+//     pub size: IVec2,
+//     pub steering_map: HashMap<Entity, Vec3>,
+//     pub units: Vec<Entity>,
+// }
+
+// impl FlowFieldProps {
+//     pub fn create_flowfield(&mut self) {
+//         let grid_size_y = self.size.y as usize;
+//         let grid_size_x = self.size.x as usize;
+
+//         for y in 0..grid_size_y {
+//             for x in 0..grid_size_x {
+//                 let cell = &self.grid[y][x]; // Immutable borrow to get best_cost
+//                 let mut best_cost = cell.best_cost;
+//                 let mut best_direction = GridDirection::None;
+
+//                 // Get all possible directions
+//                 for direction in GridDirection::all_directions() {
+//                     let delta = direction.vector();
+//                     let nx = x as isize + delta.x as isize;
+//                     let ny = y as isize + delta.y as isize;
+
+//                     if nx >= 0 && nx < grid_size_x as isize && ny >= 0 && ny < grid_size_y as isize
+//                     {
+//                         let neighbor = &self.grid[ny as usize][nx as usize];
+//                         if neighbor.best_cost < best_cost {
+//                             best_cost = neighbor.best_cost;
+//                             best_direction = direction;
+//                         }
+//                     }
+//                 }
+
+//                 // Now, set the best_direction for the cell
+//                 self.grid[y][x].best_direction = best_direction;
+//             }
+//         }
+//     }
+
+//     pub fn add_unit(&mut self, unit: Entity) {
+//         self.units.push(unit);
+//     }
+
+//     pub fn remove_unit(&mut self, unit: Entity) {
+//         self.units.retain(|&u| u != unit);
+//         self.steering_map.retain(|&u, _| u != unit);
+//     }
+// }
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum AvgDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Component, Clone, Default, PartialEq)]
+pub struct FlowField {
+    pub destination_grid_size: IVec2,
+    pub destination_cell: Cell,
+    pub destination_radius: f32,
+    pub unit_has_arrived: bool, // if true, the first unit has arrived at the destination
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
@@ -43,7 +109,42 @@ pub struct FlowFieldProps {
     pub units: Vec<Entity>,
 }
 
-impl FlowFieldProps {
+impl FlowField {
+    pub fn new(
+        cell_diameter: f32,
+        grid_size: IVec2,
+        units: Vec<Entity>,
+        unit_count: f32,
+        offset: Vec3,
+    ) -> Self {
+        let steering_map: HashMap<Entity, Vec3> =
+            units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
+
+        // let ff_props = FlowFieldProps {
+        //     cell_radius: cell_diameter / 2.0,
+        //     cell_diameter,
+        //     grid: Vec::default(),
+        //     offset,
+        //     size: grid_size,
+        //     steering_map,
+        //     units: units.clone(),
+        // };
+
+        FlowField {
+            destination_grid_size: IVec2::ZERO,
+            destination_cell: Cell::default(),
+            destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
+            unit_has_arrived: false,
+            cell_radius: cell_diameter / 2.0,
+            cell_diameter,
+            grid: Vec::default(),
+            offset,
+            size: grid_size,
+            steering_map,
+            units: units.clone(),
+        }
+    }
+
     pub fn create_flowfield(&mut self) {
         let grid_size_y = self.size.y as usize;
         let grid_size_x = self.size.x as usize;
@@ -84,60 +185,12 @@ impl FlowFieldProps {
         self.units.retain(|&u| u != unit);
         self.steering_map.retain(|&u, _| u != unit);
     }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum AvgDirection {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
-#[derive(Component, Clone, Default, PartialEq)]
-pub struct FlowField {
-    pub destination_grid_size: IVec2,
-    pub destination_cell: Cell,
-    pub destination_radius: f32,
-    pub flowfield_props: FlowFieldProps,
-    pub unit_has_arrived: bool, // if true, the first unit has arrived at the destination
-}
-
-impl FlowField {
-    pub fn new(
-        cell_diameter: f32,
-        grid_size: IVec2,
-        units: Vec<Entity>,
-        unit_count: f32,
-        offset: Vec3,
-    ) -> Self {
-        let steering_map: HashMap<Entity, Vec3> =
-            units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
-
-        let ff_props = FlowFieldProps {
-            cell_radius: cell_diameter / 2.0,
-            cell_diameter,
-            grid: Vec::default(),
-            offset,
-            size: grid_size,
-            steering_map,
-            units: units.clone(),
-        };
-
-        FlowField {
-            destination_grid_size: IVec2::ZERO,
-            destination_cell: Cell::default(),
-            destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
-            flowfield_props: ff_props,
-            unit_has_arrived: false,
-        }
-    }
 
     /// Gets the Cell at the given world position.
     pub fn get_cell_from_world_position(&self, position: Vec3) -> Cell {
         let pos = position;
-        let cell_diameter = self.flowfield_props.cell_diameter;
-        let size = self.flowfield_props.size;
+        let cell_diameter = self.cell_diameter;
+        let size = self.size;
 
         // Calculate the offset for the grid's top-left corner
         let adjusted_x = pos.x - (-size.x as f32 * cell_diameter / 2.0);
@@ -149,13 +202,7 @@ impl FlowField {
 
         let offset = Some(Vec2::new(percent_x, percent_y));
 
-        utils::get_cell_from_world_position_helper(
-            pos,
-            size,
-            cell_diameter,
-            &self.flowfield_props.grid,
-            offset,
-        )
+        utils::get_cell_from_world_position_helper(pos, size, cell_diameter, &self.grid, offset)
     }
 
     /// Smoothly sample the best_direction at an arbitrary world-space point
@@ -165,37 +212,25 @@ impl FlowField {
         let (u, v) = self.world_to_uv(world_pos);
 
         // 2) Scale uv to your discrete grid indices in float-space
-        let cols = self.flowfield_props.size.x as f32;
-        let rows = self.flowfield_props.size.y as f32;
+        let cols = self.size.x as f32;
+        let rows = self.size.y as f32;
         let fx = u * (cols - 1.0);
         let fy = v * (rows - 1.0);
 
         // 3) Corners
         let x0 = fx.floor() as usize;
         let y0 = fy.floor() as usize;
-        let x1 = (x0 + 1).min(self.flowfield_props.size.x as usize - 1);
-        let y1 = (y0 + 1).min(self.flowfield_props.size.y as usize - 1);
+        let x1 = (x0 + 1).min(self.size.x as usize - 1);
+        let y1 = (y0 + 1).min(self.size.y as usize - 1);
 
         let sx = fx - x0 as f32;
         let sy = fy - y0 as f32;
 
         // 4) Pull the four best_direction vectors (Vec2)
-        let d00 = self.flowfield_props.grid[y0][x0]
-            .best_direction
-            .vector()
-            .as_vec2();
-        let d10 = self.flowfield_props.grid[y0][x1]
-            .best_direction
-            .vector()
-            .as_vec2();
-        let d01 = self.flowfield_props.grid[y1][x0]
-            .best_direction
-            .vector()
-            .as_vec2();
-        let d11 = self.flowfield_props.grid[y1][x1]
-            .best_direction
-            .vector()
-            .as_vec2();
+        let d00 = self.grid[y0][x0].best_direction.vector().as_vec2();
+        let d10 = self.grid[y0][x1].best_direction.vector().as_vec2();
+        let d01 = self.grid[y1][x0].best_direction.vector().as_vec2();
+        let d11 = self.grid[y1][x1].best_direction.vector().as_vec2();
 
         // 5) Bilinear lerp
         let lerp = |a: Vec2, b: Vec2, t: f32| a * (1.0 - t) + b * t;
@@ -209,10 +244,10 @@ impl FlowField {
     /// Convert a world-space position into UV [0..1] over the grid.
     fn world_to_uv(&self, world_pos: Vec3) -> (f32, f32) {
         // Offset so (0,0) is top-left of your grid
-        let local = world_pos - self.flowfield_props.offset;
-        let cell_d = self.flowfield_props.cell_diameter;
-        let cols = self.flowfield_props.size.x as f32;
-        let rows = self.flowfield_props.size.y as f32;
+        let local = world_pos - self.offset;
+        let cell_d = self.cell_diameter;
+        let cols = self.size.x as f32;
+        let rows = self.size.y as f32;
 
         let u = (local.x + (cols * cell_d * 0.5)) / (cols * cell_d);
         let v = (local.z + (rows * cell_d * 0.5)) / (rows * cell_d);
@@ -223,11 +258,10 @@ impl FlowField {
     fn create_integration_field(&mut self, grid: Vec<Vec<Cell>>, destination_idx: IVec2) {
         // println!("Start Integration Field Create");
 
-        self.flowfield_props.grid = grid;
+        self.grid = grid;
 
         // Initialize the destination cell in the grid
-        let dest_cell =
-            &mut self.flowfield_props.grid[destination_idx.y as usize][destination_idx.x as usize];
+        let dest_cell = &mut self.grid[destination_idx.y as usize][destination_idx.x as usize];
         dest_cell.cost = 0;
         dest_cell.best_cost = 0;
         self.destination_cell = dest_cell.clone();
@@ -239,7 +273,7 @@ impl FlowField {
             let cur_x = cur_idx.x as usize;
             let cur_y = cur_idx.y as usize;
 
-            let cur_cell_best_cost = self.flowfield_props.grid[cur_y][cur_x].best_cost;
+            let cur_cell_best_cost = self.grid[cur_y][cur_x].best_cost;
 
             // Iterate over cardinal directions
             for direction in GridDirection::cardinal_directions() {
@@ -247,14 +281,14 @@ impl FlowField {
                 let neighbor_idx = cur_idx + delta;
 
                 if neighbor_idx.x >= 0
-                    && neighbor_idx.x < self.flowfield_props.size.x
+                    && neighbor_idx.x < self.size.x
                     && neighbor_idx.y >= 0
-                    && neighbor_idx.y < self.flowfield_props.size.y
+                    && neighbor_idx.y < self.size.y
                 {
                     let neighbor_x = neighbor_idx.x as usize;
                     let neighbor_y = neighbor_idx.y as usize;
 
-                    let neighbor_cell = &mut self.flowfield_props.grid[neighbor_y][neighbor_x];
+                    let neighbor_cell = &mut self.grid[neighbor_y][neighbor_x];
 
                     if neighbor_cell.cost == u8::MAX {
                         continue;
@@ -285,7 +319,7 @@ fn mark_unit_arrived(
         }
 
         // Check if any unit is within the cell radius
-        for &unit in &ff.flowfield_props.units {
+        for &unit in &ff.units {
             if let Ok(transform) = q_transform.get(unit) {
                 let unit_pos = transform.translation;
                 let distance_squared = (ff.destination_cell.world_pos - unit_pos).length_squared();
@@ -312,7 +346,7 @@ fn remove_units_from_flowfield(
         let radius_squared = ff.destination_radius.squared();
 
         let mut units_to_remove: Vec<Entity> = Vec::new();
-        for &mut unit_ent in ff.flowfield_props.units.iter_mut() {
+        for &mut unit_ent in ff.units.iter_mut() {
             if let Ok(unit_transform) = q_transform.get(unit_ent) {
                 let unit_pos = unit_transform.translation;
 
@@ -327,10 +361,10 @@ fn remove_units_from_flowfield(
         // Remove units from the flowfield
         for unit in units_to_remove {
             cmds.entity(unit).remove::<Destination>();
-            ff.flowfield_props.remove_unit(unit);
+            ff.remove_unit(unit);
         }
 
-        if ff.flowfield_props.units.is_empty() {
+        if ff.units.is_empty() {
             cmds.entity(ff_ent).despawn_recursive();
         }
     }
@@ -369,14 +403,12 @@ fn initialize_flowfield(
     for (ff_ent, mut ff) in q_ff.iter_mut() {
         // 1) Filter out any units from `flowfield.units` that are in `units`
         //    i.e. the ones that are about to be added to the new flowfield.
-        ff.flowfield_props.units.retain(|ent| !units.contains(ent));
+        ff.units.retain(|ent| !units.contains(ent));
 
-        ff.flowfield_props
-            .steering_map
-            .retain(|ent, _| !units.contains(ent));
+        ff.steering_map.retain(|ent, _| !units.contains(ent));
 
         // 2) If after removal, the flowfield is now empty, *then* despawn it.
-        if ff.flowfield_props.units.is_empty() {
+        if ff.units.is_empty() {
             cmds.entity(ff_ent).despawn_recursive();
 
             // Also remove any "destination radius" entity that references this flowfield
@@ -401,7 +433,7 @@ fn initialize_flowfield(
     );
 
     ff.create_integration_field(grid.grid.clone(), destination_cell.idx);
-    ff.flowfield_props.create_flowfield();
+    ff.create_flowfield();
 
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
@@ -450,7 +482,7 @@ fn update_fields(
     for mut ff in q_ff.iter_mut() {
         let dest_idx = ff.destination_cell.idx;
         ff.create_integration_field(grid.grid.clone(), dest_idx);
-        ff.flowfield_props.create_flowfield();
+        ff.create_flowfield();
 
         active_ff = Some(ff.clone());
     }
