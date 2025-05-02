@@ -32,60 +32,6 @@ fn p(q: Query<&FlowField>) {
 #[derive(Component)]
 pub struct DestinationRadius(pub u32);
 
-// #[derive(Clone, Default, PartialEq)]
-// pub struct FlowFieldProps {
-//     pub cell_radius: f32,
-//     pub cell_diameter: f32,
-//     pub grid: Vec<Vec<Cell>>,
-//     pub offset: Vec3,
-//     pub size: IVec2,
-//     pub steering_map: HashMap<Entity, Vec3>,
-//     pub units: Vec<Entity>,
-// }
-
-// impl FlowFieldProps {
-//     pub fn create_flowfield(&mut self) {
-//         let grid_size_y = self.size.y as usize;
-//         let grid_size_x = self.size.x as usize;
-
-//         for y in 0..grid_size_y {
-//             for x in 0..grid_size_x {
-//                 let cell = &self.grid[y][x]; // Immutable borrow to get best_cost
-//                 let mut best_cost = cell.best_cost;
-//                 let mut best_direction = GridDirection::None;
-
-//                 // Get all possible directions
-//                 for direction in GridDirection::all_directions() {
-//                     let delta = direction.vector();
-//                     let nx = x as isize + delta.x as isize;
-//                     let ny = y as isize + delta.y as isize;
-
-//                     if nx >= 0 && nx < grid_size_x as isize && ny >= 0 && ny < grid_size_y as isize
-//                     {
-//                         let neighbor = &self.grid[ny as usize][nx as usize];
-//                         if neighbor.best_cost < best_cost {
-//                             best_cost = neighbor.best_cost;
-//                             best_direction = direction;
-//                         }
-//                     }
-//                 }
-
-//                 // Now, set the best_direction for the cell
-//                 self.grid[y][x].best_direction = best_direction;
-//             }
-//         }
-//     }
-
-//     pub fn add_unit(&mut self, unit: Entity) {
-//         self.units.push(unit);
-//     }
-
-//     pub fn remove_unit(&mut self, unit: Entity) {
-//         self.units.retain(|&u| u != unit);
-//         self.steering_map.retain(|&u, _| u != unit);
-//     }
-// }
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum AvgDirection {
     Up,
@@ -119,16 +65,6 @@ impl FlowField {
     ) -> Self {
         let steering_map: HashMap<Entity, Vec3> =
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
-
-        // let ff_props = FlowFieldProps {
-        //     cell_radius: cell_diameter / 2.0,
-        //     cell_diameter,
-        //     grid: Vec::default(),
-        //     offset,
-        //     size: grid_size,
-        //     steering_map,
-        //     units: units.clone(),
-        // };
 
         FlowField {
             destination_grid_size: IVec2::ZERO,
