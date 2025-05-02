@@ -27,14 +27,6 @@ impl Plugin for FlowfieldPlugin {
 #[derive(Component)]
 pub struct DestinationRadius(pub u32);
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum AvgDirection {
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub arrived: bool,

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{cell::Cell, flowfield::AvgDirection};
+use crate::cell::Cell;
 
 pub fn get_world_pos(
     map_base_trans: &GlobalTransform,
