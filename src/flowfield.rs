@@ -42,6 +42,7 @@ pub enum AvgDirection {
 
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
+    pub arrived: bool,
     pub destination_grid_size: IVec2,
     pub destination_cell: Cell,
     pub destination_radius: f32,
@@ -59,15 +60,13 @@ impl FlowField {
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
         FlowField {
-            destination_grid_size: IVec2::ZERO,
             destination_cell: Cell::default(),
             destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
-            unit_has_arrived: false,
-            grid: Vec::default(),
             offset,
             size: grid_size,
             steering_map,
             units: units.clone(),
+            ..default()
         }
     }
 
