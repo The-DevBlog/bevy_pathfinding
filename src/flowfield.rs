@@ -1,5 +1,4 @@
 use bevy::{prelude::*, window::PrimaryWindow};
-use ops::FloatPow;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -11,15 +10,9 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (
-                flowfield_group_stop_system,
-                mark_unit_arrived.run_if(resource_exists::<Grid>),
-            ),
-        )
-        .add_observer(update_fields)
-        .add_observer(initialize_flowfield);
+        app.add_systems(Update, (flowfield_group_stop_system,))
+            .add_observer(update_fields)
+            .add_observer(initialize_flowfield);
     }
 }
 
@@ -33,7 +26,6 @@ pub struct FlowField {
     pub destination_grid_size: IVec2,
     pub destination_cell: Cell,
     pub destination_radius: f32,
-    pub unit_has_arrived: bool, // if true, the first unit has arrived at the destination
     pub grid: Vec<Vec<Cell>>,
     pub offset: Vec3,
     pub size: IVec2,
@@ -218,31 +210,6 @@ impl FlowField {
     }
 }
 
-// marks if a unit has arrived at the destination cell (not to be confused with the destination radius)
-fn mark_unit_arrived(
-    mut q_ff: Query<&mut FlowField>,
-    q_transform: Query<&Transform>,
-    grid: Res<Grid>,
-) {
-    for mut ff in q_ff.iter_mut() {
-        if ff.unit_has_arrived {
-            continue;
-        }
-
-        // Check if any unit is within the cell radius
-        for &unit in &ff.units {
-            if let Ok(transform) = q_transform.get(unit) {
-                let unit_pos = transform.translation;
-                let distance_squared = (ff.destination_cell.world_pos - unit_pos).length_squared();
-                if distance_squared < grid.cell_radius.squared() {
-                    ff.unit_has_arrived = true;
-                    break;
-                }
-            }
-        }
-    }
-}
-
 fn flowfield_group_stop_system(
     mut cmds: Commands,
     mut query: Query<(Entity, &mut FlowField)>,
@@ -276,7 +243,6 @@ fn flowfield_group_stop_system(
             for &unit in &ff.units {
                 cmds.entity(unit).remove::<Destination>();
             }
-            // 5) optionally clear the list (or let your remove_unit helper do it)
             ff.units.clear();
 
             // 6) if you want to despawn the flowfield itself
