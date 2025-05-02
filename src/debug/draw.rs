@@ -168,7 +168,7 @@ pub fn draw_flowfield(
         marker_scale = 1.0;
     }
 
-    let offset = calculate_offset(active_dbg_ff.cell_diameter, &dbg, DrawMode::FlowField);
+    let offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::FlowField);
     let Some(offset) = offset else {
         return;
     };
@@ -331,7 +331,7 @@ fn draw_integration_field(
         return;
     };
 
-    let base_offset = calculate_offset(ff.cell_diameter, &dbg, DrawMode::IntegrationField);
+    let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::IntegrationField);
     let Some(base_offset) = base_offset else {
         return;
     };

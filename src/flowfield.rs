@@ -46,8 +46,6 @@ pub struct FlowField {
     pub destination_cell: Cell,
     pub destination_radius: f32,
     pub unit_has_arrived: bool, // if true, the first unit has arrived at the destination
-    pub cell_radius: f32,
-    pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
     pub offset: Vec3,
     pub size: IVec2,
@@ -56,13 +54,7 @@ pub struct FlowField {
 }
 
 impl FlowField {
-    pub fn new(
-        cell_diameter: f32,
-        grid_size: IVec2,
-        units: Vec<Entity>,
-        unit_count: f32,
-        offset: Vec3,
-    ) -> Self {
+    pub fn new(grid_size: IVec2, units: Vec<Entity>, unit_count: f32, offset: Vec3) -> Self {
         let steering_map: HashMap<Entity, Vec3> =
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
@@ -71,8 +63,6 @@ impl FlowField {
             destination_cell: Cell::default(),
             destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
             unit_has_arrived: false,
-            cell_radius: cell_diameter / 2.0,
-            cell_diameter,
             grid: Vec::default(),
             offset,
             size: grid_size,
@@ -123,9 +113,9 @@ impl FlowField {
     }
 
     /// Gets the Cell at the given world position.
-    pub fn get_cell_from_world_position(&self, position: Vec3) -> Cell {
+    pub fn get_cell_from_world_position(&self, position: Vec3, grid: &Grid) -> Cell {
         let pos = position;
-        let cell_diameter = self.cell_diameter;
+        let cell_diameter = grid.cell_diameter;
         let size = self.size;
 
         // Calculate the offset for the grid's top-left corner
@@ -143,9 +133,9 @@ impl FlowField {
 
     /// Smoothly sample the best_direction at an arbitrary world-space point
     /// by bilinearly interpolating between the four enclosing cells.
-    pub fn sample_direction(&self, world_pos: Vec3) -> Vec2 {
+    pub fn sample_direction(&self, world_pos: Vec3, grid: &Grid) -> Vec2 {
         // 1) Map world -> [0..1] uv over the grid
-        let (u, v) = self.world_to_uv(world_pos);
+        let (u, v) = self.world_to_uv(world_pos, grid);
 
         // 2) Scale uv to your discrete grid indices in float-space
         let cols = self.size.x as f32;
@@ -178,10 +168,10 @@ impl FlowField {
     }
 
     /// Convert a world-space position into UV [0..1] over the grid.
-    fn world_to_uv(&self, world_pos: Vec3) -> (f32, f32) {
+    fn world_to_uv(&self, world_pos: Vec3, grid: &Grid) -> (f32, f32) {
         // Offset so (0,0) is top-left of your grid
         let local = world_pos - self.offset;
-        let cell_d = self.cell_diameter;
+        let cell_d = grid.cell_diameter;
         let cols = self.size.x as f32;
         let rows = self.size.y as f32;
 
@@ -360,13 +350,7 @@ fn initialize_flowfield(
     let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
-    let mut ff = FlowField::new(
-        grid.cell_diameter,
-        grid.size,
-        units.clone(),
-        units.len() as f32,
-        Vec3::ZERO,
-    );
+    let mut ff = FlowField::new(grid.size, units.clone(), units.len() as f32, Vec3::ZERO);
 
     ff.create_integration_field(grid.grid.clone(), destination_cell.idx);
     ff.create_flowfield();

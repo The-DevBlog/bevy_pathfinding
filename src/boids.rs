@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use bevy::prelude::*;
 
-use crate::{components::*, flowfield::FlowField};
+use crate::{components::*, flowfield::FlowField, grid::Grid};
 
 pub struct BoidsPlugin;
 
@@ -88,6 +88,7 @@ fn calculate_boid_steering(
     time: Res<Time>,
     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
+    grid: Res<Grid>,
 ) {
     let dt = time.delta_secs();
 
@@ -160,7 +161,7 @@ fn calculate_boid_steering(
 
                 let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
 
-                let dir2d = ff.sample_direction(tf.translation);
+                let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
                 let raw = sep + ali + coh + flow_force;
