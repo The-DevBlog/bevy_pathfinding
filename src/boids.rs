@@ -1,8 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
 
-use crate::{components::*, flowfield::FlowField};
+use crate::{
+    components::*,
+    flowfield::{FlowField, FlowFieldProps},
+};
 
 pub struct BoidsPlugin;
 
@@ -12,74 +15,201 @@ impl Plugin for BoidsPlugin {
     }
 }
 
+// fn calculate_boid_steering(
+//     time: Res<Time>,
+//     mut q_boids: Query<(Entity, &mut Transform, &mut Boid), With<Destination>>,
+//     mut q_ff: Query<&mut FlowField>,
+// ) {
+//     let dt = time.delta_secs();
+
+//     // ——— 1) SNAPSHOT POSITIONS ———
+//     // Collect just (Entity, Vec3) so we don't store any &Transform or &Boid.
+//     let boid_positions: Vec<(Entity, Vec3, Vec3)> = q_boids
+//         .iter()
+//         .map(|(ent, tf, boid)| (ent, tf.translation, boid.velocity))
+//         .collect();
+
+//     // ——— 2) ACTUAL STEERING PASS ———
+//     for mut ff in q_ff.iter_mut() {
+//         for (ent, mut transform, mut boid) in q_boids.iter_mut() {
+//             // skip if this boid isn't in *this* flowfield
+//             if !ff.flowfield_props.units.contains(&ent) {
+//                 continue;
+//             }
+
+//             // Build neighbor‐position list from our snapshot
+//             // Prepare new empty set for this frame
+//             let mut current_neighbors = HashSet::new();
+
+//             let enter_r2 = boid.neighbor_radius * boid.neighbor_radius;
+//             let exit_r2 = boid.neighbor_exit_radius * boid.neighbor_exit_radius;
+
+//             // Filter snapshots with hysteresis
+//             let neighbor_pos: Vec<(Vec3, Vec3)> = boid_positions
+//                 .iter()
+//                 .filter_map(|(other_ent, pos, vel)| {
+//                     let dist2 = transform.translation.distance_squared(*pos);
+//                     let was_neighbor = boid.prev_neighbors.contains(other_ent);
+
+//                     // either newly inside enter radius, or still inside exit radius
+//                     if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
+//                         current_neighbors.insert(*other_ent);
+//                         Some((*pos, *vel))
+//                     } else {
+//                         None
+//                     }
+//                 })
+//                 .collect();
+
+//             // Compute classic boid forces
+//             // let (sep, ali, coh) = compute_boids(neighbor_pos, &*transform, &*boid);
+//             let (sep, ali, coh) = compute_boids(&neighbor_pos, transform.translation, &boid);
+
+//             // Sample your now‐smooth flowfield
+//             let dir2d = ff.sample_direction(transform.translation);
+//             let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
+
+//             // Combine into a desired‐velocity vector
+//             let raw = sep + ali + coh + flow_force;
+//             let desired = raw.clamp_length_max(boid.max_speed);
+
+//             // Turn that into an acceleration (steering)
+//             let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
+
+//             // Integrate velocity & position
+//             boid.velocity += steer * dt;
+//             boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
+//             transform.translation += boid.velocity * dt;
+
+//             // (Optional) store for debugging / visualization
+//             ff.flowfield_props.steering_map.insert(ent, steer);
+//         }
+//     }
+// }
+
 fn calculate_boid_steering(
     time: Res<Time>,
-    mut q_boids: Query<(Entity, &mut Transform, &mut Boid), With<Destination>>,
+    mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
 ) {
     let dt = time.delta_secs();
 
-    // ——— 1) SNAPSHOT POSITIONS ———
-    // Collect just (Entity, Vec3) so we don't store any &Transform or &Boid.
-    let boid_positions: Vec<(Entity, Vec3, Vec3)> = q_boids
+    // snapshot positions+velocities
+    let boid_snapshot: Vec<(Entity, Vec3, Vec3)> = q_boids
         .iter()
-        .map(|(ent, tf, boid)| (ent, tf.translation, boid.velocity))
+        .map(|(e, tf, b)| (e, tf.translation, b.velocity))
         .collect();
 
-    // ——— 2) ACTUAL STEERING PASS ———
+    // 0.5) build set of all units in all flow-fields
+    let mut ff_units = HashSet::new();
     for mut ff in q_ff.iter_mut() {
-        for (ent, mut transform, mut boid) in q_boids.iter_mut() {
-            // skip if this boid isn't in *this* flowfield
-            if !ff.flowfield_props.units.contains(&ent) {
+        ff_units.extend(ff.flowfield_props.units.iter().copied());
+    }
+
+    // 1) GLOBAL SEPARATION — skip any that are in a flowfield
+    for (ent, mut tf, mut boid) in q_boids.iter_mut() {
+        // ← skip double-dippers
+        if ff_units.contains(&ent) {
+            continue;
+        }
+
+        let mut sep_force = Vec3::ZERO;
+        let r2 = boid.neighbor_radius * boid.neighbor_radius;
+        for (other_ent, pos, _) in &boid_snapshot {
+            if *other_ent == ent {
                 continue;
             }
+            let delta = tf.translation - *pos;
+            if delta.length_squared() < r2 {
+                sep_force += delta.normalize() / delta.length();
+            }
+        }
 
-            // Build neighbor‐position list from our snapshot
-            // Prepare new empty set for this frame
-            let mut current_neighbors = HashSet::new();
-
-            let enter_r2 = boid.neighbor_radius * boid.neighbor_radius;
-            let exit_r2 = boid.neighbor_exit_radius * boid.neighbor_exit_radius;
-
-            // Filter snapshots with hysteresis
-            let neighbor_pos: Vec<(Vec3, Vec3)> = boid_positions
-                .iter()
-                .filter_map(|(other_ent, pos, vel)| {
-                    let dist2 = transform.translation.distance_squared(*pos);
-                    let was_neighbor = boid.prev_neighbors.contains(other_ent);
-
-                    // either newly inside enter radius, or still inside exit radius
-                    if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
-                        current_neighbors.insert(*other_ent);
-                        Some((*pos, *vel))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            // Compute classic boid forces
-            // let (sep, ali, coh) = compute_boids(neighbor_pos, &*transform, &*boid);
-            let (sep, ali, coh) = compute_boids(&neighbor_pos, transform.translation, &boid);
-
-            // Sample your now‐smooth flowfield
-            let dir2d = ff.sample_direction(transform.translation);
-            let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
-
-            // Combine into a desired‐velocity vector
-            let raw = sep + ali + coh + flow_force;
-            let desired = raw.clamp_length_max(boid.max_speed);
-
-            // Turn that into an acceleration (steering)
+        if sep_force != Vec3::ZERO {
+            let desired = sep_force.normalize() * boid.max_speed;
             let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
-
-            // Integrate velocity & position
             boid.velocity += steer * dt;
             boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
-            transform.translation += boid.velocity * dt;
+            tf.translation += boid.velocity * dt;
+        }
+    }
 
-            // (Optional) store for debugging / visualization
-            ff.flowfield_props.steering_map.insert(ent, steer);
+    // // ——— 1) GLOBAL SEPARATION (push-away) ———
+    // for (ent, mut tf, mut boid) in q_boids.iter_mut() {
+    //     let mut sep_force = Vec3::ZERO;
+    //     let r2 = boid.neighbor_radius * boid.neighbor_radius;
+
+    //     for (other_ent, pos, _vel) in &boid_snapshot {
+    //         if *other_ent == ent {
+    //             continue;
+    //         }
+    //         let delta = tf.translation - *pos;
+    //         let dist2 = delta.length_squared();
+    //         if dist2 < r2 {
+    //             // simple inverse-distance repulsion
+    //             sep_force += delta.normalize() / dist2.sqrt();
+    //         }
+    //     }
+
+    //     if sep_force != Vec3::ZERO {
+    //         let desired = sep_force.normalize() * boid.max_speed;
+    //         let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
+
+    //         boid.velocity += steer * dt;
+    //         boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
+    //         tf.translation += boid.velocity * dt;
+    //     }
+    // }
+
+    // ——— 2) FLOW-FIELD + ALI/COH (optional) ———
+    for mut ff in q_ff.iter_mut() {
+        // 1) buffer of what we need to insert
+        let mut pending: Vec<(Entity, Vec3)> = Vec::new();
+
+        // for &unit in &ff.flowfield_props.units {
+        for &unit in &ff.flowfield_props.units {
+            if let Ok((_ent, mut tf, mut boid)) = q_boids.get_mut(unit) {
+                // rebuild neighbors with hysteresis and compute ali/coh
+                let enter_r2 = boid.neighbor_radius.powi(2);
+                let exit_r2 = boid.neighbor_exit_radius.powi(2);
+                let mut current_neighbors = HashSet::new();
+
+                let neighbor_data: Vec<(Vec3, Vec3)> = boid_snapshot
+                    .iter()
+                    .filter_map(|(other_ent, pos, vel)| {
+                        let dist2 = tf.translation.distance_squared(*pos);
+                        let was_neighbor = boid.prev_neighbors.contains(other_ent);
+                        if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
+                            current_neighbors.insert(*other_ent);
+                            Some((*pos, *vel))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
+
+                let dir2d = ff.sample_direction(tf.translation);
+                let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
+
+                let raw = sep + ali + coh + flow_force;
+                let desired = raw.clamp_length_max(boid.max_speed);
+                let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
+
+                boid.velocity += steer * dt;
+                boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
+                tf.translation += boid.velocity * dt;
+
+                // buffer insertion and update neighbors
+                pending.push((unit, steer));
+                boid.prev_neighbors = current_neighbors;
+            }
+        }
+
+        // 3) now that the immutable borrow of `units` is done, do one mutable borrow
+        for (unit, steer) in pending {
+            ff.flowfield_props.steering_map.insert(unit, steer);
         }
     }
 }
