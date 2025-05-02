@@ -17,7 +17,6 @@ impl Plugin for FlowfieldPlugin {
                 p,
                 flowfield_group_stop_system,
                 mark_unit_arrived.run_if(resource_exists::<Grid>),
-                remove_units_from_flowfield,
             ),
         )
         .add_observer(update_fields)
@@ -257,66 +256,6 @@ fn mark_unit_arrived(
     }
 }
 
-// fn flowfield_group_stop_system(
-//     mut cmds: Commands,
-//     mut query: Query<(Entity, &mut FlowField)>,
-//     tf_query: Query<&Transform>,
-// ) {
-//     for (ff_ent, mut ff) in query.iter_mut() {
-//         let mut units_to_remove: Vec<Entity> = Vec::new();
-//         if ff.arrived || ff.units.is_empty() {
-//             continue;
-//         }
-
-//         // 1) Gather each unit’s world position
-//         let mut positions = Vec::with_capacity(ff.units.len());
-//         for &unit in &ff.units {
-//             if let Ok(tf) = tf_query.get(unit) {
-//                 positions.push(tf.translation);
-//             }
-//         }
-//         if positions.is_empty() {
-//             continue;
-//         }
-
-//         // 2) Compute centroid
-//         let centroid =
-//             positions.iter().copied().reduce(|a, b| a + b).unwrap() / (positions.len() as f32);
-
-//         // 3) Compute max offset from centroid
-//         let max_offset = positions
-//             .iter()
-//             .map(|&pos| (pos - centroid).length())
-//             .fold(0.0_f32, f32::max);
-
-//         // 4) Check bounding‐circle against your stop radius
-//         let goal = ff.destination_cell.world_pos;
-
-//         let dist_to_goal = (centroid - goal).length();
-//         if dist_to_goal + max_offset < ff.destination_radius {
-//             for unit in &ff.units {
-//                 // cmds.entity(*unit).remove::<Destination>();
-//                 units_to_remove.push(*unit);
-//             }
-
-//             // everybody’s inside the circle ⇒ stop the group
-//             ff.arrived = true;
-//             // clear out your steering so they all sit still
-//             ff.steering_map.clear();
-//         }
-
-//         // Remove units from the flowfield
-//         for unit in units_to_remove {
-//             cmds.entity(unit).remove::<Destination>();
-//             ff.remove_unit(unit);
-//         }
-
-//         if ff.units.is_empty() {
-//             cmds.entity(ff_ent).despawn_recursive();
-//         }
-//     }
-// }
-
 fn flowfield_group_stop_system(
     mut cmds: Commands,
     mut query: Query<(Entity, &mut FlowField)>,
@@ -367,44 +306,6 @@ fn flowfield_group_stop_system(
             cmds.entity(ff_ent).despawn_recursive();
         }
     }
-}
-
-fn remove_units_from_flowfield(
-    mut cmds: Commands,
-    mut q_ff: Query<(Entity, &mut FlowField)>,
-    q_transform: Query<&Transform>,
-) {
-    // for (ff_ent, mut ff) in q_ff.iter_mut() {
-    //     if !ff.unit_has_arrived {
-    //         continue;
-    //     }
-
-    //     let destination_pos = ff.destination_cell.world_pos;
-    //     let radius_squared = ff.destination_radius.squared();
-
-    //     let mut units_to_remove: Vec<Entity> = Vec::new();
-    //     for &mut unit_ent in ff.units.iter_mut() {
-    //         if let Ok(unit_transform) = q_transform.get(unit_ent) {
-    //             let unit_pos = unit_transform.translation;
-
-    //             // If unit is within destination radius, store the unit for FF transfer
-    //             let distance_squared = (destination_pos - unit_pos).length_squared(); // squared for performance
-    //             if distance_squared < radius_squared {
-    //                 units_to_remove.push(unit_ent);
-    //             }
-    //         }
-    //     }
-
-    //     // Remove units from the flowfield
-    //     for unit in units_to_remove {
-    //         cmds.entity(unit).remove::<Destination>();
-    //         ff.remove_unit(unit);
-    //     }
-
-    //     if ff.units.is_empty() {
-    //         cmds.entity(ff_ent).despawn_recursive();
-    //     }
-    // }
 }
 
 fn initialize_flowfield(
