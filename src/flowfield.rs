@@ -262,47 +262,37 @@ fn flowfield_group_stop_system(
     tf_query: Query<&Transform>,
 ) {
     for (ff_ent, mut ff) in query.iter_mut() {
-        let mut units_to_remove: Vec<Entity> = Vec::new();
-
+        // 1) skip empty or already‐stopped fields
         if ff.arrived || ff.units.is_empty() {
             continue;
         }
 
-        // 1) build centroid of the group
-        let mut sum = Vec3::ZERO;
-        let mut count = 0;
-        for &unit in &ff.units {
-            if let Ok(tf) = tf_query.get(unit) {
-                sum += tf.translation;
-                count += 1;
-            }
-        }
+        // 2) compute centroid of the group
+        let (sum, count) = ff
+            .units
+            .iter()
+            .filter_map(|&u| tf_query.get(u).ok().map(|tf| tf.translation))
+            .fold((Vec3::ZERO, 0), |(sum, count), pos| (sum + pos, count + 1));
         if count == 0 {
             continue;
         }
         let centroid = sum / count as f32;
 
-        // 2) compare to the cell’s world‐pos
+        // 3) compare centroid to the world‐space goal
         let goal = ff.destination_cell.world_pos;
         if (centroid - goal).length() < ff.destination_radius {
-            for unit in &ff.units {
-                // cmds.entity(*unit).remove::<Destination>();
-                units_to_remove.push(*unit);
-            }
-
-            // _first_ time we detect the center inside the radius ⇒ stop _all_
+            // → only _now_ do we stop the entire group
             ff.arrived = true;
             ff.steering_map.clear();
-            // optionally: if you’re using physics velocities, also zero them here
-        }
 
-        // Remove units from the flowfield
-        for unit in units_to_remove {
-            cmds.entity(unit).remove::<Destination>();
-            ff.remove_unit(unit);
-        }
+            // 4) remove Destination from each unit
+            for &unit in &ff.units {
+                cmds.entity(unit).remove::<Destination>();
+            }
+            // 5) optionally clear the list (or let your remove_unit helper do it)
+            ff.units.clear();
 
-        if ff.units.is_empty() {
+            // 6) if you want to despawn the flowfield itself
             cmds.entity(ff_ent).despawn_recursive();
         }
     }

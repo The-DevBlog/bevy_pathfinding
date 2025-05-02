@@ -12,7 +12,7 @@ impl Plugin for BoidsPlugin {
     }
 }
 
-fn calculate_boid_steering(
+pub fn calculate_boid_steering(
     time: Res<Time>,
     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
@@ -28,7 +28,7 @@ fn calculate_boid_steering(
 
     // 0.5) build set of all units in all flow-fields
     let mut ff_units = HashSet::new();
-    for mut ff in q_ff.iter_mut() {
+    for ff in q_ff.iter_mut() {
         ff_units.extend(ff.units.iter().copied());
     }
 
