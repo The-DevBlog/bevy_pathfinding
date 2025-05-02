@@ -55,15 +55,14 @@ pub struct FlowField {
 }
 
 impl FlowField {
-    pub fn new(grid_size: IVec2, units: Vec<Entity>, unit_count: f32, offset: Vec3) -> Self {
+    pub fn new(size: IVec2, units: Vec<Entity>, unit_count: f32, offset: Vec3) -> Self {
         let steering_map: HashMap<Entity, Vec3> =
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
         FlowField {
-            destination_cell: Cell::default(),
             destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
             offset,
-            size: grid_size,
+            size,
             steering_map,
             units: units.clone(),
             ..default()
