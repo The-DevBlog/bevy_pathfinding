@@ -26,41 +26,13 @@ pub fn calculate_boid_steering(
         .map(|(e, tf, b)| (e, tf.translation, b.velocity))
         .collect();
 
-    // 0.5) build set of all units in all flow-fields
+    // build set of all units in all flow-fields
     let mut ff_units = HashSet::new();
     for ff in q_ff.iter_mut() {
         ff_units.extend(ff.units.iter().copied());
     }
 
-    // 1) GLOBAL SEPARATION — skip any that are in a flowfield
-    for (ent, mut tf, mut boid) in q_boids.iter_mut() {
-        // ← skip double-dippers
-        if ff_units.contains(&ent) {
-            continue;
-        }
-
-        let mut sep_force = Vec3::ZERO;
-        let r2 = boid.neighbor_radius * boid.neighbor_radius;
-        for (other_ent, pos, _) in &boid_snapshot {
-            if *other_ent == ent {
-                continue;
-            }
-            let delta = tf.translation - *pos;
-            if delta.length_squared() < r2 {
-                sep_force += delta.normalize() / delta.length();
-            }
-        }
-
-        if sep_force != Vec3::ZERO {
-            let desired = sep_force.normalize() * boid.max_speed;
-            let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
-            boid.velocity += steer * dt;
-            boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
-            tf.translation += boid.velocity * dt;
-        }
-    }
-
-    // ——— 2) FLOW-FIELD + ALI/COH (optional) ———
+    // FLOW-FIELD + SEP/ALI/COH
     for mut ff in q_ff.iter_mut() {
         // 1) buffer of what we need to insert
         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
@@ -106,7 +78,7 @@ pub fn calculate_boid_steering(
             }
         }
 
-        // 3) now that the immutable borrow of `units` is done, do one mutable borrow
+        // now that the immutable borrow of `units` is done, do one mutable borrow
         for (unit, steer) in pending {
             ff.steering_map.insert(unit, steer);
         }
