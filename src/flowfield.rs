@@ -14,7 +14,6 @@ impl Plugin for FlowfieldPlugin {
         app.add_systems(
             Update,
             (
-                p,
                 flowfield_group_stop_system,
                 mark_unit_arrived.run_if(resource_exists::<Grid>),
             ),
@@ -22,10 +21,6 @@ impl Plugin for FlowfieldPlugin {
         .add_observer(update_fields)
         .add_observer(initialize_flowfield);
     }
-}
-
-fn p(q: Query<&FlowField>) {
-    println!("FlowField count: {}", q.iter().len());
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
