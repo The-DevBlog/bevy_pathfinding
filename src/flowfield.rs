@@ -322,18 +322,18 @@ fn initialize_flowfield(
         .id();
 
     // TODO: Remove (debugging purposes)
-    {
-        let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
-        let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-        cmds.entity(ff_ent).with_children(|parent| {
-            parent.spawn((
-                DestinationRadius(ff_ent.index()),
-                mesh,
-                material,
-                Transform::from_translation(ff.destination_cell.world_pos),
-            ));
-        });
-    }
+    // {
+    //     let mesh = Mesh3d(meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
+    //     let material = MeshMaterial3d(materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+    //     cmds.entity(ff_ent).with_children(|parent| {
+    //         parent.spawn((
+    //             DestinationRadius(ff_ent.index()),
+    //             mesh,
+    //             material,
+    //             Transform::from_translation(ff.destination_cell.world_pos),
+    //         ));
+    //     });
+    // }
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
 }
