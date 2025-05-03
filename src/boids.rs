@@ -39,7 +39,7 @@ pub fn calculate_boid_steering(
 
         // for &unit in &ff.flowfield_props.units {
         for &unit in &ff.units {
-            if let Ok((_ent, mut tf, mut boid)) = q_boids.get_mut(unit) {
+            if let Ok((_ent, mut boid_tf, mut boid)) = q_boids.get_mut(unit) {
                 // rebuild neighbors with hysteresis and compute ali/coh
                 let enter_r2 = boid.neighbor_radius.powi(2);
                 let exit_r2 = boid.neighbor_exit_radius.powi(2);
@@ -48,7 +48,7 @@ pub fn calculate_boid_steering(
                 let neighbor_data: Vec<(Vec3, Vec3)> = boid_snapshot
                     .iter()
                     .filter_map(|(other_ent, pos, vel)| {
-                        let dist2 = tf.translation.distance_squared(*pos);
+                        let dist2 = boid_tf.translation.distance_squared(*pos);
                         let was_neighbor = boid.prev_neighbors.contains(other_ent);
                         if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
                             current_neighbors.insert(*other_ent);
@@ -59,9 +59,9 @@ pub fn calculate_boid_steering(
                     })
                     .collect();
 
-                let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
+                let (sep, ali, coh) = compute_boids(&neighbor_data, boid_tf.translation, &boid);
 
-                let dir2d = ff.sample_direction(tf.translation, &grid);
+                let dir2d = ff.sample_direction(boid_tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
                 let raw = sep + ali + coh + flow_force;
@@ -70,7 +70,7 @@ pub fn calculate_boid_steering(
 
                 boid.velocity += steer * dt;
                 boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
-                tf.translation += boid.velocity * dt;
+                boid_tf.translation += boid.velocity * dt;
 
                 // buffer insertion and update neighbors
                 pending.push((unit, steer));

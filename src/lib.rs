@@ -42,13 +42,14 @@ impl Plugin for BevyRtsPathFindingPlugin {
 
 #[derive(Component, Reflect)]
 pub struct BoidsInfo {
-    pub velocity: Vec3,         // start at rest
-    pub max_force: f32,         // how quickly you can turn
-    pub separation_weight: f32, // push apart
-    pub alignment_weight: f32,  // match heading
-    pub cohesion_weight: f32,   // pull toward center
-    pub max_speed: f32,         // top movement speed
-    pub neighbor_radius: f32,   // how far you “see” neighbors
+    pub velocity: Vec3,            // start at rest
+    pub max_force: f32,            // how quickly you can turn
+    pub separation_weight: f32,    // push apart
+    pub alignment_weight: f32,     // match heading
+    pub cohesion_weight: f32,      // pull toward center
+    pub max_speed: f32,            // top movement speed
+    pub neighbor_radius: f32,      // how far you “see” neighbors
+    pub neighbor_exit_radius: f32, // new: slightly larger
 }
 
 impl Default for BoidsInfo {
@@ -61,7 +62,8 @@ impl Default for BoidsInfo {
             alignment_weight: 5.0,      // medium urge to line up
             cohesion_weight: 0.0,       // medium urge to stay together
             max_speed,                  // units per second
-            neighbor_radius: 30.0,      // in world‐units (tweak to taste)
+            neighbor_radius: 25.0,      // in world‐units (tweak to taste)
+            neighbor_exit_radius: 30.0, // new: slightly larger
         }
     }
 }
@@ -82,6 +84,7 @@ fn change_boids(
         boid.cohesion_weight = new_boids_info.cohesion_weight;
         boid.max_speed = new_boids_info.max_speed;
         boid.neighbor_radius = new_boids_info.neighbor_radius;
+        boid.neighbor_exit_radius = new_boids_info.neighbor_exit_radius;
         boid.max_force = new_boids_info.max_force;
         boid.velocity = new_boids_info.velocity;
     }
