@@ -21,14 +21,15 @@ pub struct RtsObj;
 #[derive(Component, Debug)]
 pub struct Boid {
     pub prev_neighbors: HashSet<Entity>, // store last frame's neighbors
-    pub velocity: Vec3,                  // start at rest
-    pub max_force: f32,                  // how quickly you can turn
-    pub separation_weight: f32,          // push apart
-    pub alignment_weight: f32,           // match heading
-    pub cohesion_weight: f32,            // pull toward center
-    pub max_speed: f32,                  // top movement speed
-    pub neighbor_radius: f32,            // how far you “see” neighbors
-    pub neighbor_exit_radius: f32,       // new: slightly larger
+    pub velocity: Vec3,
+    pub prev_steer: Vec3,          // start at rest
+    pub max_force: f32,            // how quickly you can turn
+    pub separation_weight: f32,    // push apart
+    pub alignment_weight: f32,     // match heading
+    pub cohesion_weight: f32,      // pull toward center
+    pub max_speed: f32,            // top movement speed
+    pub neighbor_radius: f32,      // how far you “see” neighbors
+    pub neighbor_exit_radius: f32, // new: slightly larger
 }
 
 impl Default for Boid {
@@ -37,6 +38,7 @@ impl Default for Boid {
         Self {
             prev_neighbors: HashSet::new(),
             velocity: Vec3::ZERO,
+            prev_steer: Vec3::ZERO,     // start at rest
             max_force: max_speed * 0.1, // ~0.4 units/sec² of turn acceleration
             separation_weight: 40.0,    // strongest urge to avoid collisions
             alignment_weight: 5.0,      // medium urge to line up

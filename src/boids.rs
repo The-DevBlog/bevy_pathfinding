@@ -37,14 +37,14 @@ pub fn calculate_boid_steering(
         // 1) buffer of what we need to insert
         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
-        // for &unit in &ff.flowfield_props.units {
         for &unit in &ff.units {
             if let Ok((_ent, mut boid_tf, mut boid)) = q_boids.get_mut(unit) {
-                // rebuild neighbors with hysteresis and compute ali/coh
+                // rebuild neighbors with hysteresis
                 let enter_r2 = boid.neighbor_radius.powi(2);
                 let exit_r2 = boid.neighbor_exit_radius.powi(2);
                 let mut current_neighbors = HashSet::new();
 
+                // collect neighbor positions + velocities
                 let neighbor_data: Vec<(Vec3, Vec3)> = boid_snapshot
                     .iter()
                     .filter_map(|(other_ent, pos, vel)| {
@@ -59,21 +59,33 @@ pub fn calculate_boid_steering(
                     })
                     .collect();
 
+                // compute boid forces (sep, ali, coh)
                 let (sep, ali, coh) = compute_boids(&neighbor_data, boid_tf.translation, &boid);
 
+                // sample flow-field
                 let dir2d = ff.sample_direction(boid_tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
+                // STEP 3: Low-pass filter the final steering
+                // first compute raw steering
                 let raw = sep + ali + coh + flow_force;
                 let desired = raw.clamp_length_max(boid.max_speed);
-                let steer = (desired - boid.velocity).clamp_length_max(boid.max_force);
+                let unclamped_steer = desired - boid.velocity;
+                // apply clamp
+                let steer = unclamped_steer.clamp_length_max(boid.max_force);
 
-                boid.velocity += steer * dt;
+                // low-pass filter
+                let alpha = 0.1; // adjust for smoothness
+                let smooth_steer = boid.prev_steer.lerp(steer, alpha);
+                boid.prev_steer = smooth_steer;
+
+                // apply smoothed steering
+                boid.velocity += smooth_steer * dt;
                 boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
                 boid_tf.translation += boid.velocity * dt;
 
                 // buffer insertion and update neighbors
-                pending.push((unit, steer));
+                pending.push((unit, smooth_steer));
                 boid.prev_neighbors = current_neighbors;
             }
         }
