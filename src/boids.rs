@@ -68,7 +68,8 @@ pub fn calculate_boid_steering(
 
                 // STEP 3: Low-pass filter the final steering
                 // first compute raw steering
-                let raw = sep + ali + coh + flow_force;
+                // let raw = sep + ali + coh + flow_force;
+                let raw = sep + flow_force;
                 let desired = raw.clamp_length_max(boid.max_speed);
                 let unclamped_steer = desired - boid.velocity;
                 // apply clamp
