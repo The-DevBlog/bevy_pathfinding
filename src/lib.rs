@@ -59,7 +59,7 @@ impl Default for BoidsInfo {
             velocity: Vec3::ZERO,
             max_force: max_speed * 0.1, // ~0.4 units/sec² of turn acceleration
             separation_weight: 50.0,    // strongest urge to avoid collisions
-            alignment_weight: 5.0,      // medium urge to line up
+            alignment_weight: 0.0,      // medium urge to line up
             cohesion_weight: 0.0,       // medium urge to stay together
             max_speed,                  // units per second
             neighbor_radius: 40.0,      // in world‐units (tweak to taste)

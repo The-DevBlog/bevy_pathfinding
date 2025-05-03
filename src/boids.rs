@@ -34,7 +34,6 @@ pub fn calculate_boid_steering(
 
     // FLOW-FIELD + SEP/ALI/COH
     for mut ff in q_ff.iter_mut() {
-        // 1) buffer of what we need to insert
         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
         for &unit in &ff.units {
@@ -66,13 +65,10 @@ pub fn calculate_boid_steering(
                 let dir2d = ff.sample_direction(boid_tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // STEP 3: Low-pass filter the final steering
                 // first compute raw steering
-                // let raw = sep + ali + coh + flow_force;
-                let raw = sep + flow_force;
+                let raw = sep + ali + coh + flow_force;
                 let desired = raw.clamp_length_max(boid.max_speed);
                 let unclamped_steer = desired - boid.velocity;
-                // apply clamp
                 let steer = unclamped_steer.clamp_length_max(boid.max_force);
 
                 // low-pass filter
