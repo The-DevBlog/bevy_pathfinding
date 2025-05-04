@@ -28,7 +28,6 @@ pub struct Boid {
 
 impl Default for Boid {
     fn default() -> Self {
-        // let max_speed = 4.0;
         Self {
             prev_neighbors: HashSet::new(),
             velocity: Vec3::ZERO,
