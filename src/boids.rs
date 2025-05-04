@@ -21,7 +21,7 @@ pub fn calculate_boid_steering(
     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
-    mut gizmos: Gizmos,
+    mut _gizmos: Gizmos,
 ) {
     let dt = time.delta_secs();
 
@@ -40,13 +40,14 @@ pub fn calculate_boid_steering(
     let rows = grid.grid[0].len();
     let origin = grid.grid[columns / 2][rows / 2].world_pos; // assume Vec2 or Vec3 with x/z
 
-    let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
-    gizmos.grid(
-        Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
-        UVec2::new(bucket_size as u32, bucket_size as u32),
-        Vec2::new(spacing, spacing),
-        YELLOW,
-    );
+    // draw bucket grid
+    // let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
+    // _gizmos.grid(
+    //     Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
+    //     UVec2::new(bucket_size as u32, bucket_size as u32),
+    //     Vec2::new(spacing, spacing),
+    //     YELLOW,
+    // );
 
     for (ent, pos, vel) in &snapshot {
         let cell_x = ((pos.x - origin.x) / bucket_size).floor() as i32;
