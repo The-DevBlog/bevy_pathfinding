@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    f32::consts::PI,
-};
+use std::collections::{HashMap, HashSet};
 
-use bevy::{color::palettes::css::YELLOW, prelude::*};
+use bevy::prelude::*;
 
 use crate::{components::*, flowfield::FlowField, grid::Grid};
 

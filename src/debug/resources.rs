@@ -103,7 +103,7 @@ pub fn load_dbg_icon(mut images: ResMut<Assets<Image>>, mut dbg_icon: ResMut<Dbg
     let (width, height) = rgba_image.dimensions();
 
     let image = Image {
-        data: rgba_image.to_vec(),
+        data: Some(rgba_image.to_vec()),
         texture_descriptor: TextureDescriptor {
             label: None,
             size: Extent3d {

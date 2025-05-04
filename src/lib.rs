@@ -73,7 +73,7 @@ fn change_boids(
     mut q_boids: Query<&mut Boid>,
     q_boid_values: Query<&BoidsInfo>,
 ) {
-    let Ok(new_boids_info) = q_boid_values.get_single() else {
+    let Ok(new_boids_info) = q_boid_values.single() else {
         cmds.spawn((BoidsInfo::default(), Name::new("Boids Info")));
         return;
     };

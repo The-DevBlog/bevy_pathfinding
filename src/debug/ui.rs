@@ -132,7 +132,7 @@ fn handle_draw_grid_interaction(
             Interaction::Pressed => {
                 dbg.draw_grid = !dbg.draw_grid;
 
-                if let Ok(mut txt) = q_txt.get_single_mut() {
+                if let Ok(mut txt) = q_txt.single_mut() {
                     txt.0 = format!("Grid: {}", dbg.draw_grid);
                 }
             }
@@ -169,7 +169,7 @@ fn toggle_dbg_visibility(
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
-    let Ok(mut title_bar) = q_title_bar.get_single_mut() else {
+    let Ok(mut title_bar) = q_title_bar.single_mut() else {
         return;
     };
 
@@ -231,11 +231,15 @@ fn handle_drag(
     mut q_ui: Query<&mut Node, With<DebugUI>>,
     window_q: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let Ok(mut ui_style) = q_ui.get_single_mut() else {
+    let Ok(mut ui_style) = q_ui.single_mut() else {
         return;
     };
 
-    let Some(cursor_pos) = window_q.single().cursor_position() else {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window.cursor_position() else {
         return;
     };
 

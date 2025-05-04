@@ -72,7 +72,7 @@ fn draw_grid(
 ) {
     // Remove old grid lines before re-drawing
     for line_entity in &q_grid_lines {
-        cmds.entity(line_entity).despawn_recursive();
+        cmds.entity(line_entity).despawn();
     }
 
     if !dbg.draw_grid {
@@ -154,7 +154,7 @@ pub fn draw_flowfield(
 ) {
     // Remove current arrows before rendering new ones
     for arrow_entity in &q_flowfield_arrow {
-        cmds.entity(arrow_entity).despawn_recursive();
+        cmds.entity(arrow_entity).despawn();
     }
 
     let Some(active_dbg_ff) = &active_dbg_flowfield.0 else {
@@ -246,7 +246,7 @@ fn draw_costfield(
 ) {
     // Remove current cost field before rendering new one
     for cost_entity in &q_cost {
-        cmds.entity(cost_entity).despawn_recursive();
+        cmds.entity(cost_entity).despawn();
     }
 
     let base_offset = calculate_offset(grid.cell_diameter, &dbg, DrawMode::CostField);
@@ -324,7 +324,7 @@ fn draw_integration_field(
 ) {
     // Remove current cost field before rendering new one
     for cost_entity in &q_cost {
-        cmds.entity(cost_entity).despawn_recursive();
+        cmds.entity(cost_entity).despawn();
     }
 
     let Some(ff) = &active_dbg_flowfield.0 else {
@@ -405,7 +405,7 @@ fn draw_index(
 ) {
     // Remove current index entities before rendering new ones
     for idx_entity in &q_idx {
-        cmds.entity(idx_entity).despawn_recursive();
+        cmds.entity(idx_entity).despawn();
     }
 
     if dbg.draw_mode_1 != DrawMode::Index && dbg.draw_mode_2 != DrawMode::Index {
@@ -501,7 +501,7 @@ fn draw_index(
 
 //     let id = cell.idx_to_id(grid.grid.len());
 
-//     let Ok(mut instance) = q_instance.get_single_mut() else {
+//     let Ok(mut instance) = q_instance.single_mut() else {
 //         return;
 //     };
 
@@ -540,7 +540,7 @@ fn draw_index(
 //     let cell = trigger.cell;
 //     let id = cell.idx_to_id(grid.grid.len());
 
-//     let Ok(mut instance) = q_instance.get_single_mut() else {
+//     let Ok(mut instance) = q_instance.single_mut() else {
 //         return;
 //     };
 //     let Some(instance) = instance.0.get_mut(&id) else {
