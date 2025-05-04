@@ -66,8 +66,8 @@ pub fn calculate_boid_steering(
                 let cy = ((tf.translation.z - origin.y) / bucket_size).floor() as i32;
 
                 // Gather neighbor data with hysteresis
-                let enter_r2 = boid.neighbor_radius.powi(2);
-                let exit_r2 = boid.neighbor_exit_radius.powi(2);
+                let enter_r2 = boid.info.neighbor_radius.powi(2);
+                let exit_r2 = boid.info.neighbor_exit_radius.powi(2);
                 let mut current_neighbors = HashSet::new();
                 let mut neighbor_data = Vec::new();
 
@@ -93,20 +93,14 @@ pub fn calculate_boid_steering(
                 let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // Steering and integration
-                let raw = sep + ali + coh + flow_force;
-                let desired = raw.clamp_length_max(boid.max_speed);
-                let unclamped = desired - boid.velocity;
-                let steer = unclamped.clamp_length_max(boid.max_force);
-
                 // Smooth steering
+                let raw = sep + ali + coh + flow_force;
                 let alpha = 0.1;
-                let smooth = boid.prev_steer.lerp(steer, alpha);
+                let smooth = boid.prev_steer.lerp(raw, alpha);
                 boid.prev_steer = smooth;
 
                 // Apply to velocity & position
                 boid.velocity += smooth * dt;
-                boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
                 tf.translation += boid.velocity * dt;
 
                 pending.push((unit, smooth));
@@ -219,19 +213,19 @@ fn compute_boids(neighbors: &[(Vec3, Vec3)], current_pos: Vec3, boid: &Boid) -> 
                 separation += offset.normalize() / dist;
             }
         }
-        separation = (separation / count) * boid.separation_weight;
+        separation = (separation / count) * boid.info.separation;
 
         // 2) Alignment: average neighbor velocity
         for (_, n_vel) in neighbors {
             alignment += *n_vel;
         }
         // normalize & weight
-        alignment = (alignment / count).normalize_or_zero() * boid.alignment_weight;
+        alignment = (alignment / count).normalize_or_zero() * boid.info.alignment;
 
         // 3) Cohesion: same as before
         let center = neighbors.iter().map(|(n_pos, _)| *n_pos).sum::<Vec3>() / count;
         let to_center = center - current_pos;
-        cohesion = to_center.normalize_or_zero() * boid.cohesion_weight;
+        cohesion = to_center.normalize_or_zero() * boid.info.cohesion;
     }
     (separation, alignment, cohesion)
 }

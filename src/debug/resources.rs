@@ -1,7 +1,7 @@
 use bevy::{image::*, prelude::*, render::render_resource::*};
 use image::ImageFormat;
 
-use crate::components::Boid;
+use crate::components::BoidsInfo;
 
 const DBG_ICON: &[u8] = include_bytes!("../../assets/imgs/dbg_icon.png");
 
@@ -28,6 +28,7 @@ pub struct DbgOptions {
     pub print_statements: bool,
     pub draw_mode_1: DrawMode,
     pub draw_mode_2: DrawMode,
+    pub boids_info: BoidsInfo,
 }
 
 impl Default for DbgOptions {
@@ -39,6 +40,7 @@ impl Default for DbgOptions {
             print_statements: true,
             draw_mode_1: DrawMode::None,
             draw_mode_2: DrawMode::CostField,
+            boids_info: BoidsInfo::default(),
         }
     }
 }
