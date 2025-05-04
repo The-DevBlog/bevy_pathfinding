@@ -20,6 +20,7 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
+                    handle_boids_info_interaction,
                     handle_dropdown_click,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
@@ -116,6 +117,19 @@ fn handle_drawmode_option_interaction(
 
                 cmds.trigger(UpdateDropdownOptionEv);
             }
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn handle_boids_info_interaction(
+    mut q: Query<(&Interaction, &BoidsInfoCtr, &mut BackgroundColor), Changed<Interaction>>,
+) {
+    for (interaction, option, mut background) in q.iter_mut() {
+        println!("Interafcting!");
+        match interaction {
+            Interaction::Pressed => background.0 = CLR_BTN_HOVER.into(),
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
         }
@@ -423,25 +437,20 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
-    let options_container =
-        |radius: Option<BorderRadius>, options_set: OptionsSet| -> DropdownOptionsCtr {
-            let radius = match radius {
-                Some(r) => r,
-                None => BorderRadius::ZERO,
-            };
-            DropdownOptionsCtr {
-                comp: DropdownOptions(options_set),
-                visible_node: VisibleNode,
-                background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-                border_radius: radius,
-                node: Node {
-                    flex_direction: FlexDirection::Column,
-                    display: Display::None,
-                    ..default()
-                },
-                name: Name::new("Options Container"),
-            }
-        };
+    let options_container = |options_set: OptionsSet| -> DropdownOptionsCtr {
+        DropdownOptionsCtr {
+            comp: DropdownOptions(options_set),
+            visible_node: VisibleNode,
+            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+            border_radius: BorderRadius::ZERO,
+            node: Node {
+                flex_direction: FlexDirection::Column,
+                display: Display::None,
+                ..default()
+            },
+            name: Name::new("Options Container"),
+        }
+    };
 
     let btn_option = |set: OptionsSet,
                       txt: String,
@@ -474,10 +483,18 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
     let boids_info_ctr = (
         BoidsInfoCtr,
         VisibleNode,
+        Button::default(),
+        BackgroundColor::from(CLR_BACKGROUND_2),
+        BorderColor::from(CLR_BORDER),
         Text::new("Boids Info"),
         TextFont::from_font_size(FONT_SIZE),
         TextColor::from(CLR_TXT),
-        Node::default(),
+        Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            border: UiRect::bottom(Val::Px(1.0)),
+            ..default()
+        },
+        Name::new("Boids Info Ctr"),
     );
 
     // Root Container
@@ -506,7 +523,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(None, OptionsSet::One))
+        ctr.spawn(options_container(OptionsSet::One))
             // Dropdown Options
             .with_children(|options| {
                 options
@@ -553,46 +570,43 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(
-            Some(BorderRadius::bottom(Val::Px(10.0))),
-            OptionsSet::Two,
-        ))
-        // Dropdown Options
-        .with_children(|options| {
-            options
-                .spawn(btn_option(OptionsSet::Two, "None".to_string(), None))
-                .with_children(|btn| {
-                    btn.spawn(option_txt("> None".to_string()));
-                });
-            options
-                .spawn(btn_option(
-                    OptionsSet::Two,
-                    "IntegrationField".to_string(),
-                    None,
-                ))
-                .with_children(|btn| {
-                    btn.spawn(option_txt("> IntegrationField".to_string()));
-                });
-            options
-                .spawn(btn_option(OptionsSet::Two, "FlowField".to_string(), None))
-                .with_children(|btn| {
-                    btn.spawn(option_txt("> FlowField".to_string()));
-                });
-            options
-                .spawn(btn_option(OptionsSet::Two, "CostField".to_string(), None))
-                .with_children(|btn| {
-                    btn.spawn(option_txt("> CostField".to_string()));
-                });
-            options
-                .spawn(btn_option(
-                    OptionsSet::Two,
-                    "Index".to_string(),
-                    Some(BorderRadius::bottom(Val::Px(10.0))),
-                ))
-                .with_children(|btn| {
-                    btn.spawn(option_txt("> Index".to_string()));
-                });
-        });
+        ctr.spawn(options_container(OptionsSet::Two))
+            // Dropdown Options
+            .with_children(|options| {
+                options
+                    .spawn(btn_option(OptionsSet::Two, "None".to_string(), None))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("> None".to_string()));
+                    });
+                options
+                    .spawn(btn_option(
+                        OptionsSet::Two,
+                        "IntegrationField".to_string(),
+                        None,
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("> IntegrationField".to_string()));
+                    });
+                options
+                    .spawn(btn_option(OptionsSet::Two, "FlowField".to_string(), None))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("> FlowField".to_string()));
+                    });
+                options
+                    .spawn(btn_option(OptionsSet::Two, "CostField".to_string(), None))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("> CostField".to_string()));
+                    });
+                options
+                    .spawn(btn_option(
+                        OptionsSet::Two,
+                        "Index".to_string(),
+                        Some(BorderRadius::bottom(Val::Px(10.0))),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("> Index".to_string()));
+                    });
+            });
 
         // Boids Info Dropdown
         ctr.spawn(boids_info_ctr);
