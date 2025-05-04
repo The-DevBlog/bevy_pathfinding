@@ -15,7 +15,7 @@ impl Plugin for BoidsPlugin {
     }
 }
 
-// OPTIMIZED WORKING / JITTERY
+// New code. Bucketing for performance (big gains), but jittery
 pub fn calculate_boid_steering(
     time: Res<Time>,
     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
@@ -123,6 +123,7 @@ pub fn calculate_boid_steering(
     }
 }
 
+// Original code. No Bucketing, but much less jittery
 // pub fn calculate_boid_steering(
 //     time: Res<Time>,
 //     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
