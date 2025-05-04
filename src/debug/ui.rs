@@ -87,6 +87,9 @@ struct DropdownOptionsCtr {
     name: Name,
 }
 
+#[derive(Component)]
+struct BoidsInfoCtr;
+
 #[derive(Bundle)]
 struct OptionTxtCtr {
     comp: OptionTxt,
@@ -187,7 +190,7 @@ fn toggle_dbg_visibility(
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, With<DropdownOptions>>,
+    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsInfoCtr>)>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -468,6 +471,15 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
+    let boids_info_ctr = (
+        BoidsInfoCtr,
+        VisibleNode,
+        Text::new("Boids Info"),
+        TextFont::from_font_size(FONT_SIZE),
+        TextColor::from(CLR_TXT),
+        Node::default(),
+    );
+
     // Root Container
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
@@ -581,5 +593,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                     btn.spawn(option_txt("> Index".to_string()));
                 });
         });
+
+        // Boids Info Dropdown
+        ctr.spawn(boids_info_ctr);
     });
 }

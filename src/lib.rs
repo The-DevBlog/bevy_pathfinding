@@ -25,7 +25,7 @@ pub struct BevyRtsPathFindingPlugin;
 
 impl Plugin for BevyRtsPathFindingPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<BoidsInfoEgui>();
+        app.register_type::<BoidsInfo>();
 
         app.add_plugins((
             BoidsPlugin,
@@ -41,7 +41,7 @@ impl Plugin for BevyRtsPathFindingPlugin {
 }
 
 #[derive(Component, Reflect)]
-pub struct BoidsInfoEgui {
+pub struct BoidsInfo {
     pub velocity: Vec3,            // start at rest
     pub separation_weight: f32,    // push apart
     pub alignment_weight: f32,     // match heading
@@ -50,7 +50,7 @@ pub struct BoidsInfoEgui {
     pub neighbor_exit_radius: f32, // new: slightly larger
 }
 
-impl Default for BoidsInfoEgui {
+impl Default for BoidsInfo {
     fn default() -> Self {
         let neighbor_radius = 45.0;
         Self {
@@ -67,10 +67,10 @@ impl Default for BoidsInfoEgui {
 fn change_boids(
     mut cmds: Commands,
     mut q_boids: Query<&mut Boid>,
-    q_boid_values: Query<&BoidsInfoEgui>,
+    q_boid_values: Query<&BoidsInfo>,
 ) {
     let Ok(new_boids_info) = q_boid_values.single() else {
-        cmds.spawn((BoidsInfoEgui::default(), Name::new("Boids Info")));
+        cmds.spawn((BoidsInfo::default(), Name::new("Boids Info")));
         return;
     };
 
