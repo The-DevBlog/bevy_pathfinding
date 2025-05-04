@@ -44,8 +44,8 @@ impl Default for Boid {
             alignment_weight: 0.0,      // medium urge to line up
             cohesion_weight: 0.0,       // medium urge to stay together
             max_speed,                  // units per second
-            neighbor_radius: 40.0,      // in world‐units (tweak to taste)
-            neighbor_exit_radius: 40.0, // new: slightly larger
+            neighbor_radius: 45.0,      // in world‐units (tweak to taste)
+            neighbor_exit_radius: 47.5, // new: slightly larger
         }
     }
 }
