@@ -246,7 +246,7 @@ fn flowfield_group_stop_system(
             ff.units.clear();
 
             // 6) if you want to despawn the flowfield itself
-            cmds.entity(ff_ent).despawn_recursive();
+            cmds.entity(ff_ent).despawn();
         }
     }
 }
@@ -263,15 +263,19 @@ fn initialize_flowfield(
     mut _materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
 ) {
-    let Some(mouse_pos) = q_windows.single().cursor_position() else {
+    let Ok(window) = q_windows.single() else {
         return;
     };
 
-    let Ok(cam) = q_cam.get_single() else {
+    let Some(cursor_pos) = window.cursor_position() else {
         return;
     };
 
-    let Ok(map_base) = q_map_base.get_single() else {
+    let Ok(cam) = q_cam.single() else {
+        return;
+    };
+
+    let Ok(map_base) = q_map_base.single() else {
         return;
     };
 
@@ -290,19 +294,19 @@ fn initialize_flowfield(
 
         // 2) If after removal, the flowfield is now empty, *then* despawn it.
         if ff.units.is_empty() {
-            cmds.entity(ff_ent).despawn_recursive();
+            cmds.entity(ff_ent).despawn();
 
             // Also remove any "destination radius" entity that references this flowfield
             // TODO: Remove
             for (ent, d) in q_destination_radius.iter() {
                 if d.0 == ff_ent.index() {
-                    cmds.entity(ent).despawn_recursive();
+                    cmds.entity(ent).despawn();
                 }
             }
         }
     }
 
-    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, mouse_pos);
+    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, cursor_pos);
     let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
 
     let mut ff = FlowField::new(grid.size, units.clone(), units.len() as f32, Vec3::ZERO);
@@ -312,7 +316,7 @@ fn initialize_flowfield(
 
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
-    let ff_ent = cmds
+    let _ff_ent = cmds
         .spawn((
             ff.clone(),
             Name::new("ParentFlowField"),
@@ -325,7 +329,7 @@ fn initialize_flowfield(
     // {
     //     let mesh = Mesh3d(_meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
     //     let material = MeshMaterial3d(_materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-    //     cmds.entity(ff_ent).with_children(|parent| {
+    //     cmds.entity(_ff_ent).with_children(|parent| {
     //         parent.spawn((
     //             DestinationRadius(ff_ent.index()),
     //             mesh,

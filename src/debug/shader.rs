@@ -137,7 +137,7 @@ fn load_textures(
     let (width, height) = rgba_image.dimensions();
 
     let digit_atlas = Image {
-        data: rgba_image.into_raw(),
+        data: Some(rgba_image.into_raw()),
         texture_descriptor: TextureDescriptor {
             label: Some("digit_atlas"),
             size: Extent3d {
@@ -164,7 +164,7 @@ fn load_textures(
     let (width, height) = rgba_image.dimensions();
 
     let arrow_img = Image {
-        data: rgba_image.into_raw(),
+        data: Some(rgba_image.into_raw()),
         texture_descriptor: TextureDescriptor {
             label: Some("arrow_img"),
             size: Extent3d {
@@ -191,7 +191,7 @@ fn load_textures(
     let (width, height) = rgba_image.dimensions();
 
     let x_img = Image {
-        data: rgba_image.into_raw(),
+        data: Some(rgba_image.into_raw()),
         texture_descriptor: TextureDescriptor {
             label: Some("x_img"),
             size: Extent3d {
@@ -218,7 +218,7 @@ fn load_textures(
     let (width, height) = rgba_image.dimensions();
 
     let destination_img = Image {
-        data: rgba_image.into_raw(),
+        data: Some(rgba_image.into_raw()),
         texture_descriptor: TextureDescriptor {
             label: Some("destination_img"),
             size: Extent3d {
@@ -260,16 +260,17 @@ fn queue_custom(
     render_mesh_instances: Res<RenderMeshInstances>,
     material_meshes: Query<(Entity, &MainEntity), With<InstanceMaterialData>>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
-    mut views: Query<(Entity, &ExtractedView, &Msaa)>,
+    mut views: Query<(&ExtractedView, &Msaa)>,
     q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
     render_device: Res<RenderDevice>,
 ) {
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
 
-    for (view_entity, view, msaa) in &mut views {
+    for (view, msaa) in &mut views {
         let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
 
-        let Some(transparent_phase) = transparent_render_phases.get_mut(&view_entity) else {
+        let Some(transparent_phase) = transparent_render_phases.get_mut(&view.retained_view_entity)
+        else {
             continue;
         };
 
@@ -294,7 +295,8 @@ fn queue_custom(
                 draw_function: draw_custom,
                 distance: rangefinder.distance_translation(&mesh_instance.translation),
                 batch_range: 0..1,
-                extra_index: PhaseItemExtraIndex::NONE,
+                extra_index: PhaseItemExtraIndex::None,
+                indexed: false,
             });
         }
     }
