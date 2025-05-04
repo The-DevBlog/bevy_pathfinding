@@ -35,17 +35,18 @@ pub struct Boid {
 impl Default for Boid {
     fn default() -> Self {
         let max_speed = 4.0;
+        let neighbor_radius = 45.0;
         Self {
             prev_neighbors: HashSet::new(),
             velocity: Vec3::ZERO,
-            prev_steer: Vec3::ZERO,     // start at rest
-            max_force: max_speed * 0.1, // ~0.4 units/sec² of turn acceleration
-            separation_weight: 50.0,    // strongest urge to avoid collisions
-            alignment_weight: 0.0,      // medium urge to line up
-            cohesion_weight: 0.0,       // medium urge to stay together
-            max_speed,                  // units per second
-            neighbor_radius: 45.0,      // in world‐units (tweak to taste)
-            neighbor_exit_radius: 47.5, // new: slightly larger
+            prev_steer: Vec3::ZERO,                       // start at rest
+            max_force: max_speed * 0.1,                   // ~0.4 units/sec² of turn acceleration
+            separation_weight: 50.0,                      // strongest urge to avoid collisions
+            alignment_weight: 0.0,                        // medium urge to line up
+            cohesion_weight: 0.0,                         // medium urge to stay together
+            max_speed,                                    // units per second
+            neighbor_radius: neighbor_radius,             // in world‐units (tweak to taste)
+            neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
         }
     }
 }

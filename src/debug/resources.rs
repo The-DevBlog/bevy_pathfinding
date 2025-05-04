@@ -1,6 +1,8 @@
 use bevy::{image::*, prelude::*, render::render_resource::*};
 use image::ImageFormat;
 
+use crate::components::Boid;
+
 const DBG_ICON: &[u8] = include_bytes!("../../assets/imgs/dbg_icon.png");
 
 pub struct ResourcesPlugin;
@@ -22,6 +24,7 @@ pub struct DbgIcon(pub Handle<Image>);
 pub struct DbgOptions {
     pub hide: bool,
     pub draw_grid: bool,
+    pub draw_spatial_hashing_grid: bool,
     pub print_statements: bool,
     pub draw_mode_1: DrawMode,
     pub draw_mode_2: DrawMode,
@@ -32,6 +35,7 @@ impl Default for DbgOptions {
         DbgOptions {
             hide: false,
             draw_grid: true,
+            draw_spatial_hashing_grid: false,
             print_statements: true,
             draw_mode_1: DrawMode::None,
             draw_mode_2: DrawMode::CostField,
@@ -72,6 +76,15 @@ impl DbgOptions {
         Self::draw_mode_to_string(self.draw_mode_2)
     }
 }
+
+// pub struct BoidsInfo {
+//     pub max_force: f32,         // how quickly you can turn
+//     pub separation_weight: f32, // push apart
+//     pub alignment_weight: f32,  // match heading
+//     pub cohesion_weight: f32,   // pull toward center
+//     pub max_speed: f32,         // top movement speed
+//     pub neighbor_radius: f32,   // how far you “see” neighbors
+// }
 
 #[derive(Reflect, PartialEq, Clone, Copy)]
 pub enum DrawMode {

@@ -55,6 +55,7 @@ pub struct BoidsInfo {
 impl Default for BoidsInfo {
     fn default() -> Self {
         let max_speed = 30.0;
+        let neighbor_radius = 45.0;
         Self {
             velocity: Vec3::ZERO,
             max_force: max_speed * 0.1, // ~0.4 units/sec² of turn acceleration
@@ -62,8 +63,8 @@ impl Default for BoidsInfo {
             alignment_weight: 0.0,      // medium urge to line up
             cohesion_weight: 0.0,       // medium urge to stay together
             max_speed,                  // units per second
-            neighbor_radius: 40.0,      // in world‐units (tweak to taste)
-            neighbor_exit_radius: 40.0, // new: slightly larger
+            neighbor_radius: neighbor_radius, // in world‐units (tweak to taste)
+            neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
         }
     }
 }
