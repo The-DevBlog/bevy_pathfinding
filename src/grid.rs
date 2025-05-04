@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::primitives::Aabb};
+use bevy::prelude::*;
 use std::collections::HashMap;
 
 use crate::{
@@ -20,22 +20,7 @@ impl Plugin for GridPlugin {
                 remove_rts_obj,
             ),
         );
-
-        app.add_systems(Update, print.run_if(resource_exists::<Grid>));
     }
-}
-
-// TODO: Remove
-fn print(_grid: Res<Grid>, _q_objects: Query<&RtsObj>) {
-    // println!("Objects: {}", _q_objects.iter().len());
-    // for (_ent, cells) in grid.occupied_cells.iter() {
-    // println!("occupying {} cells", cells.len());
-    // for cell in cells.iter() {
-    // print!("-{},{}", cell.y, cell.x);
-    // }
-    // }
-
-    // println!();
 }
 
 #[derive(Resource, Reflect)]

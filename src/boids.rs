@@ -1,6 +1,11 @@
-use bevy::prelude::*;
+use std::{
+    collections::{HashMap, HashSet},
+    f32::consts::PI,
+};
 
-use crate::{cell::Cell, components::*, flowfield::FlowField};
+use bevy::{color::palettes::css::YELLOW, prelude::*};
+
+use crate::{components::*, flowfield::FlowField, grid::Grid};
 
 pub struct BoidsPlugin;
 
@@ -10,129 +15,225 @@ impl Plugin for BoidsPlugin {
     }
 }
 
-fn calculate_boid_steering(
-    q_boids: Query<(Entity, &Transform, &Boid), With<Destination>>,
+// New code. Bucketing for performance (big gains), but jittery
+pub fn calculate_boid_steering(
+    time: Res<Time>,
+    mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
+    grid: Res<Grid>,
+    mut gizmos: Gizmos,
 ) {
-    let mut boids_data = Vec::new();
-    for (ent, position, boid) in q_boids.iter() {
-        boids_data.push((ent, position, boid));
+    let dt = time.delta_secs();
+
+    // 1) Snapshot all boid positions & velocities
+    let snapshot: Vec<(Entity, Vec3, Vec3)> = q_boids
+        .iter()
+        .map(|(e, tf, b)| (e, tf.translation, b.velocity))
+        .collect();
+
+    // 2) Build local bucket map: (cell_x, cell_y) -> Vec<(Entity, pos, vel)>
+    let mut buckets: HashMap<(i32, i32), Vec<(Entity, Vec3, Vec3)>> =
+        HashMap::with_capacity(snapshot.len());
+
+    let bucket_size: f32 = (grid.size.x as f32) / 10.0;
+    let columns = grid.grid.len();
+    let rows = grid.grid[0].len();
+    let origin = grid.grid[columns / 2][rows / 2].world_pos; // assume Vec2 or Vec3 with x/z
+
+    let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
+    gizmos.grid(
+        Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
+        UVec2::new(bucket_size as u32, bucket_size as u32),
+        Vec2::new(spacing, spacing),
+        YELLOW,
+    );
+
+    for (ent, pos, vel) in &snapshot {
+        let cell_x = ((pos.x - origin.x) / bucket_size).floor() as i32;
+        let cell_y = ((pos.z - origin.z) / bucket_size).floor() as i32;
+        buckets
+            .entry((cell_x, cell_y))
+            .or_default()
+            .push((*ent, *pos, *vel));
     }
 
+    // 3) For each flow-field, steer only against boids in the 3×3 neighbor cells
     for mut ff in q_ff.iter_mut() {
-        // PARENT FLOWFIELD
-        // Filter down which boids are in this flowfield
-        let relevant_boids: Vec<_> = boids_data
-            .iter()
-            .filter(|(ent, _, _)| ff.flowfield_props.units.contains(ent))
-            .collect();
+        let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
-        // For each boid, build neighbor list and compute boid vectors
-        for (ent, pos, boid) in &relevant_boids {
-            let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
-            let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
+        for &unit in &ff.units {
+            if let Ok((_, mut tf, mut boid)) = q_boids.get_mut(unit) {
+                // Boid's own cell
+                let cx = ((tf.translation.x - origin.x) / bucket_size).floor() as i32;
+                let cy = ((tf.translation.z - origin.y) / bucket_size).floor() as i32;
 
-            // Flowfield direction
-            let cell = ff.get_cell_from_world_position(pos.translation);
-            let computed_boids = separation + cohesion + alignment;
-            let steering = compute_steering(cell, computed_boids, boid);
+                // Gather neighbor data with hysteresis
+                let enter_r2 = boid.neighbor_radius.powi(2);
+                let exit_r2 = boid.neighbor_exit_radius.powi(2);
+                let mut current_neighbors = HashSet::new();
+                let mut neighbor_data = Vec::new();
 
-            // Store in the map so we can apply it later
-            ff.flowfield_props.steering_map.insert(*ent, steering);
-        }
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        if let Some(bucket) = buckets.get(&(cx + dx, cy + dy)) {
+                            for &(other_ent, other_pos, other_vel) in bucket {
+                                let dist2 = tf.translation.distance_squared(other_pos);
+                                let was_neighbor = boid.prev_neighbors.contains(&other_ent);
+                                if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
+                                    current_neighbors.insert(other_ent);
+                                    neighbor_data.push((other_pos, other_vel));
+                                }
+                            }
+                        }
+                    }
+                }
 
-        // DESTINATION FLOWFIELDS
-        for ff in &mut ff.destination_flowfields.iter_mut() {
-            // Filter down which boids are in this flowfield
-            let units = ff.flowfield_props.units.clone();
-            let relevant_boids: Vec<_> = boids_data
-                .iter()
-                .filter(|(ent, _, _)| units.contains(ent))
-                .collect();
+                // Compute boid forces
+                let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
 
-            // For each boid, build neighbor list and compute boid vectors
-            for (ent, pos, boid) in &relevant_boids {
-                let neighbor_pos = gather_neighbors_positions(&relevant_boids, pos, ent, boid);
-                let (separation, alignment, cohesion) = compute_boids(neighbor_pos, pos, boid);
-                let computed_boids = separation + cohesion + alignment;
+                // Sample flow-field
+                let dir2d = ff.sample_direction(tf.translation, &grid);
+                let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // Flowfield direction
-                let cell = ff.get_cell_from_world_position(pos.translation);
-                let steering = compute_steering(cell, computed_boids, boid);
+                // Steering and integration
+                let raw = sep + ali + coh + flow_force;
+                let desired = raw.clamp_length_max(boid.max_speed);
+                let unclamped = desired - boid.velocity;
+                let steer = unclamped.clamp_length_max(boid.max_force);
 
-                // Store in the map so we can apply it later
-                ff.flowfield_props.steering_map.insert(*ent, steering);
+                // Smooth steering
+                let alpha = 0.1;
+                let smooth = boid.prev_steer.lerp(steer, alpha);
+                boid.prev_steer = smooth;
+
+                // Apply to velocity & position
+                boid.velocity += smooth * dt;
+                boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
+                tf.translation += boid.velocity * dt;
+
+                pending.push((unit, smooth));
+                boid.prev_neighbors = current_neighbors;
             }
         }
+
+        // Write all steering values back to the flow-field
+        for (unit, steer) in pending {
+            ff.steering_map.insert(unit, steer);
+        }
     }
 }
 
-fn compute_steering(cell: Cell, computed_boids: Vec3, boid: &Boid) -> Vec3 {
-    let ff_dir_2d = cell.best_direction.vector();
+// Original code. No Bucketing, but much less jittery
+// pub fn calculate_boid_steering(
+//     time: Res<Time>,
+//     mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
+//     mut q_ff: Query<&mut FlowField>,
+//     grid: Res<Grid>,
+// ) {
+//     let dt = time.delta_secs();
 
-    // Convert to 3D
-    let ff_dir_3d = Vec3::new(ff_dir_2d.x as f32, 0.0, ff_dir_2d.y as f32);
-    let flow_weight = 1.0; // if you want to tweak how strong flowfield is
-    let flowfield_force = ff_dir_3d * flow_weight;
+//     // snapshot positions+velocities
+//     let boid_snapshot: Vec<(Entity, Vec3, Vec3)> = q_boids
+//         .iter()
+//         .map(|(e, tf, b)| (e, tf.translation, b.velocity))
+//         .collect();
 
-    // Sum up final steering
-    let mut steering = computed_boids + flowfield_force;
+//     // build set of all units in all flow-fields
+//     let mut ff_units = HashSet::new();
+//     for ff in q_ff.iter_mut() {
+//         ff_units.extend(ff.units.iter().copied());
+//     }
 
-    // Optionally clamp
-    if steering.length() > boid.max_speed {
-        steering = steering.normalize() * boid.max_speed;
-    }
+//     // FLOW-FIELD + SEP/ALI/COH
+//     for mut ff in q_ff.iter_mut() {
+//         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
-    steering
-}
+//         for &unit in &ff.units {
+//             if let Ok((_ent, mut boid_tf, mut boid)) = q_boids.get_mut(unit) {
+//                 // rebuild neighbors with hysteresis
+//                 let enter_r2 = boid.neighbor_radius.powi(2);
+//                 let exit_r2 = boid.neighbor_exit_radius.powi(2);
+//                 let mut current_neighbors = HashSet::new();
 
-fn compute_boids(neighbor_pos: Vec<Vec3>, pos: &Transform, boid: &Boid) -> (Vec3, Vec3, Vec3) {
-    // Classical boids: separation, alignment, cohesion
+//                 // collect neighbor positions + velocities
+//                 let neighbor_data: Vec<(Vec3, Vec3)> = boid_snapshot
+//                     .iter()
+//                     .filter_map(|(other_ent, pos, vel)| {
+//                         let dist2 = boid_tf.translation.distance_squared(*pos);
+//                         let was_neighbor = boid.prev_neighbors.contains(other_ent);
+//                         if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
+//                             current_neighbors.insert(*other_ent);
+//                             Some((*pos, *vel))
+//                         } else {
+//                             None
+//                         }
+//                     })
+//                     .collect();
+
+//                 // compute boid forces (sep, ali, coh)
+//                 let (sep, ali, coh) = compute_boids(&neighbor_data, boid_tf.translation, &boid);
+
+//                 // sample flow-field
+//                 let dir2d = ff.sample_direction(boid_tf.translation, &grid);
+//                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
+
+//                 // first compute raw steering
+//                 let raw = sep + ali + coh + flow_force;
+//                 let desired = raw.clamp_length_max(boid.max_speed);
+//                 let unclamped_steer = desired - boid.velocity;
+//                 let steer = unclamped_steer.clamp_length_max(boid.max_force);
+
+//                 // low-pass filter
+//                 let alpha = 0.1; // adjust for smoothness
+//                 let smooth_steer = boid.prev_steer.lerp(steer, alpha);
+//                 boid.prev_steer = smooth_steer;
+
+//                 // apply smoothed steering
+//                 boid.velocity += smooth_steer * dt;
+//                 boid.velocity = boid.velocity.clamp_length_max(boid.max_speed);
+//                 boid_tf.translation += boid.velocity * dt;
+
+//                 // buffer insertion and update neighbors
+//                 pending.push((unit, smooth_steer));
+//                 boid.prev_neighbors = current_neighbors;
+//             }
+//         }
+
+//         // now that the immutable borrow of `units` is done, do one mutable borrow
+//         for (unit, steer) in pending {
+//             ff.steering_map.insert(unit, steer);
+//         }
+//     }
+// }
+
+// neighbors: slice of (position, velocity)
+fn compute_boids(neighbors: &[(Vec3, Vec3)], current_pos: Vec3, boid: &Boid) -> (Vec3, Vec3, Vec3) {
     let mut separation = Vec3::ZERO;
     let mut alignment = Vec3::ZERO;
     let mut cohesion = Vec3::ZERO;
-
-    if !neighbor_pos.is_empty() {
-        // Separation
-        for n_pos in &neighbor_pos {
-            let offset = pos.translation - *n_pos;
+    let count = neighbors.len() as f32;
+    if count > 0.0 {
+        // 1) Separation (same as before)
+        for (n_pos, _) in neighbors {
+            let offset = current_pos - *n_pos;
             let dist = offset.length();
             if dist > 0.0 {
                 separation += offset.normalize() / dist;
             }
         }
-        separation /= neighbor_pos.len() as f32;
+        separation = (separation / count) * boid.separation_weight;
 
-        separation *= boid.separation_weight;
+        // 2) Alignment: average neighbor velocity
+        for (_, n_vel) in neighbors {
+            alignment += *n_vel;
+        }
+        // normalize & weight
+        alignment = (alignment / count).normalize_or_zero() * boid.alignment_weight;
 
-        // Cohesion
-        let center = neighbor_pos.iter().sum::<Vec3>() / neighbor_pos.len() as f32;
-        let to_center = center - pos.translation;
+        // 3) Cohesion: same as before
+        let center = neighbors.iter().map(|(n_pos, _)| *n_pos).sum::<Vec3>() / count;
+        let to_center = center - current_pos;
         cohesion = to_center.normalize_or_zero() * boid.cohesion_weight;
-
-        // Alignment – you’d need neighbor velocities to do it right
-        alignment *= boid.alignment_weight;
     }
-
     (separation, alignment, cohesion)
-}
-
-fn gather_neighbors_positions(
-    relevant_boids: &[&(Entity, &Transform, &Boid)],
-    pos: &Transform,
-    ent: &Entity,
-    boid: &Boid,
-) -> Vec<Vec3> {
-    let mut neighbor_positions = Vec::new();
-    for (other_ent, other_pos, _boid) in relevant_boids.iter() {
-        if *other_ent == *ent {
-            continue;
-        }
-        let dist = pos.translation.distance(other_pos.translation);
-        if dist < boid.neighbor_radius {
-            neighbor_positions.push(other_pos.translation);
-        }
-    }
-
-    neighbor_positions
 }
