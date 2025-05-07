@@ -4,7 +4,7 @@ use bevy::prelude::*;
 #[require(Node)]
 pub struct ActiveOptionCtr;
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 pub struct VisibleNode;
 
 #[derive(Component)]

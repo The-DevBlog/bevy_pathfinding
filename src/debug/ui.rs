@@ -22,6 +22,7 @@ impl Plugin for UiPlugin {
                 (
                     handle_boids_info_interaction,
                     handle_dropdown_click,
+                    handle_boids_info_dropdown_click,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
@@ -31,7 +32,8 @@ impl Plugin for UiPlugin {
             .add_observer(hide_options)
             .add_observer(toggle_dbg_visibility)
             .add_observer(toggle_dropdown_visibility)
-            .add_observer(update_active_dropdown_option);
+            .add_observer(update_active_dropdown_option)
+            .add_observer(toggle_boids_info_dropdown_visibility);
     }
 }
 
@@ -39,7 +41,13 @@ impl Plugin for UiPlugin {
 struct ToggleDbgVisibilityEv(bool);
 
 #[derive(Event)]
+struct ToggleBoidsDropdown;
+
+#[derive(Event)]
 struct HideOptionsEv;
+
+#[derive(Component)]
+struct BoidsDropwdownOptions;
 
 #[derive(Bundle)]
 struct DropDownBtnBundle {
@@ -80,13 +88,15 @@ struct OptionBoxCtr {
 
 #[derive(Bundle)]
 struct DropdownOptionsCtr {
-    comp: DropdownOptions,
     visible_node: VisibleNode,
     background_clr: BackgroundColor,
     border_radius: BorderRadius,
     node: Node,
     name: Name,
 }
+
+#[derive(Component)]
+struct BoidsDropDownOptionsCtr;
 
 #[derive(Component)]
 struct BoidsInfoCtr;
@@ -126,8 +136,7 @@ fn handle_drawmode_option_interaction(
 fn handle_boids_info_interaction(
     mut q: Query<(&Interaction, &BoidsInfoCtr, &mut BackgroundColor), Changed<Interaction>>,
 ) {
-    for (interaction, option, mut background) in q.iter_mut() {
-        println!("Interafcting!");
+    for (interaction, _boids_info_ctr, mut background) in q.iter_mut() {
         match interaction {
             Interaction::Pressed => background.0 = CLR_BTN_HOVER.into(),
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -204,7 +213,7 @@ fn toggle_dbg_visibility(
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsInfoCtr>)>>,
+    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropwdownOptions>)>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -228,16 +237,44 @@ fn update_active_dropdown_option(
 
 fn handle_dropdown_click(
     mut cmds: Commands,
-    mut q_btn: Query<
-        (&Interaction, &DropdownBtn, &mut BackgroundColor),
-        (Changed<Interaction>, With<DropdownBtn>),
-    >,
+    mut q_btn: Query<(&Interaction, &DropdownBtn, &mut BackgroundColor), Changed<Interaction>>,
 ) {
     for (interaction, dropdown, mut background) in q_btn.iter_mut() {
         match interaction {
             Interaction::Pressed => cmds.trigger(ToggleModeEv(dropdown.0)),
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn handle_boids_info_dropdown_click(
+    mut cmds: Commands,
+    mut q_btn: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<BoidsInfoCtr>),
+    >,
+) {
+    for (interaction, mut background) in q_btn.iter_mut() {
+        match interaction {
+            Interaction::Pressed => cmds.trigger(ToggleBoidsDropdown),
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn toggle_boids_info_dropdown_visibility(
+    _trigger: Trigger<ToggleBoidsDropdown>,
+    mut q_dropdown: Query<&mut Node, With<BoidsDropwdownOptions>>,
+) {
+    println!("Toggling boids info dropdown visibility");
+    for mut dropdown in q_dropdown.iter_mut() {
+        if dropdown.display == Display::Flex {
+            dropdown.display = Display::None;
+        } else if dropdown.display == Display::None {
+            println!("Setting boids info dropdown to flex");
+            dropdown.display = Display::Flex
         }
     }
 }
@@ -437,9 +474,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
-    let options_container = |options_set: OptionsSet| -> DropdownOptionsCtr {
+    let options_container = || -> DropdownOptionsCtr {
         DropdownOptionsCtr {
-            comp: DropdownOptions(options_set),
             visible_node: VisibleNode,
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
             border_radius: BorderRadius::ZERO,
@@ -480,23 +516,6 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
-    let boids_info_ctr = (
-        BoidsInfoCtr,
-        VisibleNode,
-        Button::default(),
-        BackgroundColor::from(CLR_BACKGROUND_2),
-        BorderColor::from(CLR_BORDER),
-        Text::new("Boids Info"),
-        TextFont::from_font_size(FONT_SIZE),
-        TextColor::from(CLR_TXT),
-        Node {
-            padding: UiRect::all(Val::Px(5.0)),
-            border: UiRect::bottom(Val::Px(1.0)),
-            ..default()
-        },
-        Name::new("Boids Info Ctr"),
-    );
-
     // Root Container
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
@@ -523,7 +542,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(OptionsSet::One))
+        ctr.spawn((options_container(), DropdownOptions(OptionsSet::One)))
             // Dropdown Options
             .with_children(|options| {
                 options
@@ -570,7 +589,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(OptionsSet::Two))
+        ctr.spawn((options_container(), DropdownOptions(OptionsSet::Two)))
             // Dropdown Options
             .with_children(|options| {
                 options
@@ -598,17 +617,62 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                         btn.spawn(option_txt("> CostField".to_string()));
                     });
                 options
-                    .spawn(btn_option(
-                        OptionsSet::Two,
-                        "Index".to_string(),
-                        Some(BorderRadius::bottom(Val::Px(10.0))),
-                    ))
+                    .spawn(btn_option(OptionsSet::Two, "Index".to_string(), None))
                     .with_children(|btn| {
                         btn.spawn(option_txt("> Index".to_string()));
                     });
             });
 
-        // Boids Info Dropdown
-        ctr.spawn(boids_info_ctr);
+        // Boids Info Dropdown Container
+        let boids_info_ctr = (
+            VisibleNode,
+            BoidsInfoCtr,
+            Button::default(),
+            BackgroundColor::from(CLR_BACKGROUND_2),
+            BorderRadius::bottom(Val::Px(10.0)),
+            BorderColor::from(CLR_BORDER),
+            Node {
+                padding: UiRect::all(Val::Px(5.0)),
+                border: UiRect::top(Val::Px(1.0)),
+                ..default()
+            },
+            Name::new("Boids Info Dropdown Button"),
+        );
+
+        let boids_info_dropwdown_txt = (
+            TextFont::from_font_size(FONT_SIZE),
+            TextColor::from(CLR_TXT),
+            Text::new("Boids Info"),
+        );
+
+        let boids_option_btn = (
+            BoidsDropwdownOptions,
+            Node {
+                display: Display::Flex,
+                ..default()
+            },
+            Button::default(),
+        );
+
+        // Boids Info Dropdown Button
+        ctr.spawn(boids_info_ctr).with_children(|dropdown| {
+            dropdown.spawn(boids_info_dropwdown_txt);
+        });
+
+        // let option_txt = |txt: String| -> OptionTxtCtr {
+        //     OptionTxtCtr {
+        //         comp: OptionTxt,
+        //         txt: Text::new(txt),
+        //         txt_font: TextFont::from_font_size(FONT_SIZE),
+        //         txt_clr: TextColor::from(CLR_TXT),
+        //     }
+        // };
+        // Boids Info Dropdown Options Container
+        ctr.spawn((BoidsDropDownOptionsCtr, options_container()))
+            .with_children(|options| {
+                options.spawn(boids_option_btn).with_children(|btn| {
+                    btn.spawn(option_txt("Separation".to_string()));
+                });
+            });
     });
 }
