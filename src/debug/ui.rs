@@ -22,7 +22,7 @@ impl Plugin for UiPlugin {
                 (
                     handle_boids_info_interaction,
                     handle_dropdown_click,
-                    handle_boids_info_dropdown_click,
+                    handle_boids_dropdown_click,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
@@ -33,7 +33,7 @@ impl Plugin for UiPlugin {
             .add_observer(toggle_dbg_visibility)
             .add_observer(toggle_dropdown_visibility)
             .add_observer(update_active_dropdown_option)
-            .add_observer(toggle_boids_info_dropdown_visibility);
+            .add_observer(toggle_boids_dropdown_visibility);
     }
 }
 
@@ -213,7 +213,7 @@ fn toggle_dbg_visibility(
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropwdownOptions>)>>,
+    mut q_node: Query<&mut Node, With<DropdownOptions>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -248,7 +248,7 @@ fn handle_dropdown_click(
     }
 }
 
-fn handle_boids_info_dropdown_click(
+fn handle_boids_dropdown_click(
     mut cmds: Commands,
     mut q_btn: Query<
         (&Interaction, &mut BackgroundColor),
@@ -264,16 +264,14 @@ fn handle_boids_info_dropdown_click(
     }
 }
 
-fn toggle_boids_info_dropdown_visibility(
+fn toggle_boids_dropdown_visibility(
     _trigger: Trigger<ToggleBoidsDropdown>,
-    mut q_dropdown: Query<&mut Node, With<BoidsDropwdownOptions>>,
+    mut q_node: Query<&mut Node, With<BoidsDropDownOptionsCtr>>,
 ) {
-    println!("Toggling boids info dropdown visibility");
-    for mut dropdown in q_dropdown.iter_mut() {
+    for mut dropdown in q_node.iter_mut() {
         if dropdown.display == Display::Flex {
             dropdown.display = Display::None;
         } else if dropdown.display == Display::None {
-            println!("Setting boids info dropdown to flex");
             dropdown.display = Display::Flex
         }
     }
@@ -624,7 +622,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Boids Info Dropdown Container
-        let boids_info_ctr = (
+        let boids_dropdown_txt_ctr = (
             VisibleNode,
             BoidsInfoCtr,
             Button::default(),
@@ -655,7 +653,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         );
 
         // Boids Info Dropdown Button
-        ctr.spawn(boids_info_ctr).with_children(|dropdown| {
+        ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
             dropdown.spawn(boids_info_dropwdown_txt);
         });
 
@@ -667,11 +665,33 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         //         txt_clr: TextColor::from(CLR_TXT),
         //     }
         // };
+
+        //         let btn_option = |set: OptionsSet,
+        //         txt: String,
+        //         radius: Option<BorderRadius>|
+        // -> (SetActiveOption, BorderRadius, Node) {
+        // let radius = match radius {
+        // Some(r) => r,
+        // None => BorderRadius::ZERO,
+        // };
+
+        // (
+        // SetActiveOption { set, txt },
+        // radius,
+        // Node {
+        //   padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+        //   ..default()
+        // },
+        // )
+        // };
+
         // Boids Info Dropdown Options Container
-        ctr.spawn((BoidsDropDownOptionsCtr, options_container()))
+        ctr.spawn((VisibleNode, options_container()))
             .with_children(|options| {
                 options.spawn(boids_option_btn).with_children(|btn| {
                     btn.spawn(option_txt("Separation".to_string()));
+                    // btn.spawn(option_txt("Alignment".to_string()));
+                    // btn.spawn(option_txt("Cohesion".to_string()));
                 });
             });
     });
