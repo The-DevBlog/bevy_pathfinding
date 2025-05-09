@@ -55,7 +55,6 @@ struct DropDownBtnBundle {
     btn: Button,
     background_clr: BackgroundColor,
     border_clr: BorderColor,
-    border_radius: BorderRadius,
     node: Node,
     name: Name,
 }
@@ -403,17 +402,12 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
     );
 
     let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropDownBtnBundle {
-        let radius = match set {
-            OptionsSet::One => BorderRadius::ZERO,
-            OptionsSet::Two => BorderRadius::bottom(Val::Px(10.0)),
-        };
         DropDownBtnBundle {
             comp: DropdownBtn(set),
             visible_node: VisibleNode,
             btn: Button::default(),
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
             border_clr: BorderColor::from(CLR_BORDER),
-            border_radius: radius,
             node: Node {
                 border,
                 ..default()
