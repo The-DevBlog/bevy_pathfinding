@@ -629,6 +629,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             BoidsDropwdownOptions,
             Node {
                 display: Display::Flex,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
             Name::new("Boids Option Btn"),
