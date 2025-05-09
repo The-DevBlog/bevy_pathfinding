@@ -20,8 +20,8 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_dropdown_click,
-                    handle_boids_dropdown_click,
+                    handle_dropdown_interaction,
+                    handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
@@ -178,29 +178,23 @@ fn handle_hide_dbg_interaction(
 fn toggle_dbg_visibility(
     trigger: Trigger<ToggleDbgVisibilityEv>,
     mut q_node: Query<&mut Node, With<VisibleNode>>,
-    mut q_title_bar: Query<&mut BorderRadius, With<TitleBar>>,
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
-    let Ok(mut title_bar) = q_title_bar.single_mut() else {
-        return;
-    };
 
     for mut node in q_node.iter_mut() {
         if visible {
             node.display = Display::Flex;
-            *title_bar = BorderRadius::all(Val::Px(0.0));
             cmds.trigger(HideOptionsEv);
         } else {
             node.display = Display::None;
-            *title_bar = BorderRadius::bottom(Val::Px(10.0));
         }
     }
 }
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, With<DropdownOptions>>,
+    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropwdownOptions>)>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -222,7 +216,7 @@ fn update_active_dropdown_option(
     }
 }
 
-fn handle_dropdown_click(
+fn handle_dropdown_interaction(
     mut cmds: Commands,
     mut q_btn: Query<(&Interaction, &DropdownBtn, &mut BackgroundColor), Changed<Interaction>>,
 ) {
@@ -235,7 +229,7 @@ fn handle_dropdown_click(
     }
 }
 
-fn handle_boids_dropdown_click(
+fn handle_boids_dropdown_interaction(
     mut cmds: Commands,
     mut q_btn: Query<
         (&Interaction, &mut BackgroundColor),
@@ -253,7 +247,7 @@ fn handle_boids_dropdown_click(
 
 fn toggle_boids_dropdown_visibility(
     _trigger: Trigger<ToggleBoidsDropdown>,
-    mut q_node: Query<&mut Node, With<BoidsDropDownOptionsCtr>>,
+    mut q_node: Query<&mut Node, With<BoidsDropwdownOptions>>,
 ) {
     for mut dropdown in q_node.iter_mut() {
         if dropdown.display == Display::Flex {
@@ -679,8 +673,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             .with_children(|options| {
                 options.spawn(boids_option_btn).with_children(|btn| {
                     btn.spawn(option_txt("Separation".to_string()));
-                    // btn.spawn(option_txt("Alignment".to_string()));
-                    // btn.spawn(option_txt("Cohesion".to_string()));
+                    btn.spawn(option_txt("Alignment".to_string()));
+                    btn.spawn(option_txt("Cohesion".to_string()));
                 });
             });
     });
