@@ -20,7 +20,6 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_boids_info_interaction,
                     handle_dropdown_click,
                     handle_boids_dropdown_click,
                     handle_hide_dbg_interaction,
@@ -127,18 +126,6 @@ fn handle_drawmode_option_interaction(
 
                 cmds.trigger(UpdateDropdownOptionEv);
             }
-            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
-            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
-        }
-    }
-}
-
-fn handle_boids_info_interaction(
-    mut q: Query<(&Interaction, &BoidsInfoCtr, &mut BackgroundColor), Changed<Interaction>>,
-) {
-    for (interaction, _boids_info_ctr, mut background) in q.iter_mut() {
-        match interaction {
-            Interaction::Pressed => background.0 = CLR_BTN_HOVER.into(),
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
         }
@@ -641,6 +628,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             TextFont::from_font_size(FONT_SIZE),
             TextColor::from(CLR_TXT),
             Text::new("Boids Info"),
+            Name::new("Boids Info Dropdown Text"),
         );
 
         let boids_option_btn = (
@@ -649,6 +637,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 display: Display::Flex,
                 ..default()
             },
+            Name::new("Boids Option Btn"),
             Button::default(),
         );
 
@@ -686,7 +675,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         // };
 
         // Boids Info Dropdown Options Container
-        ctr.spawn((VisibleNode, options_container()))
+        ctr.spawn((BoidsDropDownOptionsCtr, options_container()))
             .with_children(|options| {
                 options.spawn(boids_option_btn).with_children(|btn| {
                     btn.spawn(option_txt("Separation".to_string()));
