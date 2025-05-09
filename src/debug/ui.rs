@@ -309,6 +309,7 @@ fn handle_drag(
 
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
+    mut q_node: Query<&mut Node, (With<DropdownBtn>, Without<DropdownOptions>)>,
     mut q_dropdown: Query<(&mut Node, &DropdownOptions)>,
 ) {
     let option = trigger.event().0;
@@ -317,14 +318,30 @@ fn toggle_dropdown_visibility(
         if option == OptionsSet::One && dropdown_options.0.to_num() == 1 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
+
+                for mut node in q_node.iter_mut() {
+                    // node.border.bottom = Val::Px(0.5);
+                }
             } else if dropdown.display == Display::None {
-                dropdown.display = Display::Flex
+                dropdown.display = Display::Flex;
+
+                for mut node in q_node.iter_mut() {
+                    // node.border.bottom = Val::Px(0.0);
+                }
             }
         } else if option == OptionsSet::Two && dropdown_options.0.to_num() == 2 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
+
+                for mut node in q_node.iter_mut() {
+                    // node.border.top = Val::Px(0.5);
+                }
             } else if dropdown.display == Display::None {
-                dropdown.display = Display::Flex
+                dropdown.display = Display::Flex;
+
+                for mut node in q_node.iter_mut() {
+                    // node.border.top = Val::Px(0.0);
+                }
             }
         }
     }
@@ -387,7 +404,6 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         BorderColor::from(CLR_BORDER),
         Node {
             padding: UiRect::all(Val::Px(5.0)),
-            border: UiRect::bottom(Val::Px(1.0)),
             ..default()
         },
         Name::new("Draw Grid Button"),
@@ -401,7 +417,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         Name::new("Draw Grid Txt"),
     );
 
-    let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropDownBtnBundle {
+    let dropdown_btn = |set: OptionsSet| -> DropDownBtnBundle {
         DropDownBtnBundle {
             comp: DropdownBtn(set),
             visible_node: VisibleNode,
@@ -409,7 +425,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
             border_clr: BorderColor::from(CLR_BORDER),
             node: Node {
-                border,
+                border: UiRect::top(Val::Px(1.0)),
                 ..default()
             },
             name: Name::new("Dropdown Button"),
@@ -503,7 +519,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         });
 
         // Draw Mode 1 Container
-        ctr.spawn(dropdown_btn(OptionsSet::One, UiRect::bottom(Val::Px(0.5))))
+        ctr.spawn(dropdown_btn(OptionsSet::One))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(active_option_ctr())
@@ -550,7 +566,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Draw Mode 2 Container
-        ctr.spawn(dropdown_btn(OptionsSet::Two, UiRect::top(Val::Px(0.5))))
+        ctr.spawn(dropdown_btn(OptionsSet::Two))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(active_option_ctr())
