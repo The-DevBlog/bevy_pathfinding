@@ -95,7 +95,7 @@ struct DropdownOptionsCtr {
 }
 
 #[derive(Component)]
-struct BoidsDropDownOptionsCtr;
+struct BoidsDropdownOptionsCtr;
 
 #[derive(Component)]
 struct BoidsInfoCtr;
@@ -194,7 +194,7 @@ fn toggle_dbg_visibility(
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropwdownOptions>)>>,
+    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropdownOptionsCtr>)>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -247,7 +247,7 @@ fn handle_boids_dropdown_interaction(
 
 fn toggle_boids_dropdown_visibility(
     _trigger: Trigger<ToggleBoidsDropdown>,
-    mut q_node: Query<&mut Node, With<BoidsDropwdownOptions>>,
+    mut q_node: Query<&mut Node, With<BoidsDropdownOptionsCtr>>,
 ) {
     for mut dropdown in q_node.iter_mut() {
         if dropdown.display == Display::Flex {
@@ -669,7 +669,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         // };
 
         // Boids Info Dropdown Options Container
-        ctr.spawn((BoidsDropDownOptionsCtr, options_container()))
+        ctr.spawn((BoidsDropdownOptionsCtr, options_container()))
             .with_children(|options| {
                 options.spawn(boids_option_btn).with_children(|btn| {
                     btn.spawn(option_txt("Separation".to_string()));
