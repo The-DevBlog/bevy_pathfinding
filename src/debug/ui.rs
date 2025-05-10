@@ -316,7 +316,6 @@ fn handle_drag(
 
 fn toggle_dropdown_visibility(
     trigger: Trigger<ToggleModeEv>,
-    mut q_node: Query<&mut Node, (With<DropdownBtn>, Without<DropdownOptions>)>,
     mut q_dropdown: Query<(&mut Node, &DropdownOptions)>,
 ) {
     let option = trigger.event().0;
@@ -325,30 +324,14 @@ fn toggle_dropdown_visibility(
         if option == OptionsSet::One && dropdown_options.0.to_num() == 1 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
-
-                for mut node in q_node.iter_mut() {
-                    // node.border.bottom = Val::Px(0.5);
-                }
             } else if dropdown.display == Display::None {
                 dropdown.display = Display::Flex;
-
-                for mut node in q_node.iter_mut() {
-                    // node.border.bottom = Val::Px(0.0);
-                }
             }
         } else if option == OptionsSet::Two && dropdown_options.0.to_num() == 2 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
-
-                for mut node in q_node.iter_mut() {
-                    // node.border.top = Val::Px(0.5);
-                }
             } else if dropdown.display == Display::None {
                 dropdown.display = Display::Flex;
-
-                for mut node in q_node.iter_mut() {
-                    // node.border.top = Val::Px(0.0);
-                }
             }
         }
     }
