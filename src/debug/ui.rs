@@ -470,11 +470,11 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
-    let options_container = || -> DropdownOptionsCtr {
+    let options_container = |border_radius: BorderRadius| -> DropdownOptionsCtr {
         DropdownOptionsCtr {
             visible_node: VisibleNode,
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-            border_radius: BorderRadius::ZERO,
+            border_radius,
             node: Node {
                 flex_direction: FlexDirection::Column,
                 display: Display::None,
@@ -538,39 +538,42 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn((options_container(), DropdownOptions(OptionsSet::One)))
-            // Dropdown Options
-            .with_children(|options| {
-                options
-                    .spawn(btn_option(OptionsSet::One, "None".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> None".to_string()));
-                    });
-                options
-                    .spawn(btn_option(
-                        OptionsSet::One,
-                        "IntegrationField".to_string(),
-                        None,
-                    ))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> IntegrationField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "FlowField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> FlowField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "CostField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> CostField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "Index".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> Index".to_string()));
-                    });
-            });
+        ctr.spawn((
+            options_container(BorderRadius::all(Val::ZERO)),
+            DropdownOptions(OptionsSet::One),
+        ))
+        // Dropdown Options
+        .with_children(|options| {
+            options
+                .spawn(btn_option(OptionsSet::One, "None".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> None".to_string()));
+                });
+            options
+                .spawn(btn_option(
+                    OptionsSet::One,
+                    "IntegrationField".to_string(),
+                    None,
+                ))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> IntegrationField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "FlowField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> FlowField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "CostField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> CostField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "Index".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> Index".to_string()));
+                });
+        });
 
         // Draw Mode 2 Container
         ctr.spawn(dropdown_btn(OptionsSet::Two))
@@ -585,39 +588,42 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn((options_container(), DropdownOptions(OptionsSet::Two)))
-            // Dropdown Options
-            .with_children(|options| {
-                options
-                    .spawn(btn_option(OptionsSet::Two, "None".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> None".to_string()));
-                    });
-                options
-                    .spawn(btn_option(
-                        OptionsSet::Two,
-                        "IntegrationField".to_string(),
-                        None,
-                    ))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> IntegrationField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::Two, "FlowField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> FlowField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::Two, "CostField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> CostField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::Two, "Index".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> Index".to_string()));
-                    });
-            });
+        ctr.spawn((
+            options_container(BorderRadius::all(Val::ZERO)),
+            DropdownOptions(OptionsSet::Two),
+        ))
+        // Dropdown Options
+        .with_children(|options| {
+            options
+                .spawn(btn_option(OptionsSet::Two, "None".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> None".to_string()));
+                });
+            options
+                .spawn(btn_option(
+                    OptionsSet::Two,
+                    "IntegrationField".to_string(),
+                    None,
+                ))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> IntegrationField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::Two, "FlowField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> FlowField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::Two, "CostField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> CostField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::Two, "Index".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> Index".to_string()));
+                });
+        });
 
         // Boids Info Dropdown Container
         let boids_dropdown_txt_ctr = (
@@ -687,13 +693,16 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         // };
 
         // Boids Info Dropdown Options Container
-        ctr.spawn((BoidsDropdownOptionsCtr, options_container()))
-            .with_children(|options| {
-                options.spawn(boids_option_btn).with_children(|btn| {
-                    btn.spawn(option_txt("Separation".to_string()));
-                    btn.spawn(option_txt("Alignment".to_string()));
-                    btn.spawn(option_txt("Cohesion".to_string()));
-                });
+        ctr.spawn((
+            BoidsDropdownOptionsCtr,
+            options_container(BorderRadius::bottom(Val::Px(10.0))),
+        ))
+        .with_children(|options| {
+            options.spawn(boids_option_btn).with_children(|btn| {
+                btn.spawn(option_txt("Separation".to_string()));
+                btn.spawn(option_txt("Alignment".to_string()));
+                btn.spawn(option_txt("Cohesion".to_string()));
             });
+        });
     });
 }
