@@ -177,12 +177,18 @@ fn handle_hide_dbg_interaction(
 fn toggle_dbg_visibility(
     trigger: Trigger<ToggleDbgVisibilityEv>,
     mut q_node: Query<&mut Node, With<VisibleNode>>,
+    mut q_border: Query<&mut BorderRadius, With<BoidsInfoCtr>>,
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
 
+    let Ok(mut border) = q_border.single_mut() else {
+        return;
+    };
+
     for mut node in q_node.iter_mut() {
         if visible {
+            *border = BorderRadius::bottom(Val::Px(10.0));
             node.display = Display::Flex;
             cmds.trigger(HideOptionsEv);
         } else {
@@ -631,7 +637,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             Name::new("Boids Info Dropdown Text"),
         );
 
-        let boids_option_btn = (
+        let boids_options_ctr_btn = (
             BoidsDropwdownOptions,
             Node {
                 display: Display::Flex,
@@ -647,33 +653,24 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             dropdown.spawn(boids_info_dropwdown_txt);
         });
 
-        // let option_txt = |txt: String| -> OptionTxtCtr {
-        //     OptionTxtCtr {
-        //         comp: OptionTxt,
-        //         txt: Text::new(txt),
-        //         txt_font: TextFont::from_font_size(FONT_SIZE),
-        //         txt_clr: TextColor::from(CLR_TXT),
-        //     }
-        // };
+        let boids_option_btn = |txt: String,
+                                radius: Option<BorderRadius>|
+         -> (Button, BorderRadius, Node, Name) {
+            let radius = match radius {
+                Some(r) => r,
+                None => BorderRadius::ZERO,
+            };
 
-        //         let btn_option = |set: OptionsSet,
-        //         txt: String,
-        //         radius: Option<BorderRadius>|
-        // -> (SetActiveOption, BorderRadius, Node) {
-        // let radius = match radius {
-        // Some(r) => r,
-        // None => BorderRadius::ZERO,
-        // };
-
-        // (
-        // SetActiveOption { set, txt },
-        // radius,
-        // Node {
-        //   padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-        //   ..default()
-        // },
-        // )
-        // };
+            (
+                Button::default(),
+                radius,
+                Node {
+                    padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                    ..default()
+                },
+                Name::new(format!("Boids Option Btn {}", txt)),
+            )
+        };
 
         // Boids Info Dropdown Options Container
         ctr.spawn((
@@ -681,11 +678,30 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             options_container(BorderRadius::bottom(Val::Px(10.0))),
         ))
         .with_children(|options| {
-            options.spawn(boids_option_btn).with_children(|btn| {
-                btn.spawn(option_txt("Separation".to_string()));
-                btn.spawn(option_txt("Alignment".to_string()));
-                btn.spawn(option_txt("Cohesion".to_string()));
-            });
+            options
+                .spawn(boids_options_ctr_btn)
+                .with_children(|options| {
+                    options
+                        .spawn(boids_option_btn("Separation".to_string(), None))
+                        .with_children(|btn| {
+                            btn.spawn(option_txt("Separation".to_string()));
+                        });
+
+                    options
+                        .spawn(boids_option_btn("Alignment".to_string(), None))
+                        .with_children(|btn| {
+                            btn.spawn(option_txt("Alignment".to_string()));
+                        });
+
+                    options
+                        .spawn(boids_option_btn(
+                            "Cohesion".to_string(),
+                            Some(BorderRadius::top(Val::Px(10.0))),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn(option_txt("Cohesion".to_string()));
+                        });
+                });
         });
     });
 }
