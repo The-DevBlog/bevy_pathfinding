@@ -203,6 +203,7 @@ fn toggle_dbg_visibility(
     trigger: Trigger<ToggleDbgVisibilityEv>,
     mut q_node: Query<&mut Node, With<VisibleNode>>,
     mut q_border: Query<&mut BorderRadius, With<BoidsInfoCtr>>,
+    mut q_border_root: Query<&mut Node, (With<RootCtr>, Without<VisibleNode>)>,
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
@@ -211,12 +212,19 @@ fn toggle_dbg_visibility(
         return;
     };
 
+    let Ok(mut border_root) = q_border_root.single_mut() else {
+        return;
+    };
+
     for mut node in q_node.iter_mut() {
         if visible {
             *border = BorderRadius::bottom(Val::Px(10.0));
+            border_root.border.bottom = Val::Px(1.0);
             node.display = Display::Flex;
             cmds.trigger(HideOptionsEv);
         } else {
+            *border = BorderRadius::all(Val::Px(10.0));
+            border_root.border.bottom = Val::Px(5.0);
             node.display = Display::None;
         }
     }
