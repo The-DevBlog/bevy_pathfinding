@@ -27,6 +27,7 @@ impl Plugin for UiPlugin {
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
+                    handle_slider_arrow_interaction,
                     handle_drag,
                 ),
             )
@@ -100,6 +101,14 @@ struct BoidsDropdownOptionsCtr;
 
 #[derive(Component)]
 struct BoidsInfoCtr;
+
+#[derive(Component)]
+struct BoidsSliderBtn(BoidsSliderBtnOptions);
+
+enum BoidsSliderBtnOptions {
+    Left,
+    Right,
+}
 
 #[derive(Bundle)]
 struct OptionTxtCtr {
@@ -688,14 +697,6 @@ fn draw_ui_box(
             ),
         ];
 
-        #[derive(Component)]
-        struct BoidsSliderBtn(BoidsSliderBtnOptions);
-
-        enum BoidsSliderBtnOptions {
-            Left,
-            Right,
-        }
-
         let boids_slider_ctr =
             || -> (Node, Name) { (Node::default(), Name::new("Boids Option Slider")) };
 
@@ -753,4 +754,17 @@ fn draw_ui_box(
             });
         });
     });
+}
+
+fn handle_slider_arrow_interaction(
+    mut q_slider: Query<(&Interaction, &BoidsSliderBtn), Changed<Interaction>>,
+) {
+    for (interaction, slider) in q_slider.iter_mut() {
+        if interaction == &Interaction::Pressed {
+            match slider.0 {
+                BoidsSliderBtnOptions::Left => println!("Slider Left"),
+                BoidsSliderBtnOptions::Right => println!("Slider Right"),
+            }
+        }
+    }
 }
