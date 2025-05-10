@@ -557,6 +557,57 @@ fn draw_ui_box(
         )
     };
 
+    let Ok(boids_info) = q_boids_info.single_mut() else {
+        return;
+    };
+
+    let labels = &[
+        (
+            "Separation",
+            boids_info.separation_weight,
+            BoidsInfoOptions::Separation,
+            None,
+        ),
+        (
+            "Alignment",
+            boids_info.alignment_weight,
+            BoidsInfoOptions::Alignment,
+            None,
+        ),
+        (
+            "Cohesion",
+            boids_info.cohesion_weight,
+            BoidsInfoOptions::Cohesion,
+            Some(BorderRadius::top(Val::Px(10.0))),
+        ),
+    ];
+
+    let boids_slider_ctr = || (Node::default(), Name::new("Boids Option Slider"));
+
+    let boids_option_slider_btn =
+        |txt: String, info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
+            (
+                BoidsInfo(info),
+                BoidsSliderBtn(arrow),
+                Text::new(txt.clone()),
+                TextColor::from(CLR_TXT),
+                TextFont::from_font_size(FONT_SIZE),
+                Button::default(),
+                Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
+            )
+        };
+
+    let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
+        (
+            BoidsSliderValue,
+            BoidsInfo(info),
+            Text::new(val),
+            TextColor::from(CLR_TXT),
+            TextFont::from_font_size(FONT_SIZE),
+            Name::new("Boids Option Slider Value"),
+        )
+    };
+
     // Root Container
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
@@ -669,57 +720,6 @@ fn draw_ui_box(
                     btn.spawn(option_txt("> Index".to_string()));
                 });
         });
-
-        let Ok(boids_info) = q_boids_info.single_mut() else {
-            return;
-        };
-
-        let labels = &[
-            (
-                "Separation",
-                boids_info.separation_weight,
-                BoidsInfoOptions::Separation,
-                None,
-            ),
-            (
-                "Alignment",
-                boids_info.alignment_weight,
-                BoidsInfoOptions::Alignment,
-                None,
-            ),
-            (
-                "Cohesion",
-                boids_info.cohesion_weight,
-                BoidsInfoOptions::Cohesion,
-                Some(BorderRadius::top(Val::Px(10.0))),
-            ),
-        ];
-
-        let boids_slider_ctr = || (Node::default(), Name::new("Boids Option Slider"));
-
-        let boids_option_slider_btn =
-            |txt: String, info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
-                (
-                    BoidsInfo(info),
-                    BoidsSliderBtn(arrow),
-                    Text::new(txt.clone()),
-                    TextColor::from(CLR_TXT),
-                    TextFont::from_font_size(FONT_SIZE),
-                    Button::default(),
-                    Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
-                )
-            };
-
-        let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
-            (
-                BoidsSliderValue,
-                BoidsInfo(info),
-                Text::new(val),
-                TextColor::from(CLR_TXT),
-                TextFont::from_font_size(FONT_SIZE),
-                Name::new("Boids Option Slider Value"),
-            )
-        };
 
         // Boids Info Dropdown Button
         ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
