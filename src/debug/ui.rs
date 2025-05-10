@@ -584,23 +584,41 @@ fn draw_ui_box(
 
     let boids_slider_ctr = || (Node::default(), Name::new("Boids Option Slider"));
 
-    let boids_option_slider_btn =
-        |txt: String, info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
-            (
-                BoidsInfo(info),
-                BoidsSliderBtn(arrow),
-                Text::new(txt.clone()),
-                TextColor::from(CLR_TXT),
-                TextFont::from_font_size(FONT_SIZE),
-                Button::default(),
-                Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
-            )
-        };
+    let boids_option_slider_arrow_btn = |info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
+        (
+            BackgroundColor::from(CLR_BACKGROUND_1),
+            BorderColor::from(CLR_BORDER),
+            BorderRadius::all(Val::Px(7.5)),
+            BoidsInfo(info),
+            BoidsSliderBtn(arrow),
+            Node {
+                border: UiRect::all(Val::Px(1.0)),
+                padding: UiRect::horizontal(Val::Px(5.0)),
+                ..default()
+            },
+            Button::default(),
+            Name::new(format!("Boids Option Slider Btn")),
+        )
+    };
+
+    let boids_option_slider_arrow_txt = |txt: String| {
+        (
+            Text::new(txt.clone()),
+            TextColor::from(CLR_TXT),
+            TextFont::from_font_size(FONT_SIZE),
+            Name::new(format!("Boids Option Slider txt")),
+        )
+    };
 
     let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
         (
             BoidsSliderValue,
             BoidsInfo(info),
+            Node {
+                margin: UiRect::horizontal(Val::Px(2.5)),
+                top: Val::Px(2.0),
+                ..default()
+            },
             Text::new(val),
             TextColor::from(CLR_TXT),
             TextFont::from_font_size(FONT_SIZE),
@@ -742,17 +760,19 @@ fn draw_ui_box(
 
                         // Slider
                         btn.spawn(boids_slider_ctr()).with_children(|slider| {
-                            slider.spawn(boids_option_slider_btn(
-                                "<".to_string(),
-                                *info,
-                                BoidsSliderBtnOptions::Left,
-                            ));
+                            slider
+                                .spawn(boids_option_slider_arrow_btn(
+                                    *info,
+                                    BoidsSliderBtnOptions::Left,
+                                ))
+                                .with_child(boids_option_slider_arrow_txt("<".to_string()));
                             slider.spawn(boids_option_slider_value(value.to_string(), *info));
-                            slider.spawn(boids_option_slider_btn(
-                                ">".to_string(),
-                                *info,
-                                BoidsSliderBtnOptions::Right,
-                            ));
+                            slider
+                                .spawn(boids_option_slider_arrow_btn(
+                                    *info,
+                                    BoidsSliderBtnOptions::Right,
+                                ))
+                                .with_child(boids_option_slider_arrow_txt(">".to_string()));
                         });
                     });
             }
