@@ -501,6 +501,56 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         }
     };
 
+    let boids_dropdown_txt_ctr = (
+        VisibleNode,
+        BoidsInfoCtr,
+        Button::default(),
+        BackgroundColor::from(CLR_BACKGROUND_2),
+        BorderRadius::bottom(Val::Px(10.0)),
+        BorderColor::from(CLR_BORDER),
+        Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            border: UiRect::top(Val::Px(1.0)),
+            ..default()
+        },
+        Name::new("Boids Info Dropdown Button"),
+    );
+
+    let boids_info_dropwdown_txt = (
+        TextFont::from_font_size(FONT_SIZE),
+        TextColor::from(CLR_TXT),
+        Text::new("Boids Info"),
+        Name::new("Boids Info Dropdown Text"),
+    );
+
+    let boids_options_ctr = (
+        BoidsDropwdownOptions,
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            ..default()
+        },
+        Name::new("Boids Option Container"),
+    );
+
+    let boids_option_btn =
+        |txt: String, radius: Option<BorderRadius>| -> (Button, BorderRadius, Node, Name) {
+            let radius = match radius {
+                Some(r) => r,
+                None => BorderRadius::ZERO,
+            };
+
+            (
+                Button::default(),
+                radius,
+                Node {
+                    padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                    ..default()
+                },
+                Name::new(format!("Boids Option Btn {}", txt)),
+            )
+        };
+
     // Root Container
     cmds.spawn(root_ctr).with_children(|ctr| {
         // Title Bar
@@ -614,63 +664,10 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 });
         });
 
-        // Boids Info Dropdown Container
-        let boids_dropdown_txt_ctr = (
-            VisibleNode,
-            BoidsInfoCtr,
-            Button::default(),
-            BackgroundColor::from(CLR_BACKGROUND_2),
-            BorderRadius::bottom(Val::Px(10.0)),
-            BorderColor::from(CLR_BORDER),
-            Node {
-                padding: UiRect::all(Val::Px(5.0)),
-                border: UiRect::top(Val::Px(1.0)),
-                ..default()
-            },
-            Name::new("Boids Info Dropdown Button"),
-        );
-
-        let boids_info_dropwdown_txt = (
-            TextFont::from_font_size(FONT_SIZE),
-            TextColor::from(CLR_TXT),
-            Text::new("Boids Info"),
-            Name::new("Boids Info Dropdown Text"),
-        );
-
-        let boids_options_ctr_btn = (
-            BoidsDropwdownOptions,
-            Node {
-                display: Display::Flex,
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            Name::new("Boids Option Btn"),
-            Button::default(),
-        );
-
         // Boids Info Dropdown Button
         ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
             dropdown.spawn(boids_info_dropwdown_txt);
         });
-
-        let boids_option_btn = |txt: String,
-                                radius: Option<BorderRadius>|
-         -> (Button, BorderRadius, Node, Name) {
-            let radius = match radius {
-                Some(r) => r,
-                None => BorderRadius::ZERO,
-            };
-
-            (
-                Button::default(),
-                radius,
-                Node {
-                    padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-                    ..default()
-                },
-                Name::new(format!("Boids Option Btn {}", txt)),
-            )
-        };
 
         // Boids Info Dropdown Options Container
         ctr.spawn((
@@ -678,30 +675,28 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             options_container(BorderRadius::bottom(Val::Px(10.0))),
         ))
         .with_children(|options| {
-            options
-                .spawn(boids_options_ctr_btn)
-                .with_children(|options| {
-                    options
-                        .spawn(boids_option_btn("Separation".to_string(), None))
-                        .with_children(|btn| {
-                            btn.spawn(option_txt("Separation".to_string()));
-                        });
+            options.spawn(boids_options_ctr).with_children(|options| {
+                options
+                    .spawn(boids_option_btn("Separation".to_string(), None))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("Separation".to_string()));
+                    });
 
-                    options
-                        .spawn(boids_option_btn("Alignment".to_string(), None))
-                        .with_children(|btn| {
-                            btn.spawn(option_txt("Alignment".to_string()));
-                        });
+                options
+                    .spawn(boids_option_btn("Alignment".to_string(), None))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("Alignment".to_string()));
+                    });
 
-                    options
-                        .spawn(boids_option_btn(
-                            "Cohesion".to_string(),
-                            Some(BorderRadius::top(Val::Px(10.0))),
-                        ))
-                        .with_children(|btn| {
-                            btn.spawn(option_txt("Cohesion".to_string()));
-                        });
-                });
+                options
+                    .spawn(boids_option_btn(
+                        "Cohesion".to_string(),
+                        Some(BorderRadius::top(Val::Px(10.0))),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn(option_txt("Cohesion".to_string()));
+                    });
+            });
         });
     });
 }
