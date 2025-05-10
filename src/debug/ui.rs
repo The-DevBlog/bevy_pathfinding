@@ -442,70 +442,57 @@ fn draw_ui_box(
         Name::new("Draw Grid Txt"),
     );
 
-    let dropdown_btn = |set: OptionsSet| -> DropDownBtnBundle {
-        DropDownBtnBundle {
-            comp: DropdownBtn(set),
-            visible_node: VisibleNode,
-            btn: Button::default(),
-            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-            border_clr: BorderColor::from(CLR_BORDER),
-            node: Node {
-                border: UiRect::top(Val::Px(1.0)),
-                ..default()
-            },
-            name: Name::new("Dropdown Button"),
-        }
+    let dropdown_btn = |set: OptionsSet| DropDownBtnBundle {
+        comp: DropdownBtn(set),
+        visible_node: VisibleNode,
+        btn: Button::default(),
+        background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+        border_clr: BorderColor::from(CLR_BORDER),
+        node: Node {
+            border: UiRect::top(Val::Px(1.0)),
+            ..default()
+        },
+        name: Name::new("Dropdown Button"),
     };
 
-    let active_option_ctr = || -> ActiveOptionCtrBundle {
-        ActiveOptionCtrBundle {
-            comp: ActiveOptionCtr,
-            border_clr: BorderColor::from(CLR_BORDER),
-            node: Node {
-                padding: UiRect::all(Val::Px(5.0)),
-                ..default()
-            },
-            name: Name::new("Draw Mode Container"),
-        }
+    let active_option_ctr = || ActiveOptionCtrBundle {
+        comp: ActiveOptionCtr,
+        border_clr: BorderColor::from(CLR_BORDER),
+        node: Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            ..default()
+        },
+        name: Name::new("Draw Mode Container"),
     };
 
-    let draw_mode_txt = |txt: String| -> DrawModeTxtCtr {
-        DrawModeTxtCtr {
-            comp: DrawModeTxt,
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-            name: Name::new("Draw Mode Text"),
-        }
+    let draw_mode_txt = |txt: String| DrawModeTxtCtr {
+        comp: DrawModeTxt,
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_clr: TextColor::from(CLR_TXT),
+        name: Name::new("Draw Mode Text"),
     };
 
-    let active_option = |txt: String, set: OptionsSet| -> OptionBoxCtr {
-        OptionBoxCtr {
-            comp: OptionBox(set),
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-        }
+    let active_option = |txt: String, set: OptionsSet| OptionBoxCtr {
+        comp: OptionBox(set),
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_clr: TextColor::from(CLR_TXT),
     };
 
-    let options_container = |border_radius: BorderRadius| -> DropdownOptionsCtr {
-        DropdownOptionsCtr {
-            visible_node: VisibleNode,
-            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-            border_radius,
-            node: Node {
-                flex_direction: FlexDirection::Column,
-                display: Display::None,
-                ..default()
-            },
-            name: Name::new("Options Container"),
-        }
+    let options_container = |border_radius: BorderRadius| DropdownOptionsCtr {
+        visible_node: VisibleNode,
+        background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+        border_radius,
+        node: Node {
+            flex_direction: FlexDirection::Column,
+            display: Display::None,
+            ..default()
+        },
+        name: Name::new("Options Container"),
     };
 
-    let btn_option = |set: OptionsSet,
-                      txt: String,
-                      radius: Option<BorderRadius>|
-     -> (SetActiveOption, BorderRadius, Node) {
+    let btn_option = |set: OptionsSet, txt: String, radius: Option<BorderRadius>| {
         let radius = match radius {
             Some(r) => r,
             None => BorderRadius::ZERO,
@@ -522,13 +509,11 @@ fn draw_ui_box(
         )
     };
 
-    let option_txt = |txt: String| -> OptionTxtCtr {
-        OptionTxtCtr {
-            comp: OptionTxt,
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-        }
+    let option_txt = |txt: String| OptionTxtCtr {
+        comp: OptionTxt,
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_clr: TextColor::from(CLR_TXT),
     };
 
     let boids_dropdown_txt_ctr = (
@@ -563,25 +548,24 @@ fn draw_ui_box(
         Name::new("Boids Option Container"),
     );
 
-    let boids_option_btn =
-        |txt: String, radius: Option<BorderRadius>| -> (Button, BorderRadius, Node, Name) {
-            let radius = match radius {
-                Some(r) => r,
-                None => BorderRadius::ZERO,
-            };
-
-            (
-                Button::default(),
-                radius,
-                Node {
-                    padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-                    margin: UiRect::new(Val::Px(5.0), Val::Px(20.0), Val::Auto, Val::Auto),
-                    justify_content: JustifyContent::SpaceBetween,
-                    ..default()
-                },
-                Name::new(format!("Boids Option Btn {}", txt)),
-            )
+    let boids_option_btn = |txt: String, radius: Option<BorderRadius>| {
+        let radius = match radius {
+            Some(r) => r,
+            None => BorderRadius::ZERO,
         };
+
+        (
+            Button::default(),
+            radius,
+            Node {
+                padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                margin: UiRect::new(Val::Px(5.0), Val::Px(20.0), Val::Auto, Val::Auto),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            Name::new(format!("Boids Option Btn {}", txt)),
+        )
+    };
 
     // Root Container
     cmds.spawn(root_ctr).with_children(|ctr| {
@@ -696,7 +680,7 @@ fn draw_ui_box(
                 });
         });
 
-        let Ok(mut boids_info) = q_boids_info.single_mut() else {
+        let Ok(boids_info) = q_boids_info.single_mut() else {
             return;
         };
 
@@ -721,31 +705,20 @@ fn draw_ui_box(
             ),
         ];
 
-        let boids_slider_ctr =
-            || -> (Node, Name) { (Node::default(), Name::new("Boids Option Slider")) };
+        let boids_slider_ctr = || (Node::default(), Name::new("Boids Option Slider"));
 
-        let boids_option_slider_btn = |txt: String,
-                                       info: BoidsInfoOptions,
-                                       arrow: BoidsSliderBtnOptions|
-         -> (
-            BoidsInfo,
-            BoidsSliderBtn,
-            Text,
-            TextColor,
-            TextFont,
-            Button,
-            Name,
-        ) {
-            (
-                BoidsInfo(info),
-                BoidsSliderBtn(arrow),
-                Text::new(txt.clone()),
-                TextColor::from(CLR_TXT),
-                TextFont::from_font_size(FONT_SIZE),
-                Button::default(),
-                Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
-            )
-        };
+        let boids_option_slider_btn =
+            |txt: String, info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
+                (
+                    BoidsInfo(info),
+                    BoidsSliderBtn(arrow),
+                    Text::new(txt.clone()),
+                    TextColor::from(CLR_TXT),
+                    TextFont::from_font_size(FONT_SIZE),
+                    Button::default(),
+                    Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
+                )
+            };
 
         let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
             (
