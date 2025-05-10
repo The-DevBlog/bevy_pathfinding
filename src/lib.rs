@@ -52,6 +52,16 @@ pub struct BoidsInfoUpdater {
     pub neighbor_exit_radius: f32, // new: slightly larger
 }
 
+// impl BoidsInfoUpdater {
+//     pub fn weight_mut(&mut self, opt: BoidsInfoOptions) -> &mut f32 {
+//         match opt {
+//             BoidsInfoOptions::Separation => &mut self.separation_weight,
+//             BoidsInfoOptions::Alignment => &mut self.alignment_weight,
+//             BoidsInfoOptions::Cohesion => &mut self.cohesion_weight,
+//         }
+//     }
+// }
+
 impl Default for BoidsInfoUpdater {
     fn default() -> Self {
         let neighbor_radius = 45.0;

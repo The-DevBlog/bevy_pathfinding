@@ -794,46 +794,45 @@ fn draw_ui_box(
 }
 
 fn handle_slider_arrow_interaction(
-    mut q_boids_info: Query<&mut BoidsInfoUpdater>,
+    mut boids_updater: Query<&mut BoidsInfoUpdater>,
     mut q_slider: Query<(&Interaction, &BoidsSliderBtn, &BoidsInfo), Changed<Interaction>>,
     mut q_txt: Query<(&mut Text, &BoidsInfo), (With<BoidsSliderValue>, Without<BoidsSliderBtn>)>,
 ) {
-    let Ok(mut boids_info_updater) = q_boids_info.single_mut() else {
+    let Ok(mut updater) = boids_updater.single_mut() else {
         return;
     };
 
     for (interaction, slider, boids_info) in q_slider.iter_mut() {
-        if interaction == &Interaction::Pressed {
-            for (mut txt, boids_info_2) in q_txt.iter_mut() {
-                if boids_info.0 == boids_info_2.0 {
-                    match slider.0 {
-                        BoidsSliderBtnOptions::Left => {
-                            if boids_info_2.0 == BoidsInfoOptions::Separation {
-                                boids_info_updater.separation_weight -= 1.0;
-                                txt.0 = format!("{}", boids_info_updater.separation_weight);
-                            } else if boids_info_2.0 == BoidsInfoOptions::Alignment {
-                                boids_info_updater.alignment_weight -= 1.0;
-                                txt.0 = format!("{}", boids_info_updater.alignment_weight);
-                            } else if boids_info_2.0 == BoidsInfoOptions::Cohesion {
-                                boids_info_updater.cohesion_weight -= 1.0;
-                                txt.0 = format!("{}", boids_info_updater.cohesion_weight);
-                            }
-                        }
-                        BoidsSliderBtnOptions::Right => {
-                            if boids_info_2.0 == BoidsInfoOptions::Separation {
-                                boids_info_updater.separation_weight += 1.0;
-                                txt.0 = format!("{}", boids_info_updater.separation_weight);
-                            } else if boids_info_2.0 == BoidsInfoOptions::Alignment {
-                                boids_info_updater.alignment_weight += 1.0;
-                                txt.0 = format!("{}", boids_info_updater.alignment_weight);
-                            } else if boids_info_2.0 == BoidsInfoOptions::Cohesion {
-                                boids_info_updater.cohesion_weight += 1.0;
-                                txt.0 = format!("{}", boids_info_updater.cohesion_weight);
-                            }
-                        }
-                    }
-                }
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        if let Some((mut txt, _)) = q_txt
+            .iter_mut()
+            .find(|(_txt, info2)| info2.0 == boids_info.0)
+        {
+            // grab the old value…
+            let mut w = match boids_info.0 {
+                BoidsInfoOptions::Separation => updater.separation_weight,
+                BoidsInfoOptions::Alignment => updater.alignment_weight,
+                BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+            };
+
+            // bump it
+            match slider.0 {
+                BoidsSliderBtnOptions::Left => w -= 1.0,
+                BoidsSliderBtnOptions::Right => w += 1.0,
             }
+
+            // update BoidsUpdater
+            match boids_info.0 {
+                BoidsInfoOptions::Separation => updater.separation_weight = w,
+                BoidsInfoOptions::Alignment => updater.alignment_weight = w,
+                BoidsInfoOptions::Cohesion => updater.cohesion_weight = w,
+            }
+
+            // update the UI text
+            txt.0 = w.to_string();
         }
     }
 }
