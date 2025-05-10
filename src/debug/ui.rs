@@ -481,17 +481,22 @@ fn draw_ui_box(
         txt_clr: TextColor::from(CLR_TXT),
     };
 
-    let options_container = |border_radius: BorderRadius| DropdownOptionsCtr {
-        visible_node: VisibleNode,
-        background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-        border_radius,
-        node: Node {
-            flex_direction: FlexDirection::Column,
-            display: Display::None,
-            ..default()
-        },
-        name: Name::new("Options Container"),
-    };
+    let options_container =
+        |border_radius: BorderRadius, padding: Option<f32>| DropdownOptionsCtr {
+            visible_node: VisibleNode,
+            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+            border_radius,
+            node: Node {
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::bottom(match padding {
+                    Some(p) => Val::Px(p),
+                    None => Val::Px(0.0),
+                }),
+                display: Display::None,
+                ..default()
+            },
+            name: Name::new("Options Container"),
+        };
 
     let btn_option = |set: OptionsSet, txt: String, radius: Option<BorderRadius>| {
         let radius = match radius {
@@ -550,7 +555,7 @@ fn draw_ui_box(
             radius,
             Node {
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-                margin: UiRect::new(Val::Px(5.0), Val::Px(20.0), Val::Auto, Val::Auto),
+                margin: UiRect::new(Val::Px(5.0), Val::Px(15.0), Val::Auto, Val::Auto),
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
@@ -583,7 +588,16 @@ fn draw_ui_box(
         ),
     ];
 
-    let boids_slider_ctr = || (Node::default(), Name::new("Boids Option Slider"));
+    let boids_slider_ctr = || {
+        (
+            Node {
+                width: Val::Percent(40.0),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            Name::new("Boids Option Slider"),
+        )
+    };
 
     let boids_option_slider_arrow_btn = |info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
         (
@@ -654,7 +668,7 @@ fn draw_ui_box(
 
         // Dropdown Options Container
         ctr.spawn((
-            options_container(BorderRadius::all(Val::ZERO)),
+            options_container(BorderRadius::all(Val::ZERO), None),
             DropdownOptions(OptionsSet::One),
         ))
         // Dropdown Options
@@ -704,7 +718,7 @@ fn draw_ui_box(
 
         // Dropdown Options Container
         ctr.spawn((
-            options_container(BorderRadius::all(Val::ZERO)),
+            options_container(BorderRadius::all(Val::ZERO), None),
             DropdownOptions(OptionsSet::Two),
         ))
         // Dropdown Options
@@ -748,7 +762,7 @@ fn draw_ui_box(
         // Boids Info Dropdown Options Ctr
         ctr.spawn((
             BoidsDropdownOptionsCtr,
-            options_container(BorderRadius::bottom(Val::Px(10.0))),
+            options_container(BorderRadius::bottom(Val::Px(10.0)), Some(5.0)),
         ))
         .with_children(|options| {
             // Boids Info Dropdown Options
