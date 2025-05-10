@@ -247,11 +247,18 @@ fn handle_boids_dropdown_interaction(
 fn toggle_boids_dropdown_visibility(
     _trigger: Trigger<ToggleBoidsDropdown>,
     mut q_node: Query<&mut Node, With<BoidsDropdownOptionsCtr>>,
+    mut q_border: Query<&mut BorderRadius, (With<BoidsInfoCtr>, Without<BoidsDropdownOptionsCtr>)>,
 ) {
+    let Ok(mut border) = q_border.single_mut() else {
+        return;
+    };
+
     for mut dropdown in q_node.iter_mut() {
         if dropdown.display == Display::Flex {
             dropdown.display = Display::None;
+            *border = BorderRadius::bottom(Val::Px(10.0));
         } else if dropdown.display == Display::None {
+            *border = BorderRadius::bottom(Val::Px(0.0));
             dropdown.display = Display::Flex
         }
     }
