@@ -4,6 +4,7 @@ use super::components::*;
 use super::resources;
 use super::resources::*;
 
+use bevy::color::palettes::css::WHITE;
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -588,7 +589,7 @@ fn draw_ui_box(
         (
             BackgroundColor::from(CLR_BACKGROUND_1),
             BorderColor::from(CLR_BORDER),
-            BorderRadius::all(Val::Px(7.5)),
+            BorderRadius::all(Val::Px(10.0)),
             BoidsInfo(info),
             BoidsSliderBtn(arrow),
             Node {
@@ -782,44 +783,64 @@ fn draw_ui_box(
 
 fn handle_slider_arrow_interaction(
     mut boids_updater: Query<&mut BoidsInfoUpdater>,
-    mut q_slider: Query<(&Interaction, &BoidsSliderBtn, &BoidsInfo), Changed<Interaction>>,
+    mut q_slider: Query<
+        (
+            &Interaction,
+            &BoidsSliderBtn,
+            &BoidsInfo,
+            &mut BackgroundColor,
+            &mut BorderColor,
+        ),
+        Changed<Interaction>,
+    >,
     mut q_txt: Query<(&mut Text, &BoidsInfo), (With<BoidsSliderValue>, Without<BoidsSliderBtn>)>,
 ) {
     let Ok(mut updater) = boids_updater.single_mut() else {
         return;
     };
 
-    for (interaction, slider, boids_info) in q_slider.iter_mut() {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
+    for (interaction, slider, boids_info, mut background_clr, mut border_clr) in q_slider.iter_mut()
+    {
+        match interaction {
+            Interaction::Pressed => {
+                if let Some((mut txt, _)) = q_txt
+                    .iter_mut()
+                    .find(|(_txt, info2)| info2.0 == boids_info.0)
+                {
+                    // grab the old value…
+                    let mut val = match boids_info.0 {
+                        BoidsInfoOptions::Separation => updater.separation_weight,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                    };
 
-        if let Some((mut txt, _)) = q_txt
-            .iter_mut()
-            .find(|(_txt, info2)| info2.0 == boids_info.0)
-        {
-            // grab the old value…
-            let mut val = match boids_info.0 {
-                BoidsInfoOptions::Separation => updater.separation_weight,
-                BoidsInfoOptions::Alignment => updater.alignment_weight,
-                BoidsInfoOptions::Cohesion => updater.cohesion_weight,
-            };
+                    // bump it
+                    match slider.0 {
+                        BoidsSliderBtnOptions::Left => val -= 1.0,
+                        BoidsSliderBtnOptions::Right => val += 1.0,
+                    }
 
-            // bump it
-            match slider.0 {
-                BoidsSliderBtnOptions::Left => val -= 1.0,
-                BoidsSliderBtnOptions::Right => val += 1.0,
+                    // update BoidsUpdater
+                    match boids_info.0 {
+                        BoidsInfoOptions::Separation => updater.separation_weight = val,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight = val,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
+                    }
+
+                    txt.0 = val.to_string();
+                }
+
+                background_clr.0 = CLR_BTN_HOVER.into();
+                border_clr.0 = WHITE.into();
             }
-
-            // update BoidsUpdater
-            match boids_info.0 {
-                BoidsInfoOptions::Separation => updater.separation_weight = val,
-                BoidsInfoOptions::Alignment => updater.alignment_weight = val,
-                BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
+            Interaction::Hovered => {
+                background_clr.0 = CLR_BTN_HOVER.into();
+                border_clr.0 = WHITE.into();
             }
-
-            // update the UI text
-            txt.0 = val.to_string();
+            Interaction::None => {
+                background_clr.0 = CLR_BACKGROUND_1.into();
+                border_clr.0 = CLR_BORDER.into();
+            }
         }
     }
 }
