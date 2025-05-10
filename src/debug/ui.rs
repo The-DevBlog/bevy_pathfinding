@@ -103,6 +103,19 @@ struct BoidsDropdownOptionsCtr;
 struct BoidsInfoCtr;
 
 #[derive(Component)]
+struct BoidsSliderValue;
+
+#[derive(Component)]
+struct BoidsInfo(BoidsInfoOptions);
+
+#[derive(Clone, Copy, PartialEq)]
+enum BoidsInfoOptions {
+    Separation,
+    Alignment,
+    Cohesion,
+}
+
+#[derive(Component)]
 struct BoidsSliderBtn(BoidsSliderBtnOptions);
 
 enum BoidsSliderBtnOptions {
@@ -688,11 +701,22 @@ fn draw_ui_box(
         };
 
         let labels = &[
-            ("Separation", boids_info.separation_weight, None),
-            ("Alignment", boids_info.alignment_weight, None),
+            (
+                "Separation",
+                boids_info.separation_weight,
+                BoidsInfoOptions::Separation,
+                None,
+            ),
+            (
+                "Alignment",
+                boids_info.alignment_weight,
+                BoidsInfoOptions::Alignment,
+                None,
+            ),
             (
                 "Cohesion",
                 boids_info.cohesion_weight,
+                BoidsInfoOptions::Cohesion,
                 Some(BorderRadius::top(Val::Px(10.0))),
             ),
         ];
@@ -700,22 +724,33 @@ fn draw_ui_box(
         let boids_slider_ctr =
             || -> (Node, Name) { (Node::default(), Name::new("Boids Option Slider")) };
 
-        let boids_option_slider_btn =
-            |txt: String,
-             arrow: BoidsSliderBtnOptions|
-             -> (BoidsSliderBtn, Text, TextColor, TextFont, Button, Name) {
-                (
-                    BoidsSliderBtn(arrow),
-                    Text::new(txt.clone()),
-                    TextColor::from(CLR_TXT),
-                    TextFont::from_font_size(FONT_SIZE),
-                    Button::default(),
-                    Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
-                )
-            };
-
-        let boids_option_slider_value = |val: String| {
+        let boids_option_slider_btn = |txt: String,
+                                       info: BoidsInfoOptions,
+                                       arrow: BoidsSliderBtnOptions|
+         -> (
+            BoidsInfo,
+            BoidsSliderBtn,
+            Text,
+            TextColor,
+            TextFont,
+            Button,
+            Name,
+        ) {
             (
+                BoidsInfo(info),
+                BoidsSliderBtn(arrow),
+                Text::new(txt.clone()),
+                TextColor::from(CLR_TXT),
+                TextFont::from_font_size(FONT_SIZE),
+                Button::default(),
+                Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
+            )
+        };
+
+        let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
+            (
+                BoidsSliderValue,
+                BoidsInfo(info),
                 Text::new(val),
                 TextColor::from(CLR_TXT),
                 TextFont::from_font_size(FONT_SIZE),
@@ -733,7 +768,7 @@ fn draw_ui_box(
         ))
         .with_children(|options| {
             options.spawn(boids_options_ctr).with_children(|options| {
-                for (label, value, radius) in labels {
+                for (label, value, info, radius) in labels {
                     options
                         .spawn(boids_option_btn(label.to_string(), *radius))
                         .with_children(|btn| {
@@ -741,11 +776,13 @@ fn draw_ui_box(
                             btn.spawn(boids_slider_ctr()).with_children(|slider| {
                                 slider.spawn(boids_option_slider_btn(
                                     "<".to_string(),
+                                    *info,
                                     BoidsSliderBtnOptions::Left,
                                 ));
-                                slider.spawn(boids_option_slider_value(value.to_string()));
+                                slider.spawn(boids_option_slider_value(value.to_string(), *info));
                                 slider.spawn(boids_option_slider_btn(
                                     ">".to_string(),
+                                    *info,
                                     BoidsSliderBtnOptions::Right,
                                 ));
                             });
@@ -757,13 +794,45 @@ fn draw_ui_box(
 }
 
 fn handle_slider_arrow_interaction(
-    mut q_slider: Query<(&Interaction, &BoidsSliderBtn), Changed<Interaction>>,
+    mut q_boids_info: Query<&mut BoidsInfoUpdater>,
+    mut q_slider: Query<(&Interaction, &BoidsSliderBtn, &BoidsInfo), Changed<Interaction>>,
+    mut q_txt: Query<(&mut Text, &BoidsInfo), (With<BoidsSliderValue>, Without<BoidsSliderBtn>)>,
 ) {
-    for (interaction, slider) in q_slider.iter_mut() {
+    let Ok(mut boids_info_updater) = q_boids_info.single_mut() else {
+        return;
+    };
+
+    for (interaction, slider, boids_info) in q_slider.iter_mut() {
         if interaction == &Interaction::Pressed {
-            match slider.0 {
-                BoidsSliderBtnOptions::Left => println!("Slider Left"),
-                BoidsSliderBtnOptions::Right => println!("Slider Right"),
+            for (mut txt, boids_info_2) in q_txt.iter_mut() {
+                if boids_info.0 == boids_info_2.0 {
+                    match slider.0 {
+                        BoidsSliderBtnOptions::Left => {
+                            if boids_info_2.0 == BoidsInfoOptions::Separation {
+                                boids_info_updater.separation_weight -= 1.0;
+                                txt.0 = format!("{}", boids_info_updater.separation_weight);
+                            } else if boids_info_2.0 == BoidsInfoOptions::Alignment {
+                                boids_info_updater.alignment_weight -= 1.0;
+                                txt.0 = format!("{}", boids_info_updater.alignment_weight);
+                            } else if boids_info_2.0 == BoidsInfoOptions::Cohesion {
+                                boids_info_updater.cohesion_weight -= 1.0;
+                                txt.0 = format!("{}", boids_info_updater.cohesion_weight);
+                            }
+                        }
+                        BoidsSliderBtnOptions::Right => {
+                            if boids_info_2.0 == BoidsInfoOptions::Separation {
+                                boids_info_updater.separation_weight += 1.0;
+                                txt.0 = format!("{}", boids_info_updater.separation_weight);
+                            } else if boids_info_2.0 == BoidsInfoOptions::Alignment {
+                                boids_info_updater.alignment_weight += 1.0;
+                                txt.0 = format!("{}", boids_info_updater.alignment_weight);
+                            } else if boids_info_2.0 == BoidsInfoOptions::Cohesion {
+                                boids_info_updater.cohesion_weight += 1.0;
+                                txt.0 = format!("{}", boids_info_updater.cohesion_weight);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
