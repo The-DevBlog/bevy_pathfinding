@@ -538,16 +538,6 @@ fn draw_ui_box(
         Name::new("Boids Info Dropdown Text"),
     );
 
-    let boids_options_ctr = (
-        BoidsDropwdownOptions,
-        Node {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            ..default()
-        },
-        Name::new("Boids Option Container"),
-    );
-
     let boids_option_btn = |txt: String, radius: Option<BorderRadius>| {
         let radius = match radius {
             Some(r) => r,
@@ -743,31 +733,29 @@ fn draw_ui_box(
         ))
         .with_children(|options| {
             // Boids Info Dropdown Options
-            options.spawn(boids_options_ctr).with_children(|options| {
-                for (label, value, info, radius) in labels {
-                    options
-                        .spawn(boids_option_btn(label.to_string(), *radius))
-                        .with_children(|btn| {
-                            // Options Txt
-                            btn.spawn(option_txt(label.to_string()));
+            for (label, value, info, radius) in labels {
+                options
+                    .spawn(boids_option_btn(label.to_string(), *radius))
+                    .with_children(|btn| {
+                        // Options Txt
+                        btn.spawn(option_txt(label.to_string()));
 
-                            // Slider
-                            btn.spawn(boids_slider_ctr()).with_children(|slider| {
-                                slider.spawn(boids_option_slider_btn(
-                                    "<".to_string(),
-                                    *info,
-                                    BoidsSliderBtnOptions::Left,
-                                ));
-                                slider.spawn(boids_option_slider_value(value.to_string(), *info));
-                                slider.spawn(boids_option_slider_btn(
-                                    ">".to_string(),
-                                    *info,
-                                    BoidsSliderBtnOptions::Right,
-                                ));
-                            });
+                        // Slider
+                        btn.spawn(boids_slider_ctr()).with_children(|slider| {
+                            slider.spawn(boids_option_slider_btn(
+                                "<".to_string(),
+                                *info,
+                                BoidsSliderBtnOptions::Left,
+                            ));
+                            slider.spawn(boids_option_slider_value(value.to_string(), *info));
+                            slider.spawn(boids_option_slider_btn(
+                                ">".to_string(),
+                                *info,
+                                BoidsSliderBtnOptions::Right,
+                            ));
                         });
-                }
-            });
+                    });
+            }
         });
     });
 }
@@ -791,7 +779,7 @@ fn handle_slider_arrow_interaction(
             .find(|(_txt, info2)| info2.0 == boids_info.0)
         {
             // grab the old value…
-            let mut w = match boids_info.0 {
+            let mut val = match boids_info.0 {
                 BoidsInfoOptions::Separation => updater.separation_weight,
                 BoidsInfoOptions::Alignment => updater.alignment_weight,
                 BoidsInfoOptions::Cohesion => updater.cohesion_weight,
@@ -799,19 +787,19 @@ fn handle_slider_arrow_interaction(
 
             // bump it
             match slider.0 {
-                BoidsSliderBtnOptions::Left => w -= 1.0,
-                BoidsSliderBtnOptions::Right => w += 1.0,
+                BoidsSliderBtnOptions::Left => val -= 1.0,
+                BoidsSliderBtnOptions::Right => val += 1.0,
             }
 
             // update BoidsUpdater
             match boids_info.0 {
-                BoidsInfoOptions::Separation => updater.separation_weight = w,
-                BoidsInfoOptions::Alignment => updater.alignment_weight = w,
-                BoidsInfoOptions::Cohesion => updater.cohesion_weight = w,
+                BoidsInfoOptions::Separation => updater.separation_weight = val,
+                BoidsInfoOptions::Alignment => updater.alignment_weight = val,
+                BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
             }
 
             // update the UI text
-            txt.0 = w.to_string();
+            txt.0 = val.to_string();
         }
     }
 }
