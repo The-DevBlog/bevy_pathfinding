@@ -735,17 +735,23 @@ fn draw_ui_box(
         ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
             dropdown.spawn(boids_info_dropwdown_txt);
         });
+
+        // Boids Info Dropdown Options Ctr
         ctr.spawn((
             BoidsDropdownOptionsCtr,
             options_container(BorderRadius::bottom(Val::Px(10.0))),
         ))
         .with_children(|options| {
+            // Boids Info Dropdown Options
             options.spawn(boids_options_ctr).with_children(|options| {
                 for (label, value, info, radius) in labels {
                     options
                         .spawn(boids_option_btn(label.to_string(), *radius))
                         .with_children(|btn| {
+                            // Options Txt
                             btn.spawn(option_txt(label.to_string()));
+
+                            // Slider
                             btn.spawn(boids_slider_ctr()).with_children(|slider| {
                                 slider.spawn(boids_option_slider_btn(
                                     "<".to_string(),
