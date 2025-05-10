@@ -487,6 +487,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             radius,
             Node {
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                margin: UiRect::left(Val::Px(5.0)),
                 ..default()
             },
         )
@@ -545,6 +546,8 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 radius,
                 Node {
                     padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                    margin: UiRect::new(Val::Px(5.0), Val::Px(20.0), Val::Auto, Val::Auto),
+                    justify_content: JustifyContent::SpaceBetween,
                     ..default()
                 },
                 Name::new(format!("Boids Option Btn {}", txt)),
@@ -670,6 +673,40 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             ("Cohesion", Some(BorderRadius::top(Val::Px(10.0)))),
         ];
 
+        #[derive(Component)]
+        struct BoidsSliderBtn(BoidsSliderBtnOptions);
+
+        enum BoidsSliderBtnOptions {
+            Left,
+            Right,
+        }
+
+        let boids_slider_ctr =
+            || -> (Node, Name) { (Node::default(), Name::new("Boids Option Slider")) };
+
+        let boids_option_slider_btn =
+            |txt: String,
+             arrow: BoidsSliderBtnOptions|
+             -> (BoidsSliderBtn, Text, TextColor, TextFont, Button, Name) {
+                (
+                    BoidsSliderBtn(arrow),
+                    Text::new(txt.clone()),
+                    TextColor::from(CLR_TXT),
+                    TextFont::from_font_size(FONT_SIZE),
+                    Button::default(),
+                    Name::new(format!("Boids Option Slider Btn: '{}'", txt)),
+                )
+            };
+
+        let boids_option_slider_value = || {
+            (
+                Text::new("0.0".to_string()),
+                TextColor::from(CLR_TXT),
+                TextFont::from_font_size(FONT_SIZE),
+                Name::new("Boids Option Slider Value"),
+            )
+        };
+
         // Boids Info Dropdown Button
         ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
             dropdown.spawn(boids_info_dropwdown_txt);
@@ -685,6 +722,17 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                         .spawn(boids_option_btn(label.to_string(), *radius))
                         .with_children(|btn| {
                             btn.spawn(option_txt(label.to_string()));
+                            btn.spawn(boids_slider_ctr()).with_children(|slider| {
+                                slider.spawn(boids_option_slider_btn(
+                                    "<".to_string(),
+                                    BoidsSliderBtnOptions::Left,
+                                ));
+                                slider.spawn(boids_option_slider_value());
+                                slider.spawn(boids_option_slider_btn(
+                                    ">".to_string(),
+                                    BoidsSliderBtnOptions::Right,
+                                ));
+                            });
                         });
                 }
             });
