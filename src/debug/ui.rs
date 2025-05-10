@@ -1,3 +1,5 @@
+use crate::BoidsInfoUpdater;
+
 use super::components::*;
 use super::resources;
 use super::resources::*;
@@ -343,7 +345,12 @@ fn toggle_dropdown_visibility(
     }
 }
 
-fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>) {
+fn draw_ui_box(
+    mut cmds: Commands,
+    dbg: Res<DbgOptions>,
+    dbg_icon: Res<DbgIcon>,
+    mut q_boids_info: Query<&BoidsInfoUpdater>,
+) {
     let root_ctr = (
         RootCtr,
         Node {
@@ -667,10 +674,18 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 });
         });
 
+        let Ok(mut boids_info) = q_boids_info.single_mut() else {
+            return;
+        };
+
         let labels = &[
-            ("Separation", None),
-            ("Alignment", None),
-            ("Cohesion", Some(BorderRadius::top(Val::Px(10.0)))),
+            ("Separation", boids_info.separation_weight, None),
+            ("Alignment", boids_info.alignment_weight, None),
+            (
+                "Cohesion",
+                boids_info.cohesion_weight,
+                Some(BorderRadius::top(Val::Px(10.0))),
+            ),
         ];
 
         #[derive(Component)]
@@ -698,9 +713,9 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 )
             };
 
-        let boids_option_slider_value = || {
+        let boids_option_slider_value = |val: String| {
             (
-                Text::new("0.0".to_string()),
+                Text::new(val),
                 TextColor::from(CLR_TXT),
                 TextFont::from_font_size(FONT_SIZE),
                 Name::new("Boids Option Slider Value"),
@@ -717,7 +732,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         ))
         .with_children(|options| {
             options.spawn(boids_options_ctr).with_children(|options| {
-                for (label, radius) in labels {
+                for (label, value, radius) in labels {
                     options
                         .spawn(boids_option_btn(label.to_string(), *radius))
                         .with_children(|btn| {
@@ -727,7 +742,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                                     "<".to_string(),
                                     BoidsSliderBtnOptions::Left,
                                 ));
-                                slider.spawn(boids_option_slider_value());
+                                slider.spawn(boids_option_slider_value(value.to_string()));
                                 slider.spawn(boids_option_slider_btn(
                                     ">".to_string(),
                                     BoidsSliderBtnOptions::Right,
