@@ -664,42 +664,29 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                 });
         });
 
+        let labels = &[
+            ("Separation", None),
+            ("Alignment", None),
+            ("Cohesion", Some(BorderRadius::top(Val::Px(10.0)))),
+        ];
+
         // Boids Info Dropdown Button
         ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
             dropdown.spawn(boids_info_dropwdown_txt);
         });
-
-        // Boids Info Dropdown Options Container
         ctr.spawn((
             BoidsDropdownOptionsCtr,
             options_container(BorderRadius::bottom(Val::Px(10.0))),
         ))
         .with_children(|options| {
-            // Boids Info Dropdown Options Container
             options.spawn(boids_options_ctr).with_children(|options| {
-                // Separation
-                options
-                    .spawn(boids_option_btn("Separation".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("Separation".to_string()));
-                    });
-
-                // Alignment
-                options
-                    .spawn(boids_option_btn("Alignment".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("Alignment".to_string()));
-                    });
-
-                // Cohesion
-                options
-                    .spawn(boids_option_btn(
-                        "Cohesion".to_string(),
-                        Some(BorderRadius::top(Val::Px(10.0))),
-                    ))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("Cohesion".to_string()));
-                    });
+                for (label, radius) in labels {
+                    options
+                        .spawn(boids_option_btn(label.to_string(), *radius))
+                        .with_children(|btn| {
+                            btn.spawn(option_txt(label.to_string()));
+                        });
+                }
             });
         });
     });
