@@ -927,7 +927,7 @@ fn slider_drag_start_end(
                         info: *boids_info,
                         start_x: cursor_pos.x,
                         start_val,
-                        sensitivity: 0.1,
+                        sensitivity: 0.035,
                     });
                 }
             }
