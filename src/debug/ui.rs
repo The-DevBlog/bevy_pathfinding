@@ -532,7 +532,7 @@ fn draw_ui_box(
     let option_txt = |txt: String| OptionTxtCtr {
         comp: OptionTxt,
         txt: Text::new(txt),
-        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_font: TextFont::from_font_size(FONT_SIZE - 1.0),
         txt_clr: TextColor::from(CLR_TXT),
     };
 
@@ -568,8 +568,8 @@ fn draw_ui_box(
             Button::default(),
             radius,
             Node {
+                margin: UiRect::horizontal(Val::Px(5.0)),
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
-                margin: UiRect::new(Val::Px(5.0), Val::Px(15.0), Val::Auto, Val::Auto),
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
@@ -611,7 +611,7 @@ fn draw_ui_box(
     let boids_slider_ctr = || {
         (
             Node {
-                width: Val::Percent(40.0),
+                width: Val::Percent(38.0),
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
@@ -640,7 +640,7 @@ fn draw_ui_box(
         (
             Text::new(txt.clone()),
             TextColor::from(CLR_TXT),
-            TextFont::from_font_size(FONT_SIZE),
+            TextFont::from_font_size(FONT_SIZE - 1.0),
             Name::new(format!("Boids Option Slider txt")),
         )
     };
@@ -656,7 +656,7 @@ fn draw_ui_box(
             },
             Text::new(val),
             TextColor::from(CLR_TXT),
-            TextFont::from_font_size(FONT_SIZE),
+            TextFont::from_font_size(FONT_SIZE - 1.0),
             Button::default(),
             Name::new("Boids Option Slider Value"),
         )
@@ -787,7 +787,7 @@ fn draw_ui_box(
         ))
         .with_children(|options| {
             // Boids Info Dropdown Options
-            for (label, value, info, radius) in labels {
+            for (label, val, info, radius) in labels {
                 options
                     .spawn(boids_option_btn(label.to_string(), *radius))
                     .with_children(|btn| {
@@ -799,7 +799,7 @@ fn draw_ui_box(
                             slider
                                 .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Left))
                                 .with_child(boids_option_slider_arrow_txt("<".to_string()));
-                            slider.spawn(boids_option_slider_value(value.to_string(), *info));
+                            slider.spawn(boids_option_slider_value(format!("{:.1}", val), *info));
                             slider
                                 .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Right))
                                 .with_child(boids_option_slider_arrow_txt(">".to_string()));
@@ -848,8 +848,8 @@ fn handle_slider_arrow_interaction(
 
                     // bump it
                     match slider {
-                        BoidsSliderBtn::Left => val -= 1.0,
-                        BoidsSliderBtn::Right => val += 1.0,
+                        BoidsSliderBtn::Left => val -= 0.1,
+                        BoidsSliderBtn::Right => val += 0.1,
                     }
 
                     // update BoidsUpdater
@@ -862,8 +862,8 @@ fn handle_slider_arrow_interaction(
                             updater.neighbor_exit_radius = val * 1.05
                         }
                     }
-
-                    txt.0 = val.to_string();
+                    txt.0 = format!("{:.1}", val);
+                    // txt.0 = val.to_string();
                 }
 
                 background_clr.0 = CLR_BTN_HOVER.into();
