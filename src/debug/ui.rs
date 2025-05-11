@@ -589,7 +589,6 @@ fn draw_ui_box(
             boids_info.cohesion_weight,
             BoidsInfoOptions::Cohesion,
             None,
-            // Some(BorderRadius::top(Val::Px(10.0))),
         ),
         (
             "Neighbor Radius",
