@@ -6,6 +6,7 @@ use super::resources::*;
 
 use bevy::color::palettes::css::WHITE;
 use bevy::window::SystemCursorIcon;
+use bevy::window::WindowFocused;
 use bevy::winit::cursor::CursorIcon;
 use bevy::{prelude::*, window::PrimaryWindow};
 
@@ -29,6 +30,7 @@ impl Plugin for UiPlugin {
                     update_cursor_icon_default.run_if(resource_removed::<DragState>),
                     slider_drag_start_end.before(slider_drag_update),
                     slider_drag_update.run_if(resource_exists::<DragState>),
+                    remove_drag_on_win_focus_lost.run_if(resource_exists::<DragState>),
                     handle_dropdown_interaction,
                     handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
@@ -938,10 +940,6 @@ fn slider_drag_start_end(
             Interaction::None => {
                 background_clr.0 = CLR_BACKGROUND_1.into();
                 *cursor = SystemCursorIcon::Default.into();
-
-                if input.just_released(MouseButton::Left) {
-                    cmds.remove_resource::<DragState>();
-                }
             }
         }
     }
@@ -999,4 +997,10 @@ fn update_cursor_icon_default(mut q_cursor: Query<&mut CursorIcon>) {
     };
 
     *cursor = SystemCursorIcon::Default.into();
+}
+
+fn remove_drag_on_win_focus_lost(input: Res<ButtonInput<MouseButton>>, mut cmds: Commands) {
+    if input.just_released(MouseButton::Left) {
+        cmds.remove_resource::<DragState>();
+    }
 }
