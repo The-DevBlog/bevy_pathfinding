@@ -5,6 +5,8 @@ use super::resources;
 use super::resources::*;
 
 use bevy::color::palettes::css::WHITE;
+use bevy::window::SystemCursorIcon;
+use bevy::winit::cursor::CursorIcon;
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -23,6 +25,8 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
+                    update_cursor_icon_grab.run_if(resource_added::<DragState>),
+                    update_cursor_icon_default.run_if(resource_removed::<DragState>),
                     slider_drag_start_end.before(slider_drag_update),
                     slider_drag_update.run_if(resource_exists::<DragState>),
                     handle_dropdown_interaction,
@@ -863,7 +867,6 @@ fn handle_slider_arrow_interaction(
                         }
                     }
                     txt.0 = format!("{:.1}", val);
-                    // txt.0 = val.to_string();
                 }
 
                 background_clr.0 = CLR_BTN_HOVER.into();
@@ -883,12 +886,16 @@ fn handle_slider_arrow_interaction(
 
 fn slider_drag_start_end(
     mut cmds: Commands,
-    window_q: Query<&Window, With<PrimaryWindow>>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
     input: Res<ButtonInput<MouseButton>>,
-    mut q: Query<(&Interaction, &BoidsInfoOptions), (With<BoidsSliderValue>, Changed<Interaction>)>,
-    mut updater: Query<&mut BoidsInfoUpdater>,
+    mut q: Query<
+        (&Interaction, &mut BackgroundColor, &BoidsInfoOptions),
+        (With<BoidsSliderValue>, Changed<Interaction>),
+    >,
+    mut q_updater: Query<&mut BoidsInfoUpdater>,
+    mut q_cursor: Query<&mut CursorIcon>,
 ) {
-    let Ok(window) = window_q.single() else {
+    let Ok(window) = q_window.single() else {
         return;
     };
 
@@ -896,32 +903,46 @@ fn slider_drag_start_end(
         return;
     };
 
-    let Ok(updater) = updater.single_mut() else {
+    let Ok(mut cursor) = q_cursor.single_mut() else {
         return;
     };
 
-    for (interaction, boids_info) in q.iter_mut() {
+    let Ok(updater) = q_updater.single_mut() else {
+        return;
+    };
+
+    for (interaction, mut background_clr, boids_info) in q.iter_mut() {
         match *interaction {
-            Interaction::Pressed if input.just_pressed(MouseButton::Left) => {
-                println!("Drag STARTED");
-                let start_val = match boids_info {
-                    BoidsInfoOptions::Separation => updater.separation_weight,
-                    BoidsInfoOptions::Alignment => updater.alignment_weight,
-                    BoidsInfoOptions::Cohesion => updater.cohesion_weight,
-                    BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
-                };
-                cmds.insert_resource(DragState {
-                    info: *boids_info,
-                    start_x: cursor_pos.x,
-                    start_val,
-                    sensitivity: 0.1, // e.g. 0.1 units per pixel
-                });
+            Interaction::Pressed => {
+                if input.just_pressed(MouseButton::Left) {
+                    let start_val = match boids_info {
+                        BoidsInfoOptions::Separation => updater.separation_weight,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                    };
+                    cmds.insert_resource(DragState {
+                        info: *boids_info,
+                        start_x: cursor_pos.x,
+                        start_val,
+                        sensitivity: 0.1,
+                    });
+                }
             }
-            Interaction::None if input.just_released(MouseButton::Left) => {
-                println!("Drag ENDED");
-                cmds.remove_resource::<DragState>();
+
+            Interaction::Hovered => {
+                background_clr.0 = CLR_BTN_HOVER.into();
+                *cursor = SystemCursorIcon::Grabbing.into();
             }
-            _ => {}
+
+            Interaction::None => {
+                background_clr.0 = CLR_BACKGROUND_1.into();
+                *cursor = SystemCursorIcon::Default.into();
+
+                if input.just_released(MouseButton::Left) {
+                    cmds.remove_resource::<DragState>();
+                }
+            }
         }
     }
 }
@@ -940,24 +961,42 @@ fn slider_drag_update(
         return;
     };
 
-    if let Some(cursor) = window.cursor_position() {
-        let dx = cursor.x - drag.start_x;
-        let new_val = drag.start_val + dx * drag.sensitivity;
+    let Some(cursor) = window.cursor_position() else {
+        return;
+    };
 
-        // write into your updater
-        match drag.info {
-            BoidsInfoOptions::Separation => updater.separation_weight = new_val,
-            BoidsInfoOptions::Alignment => updater.alignment_weight = new_val,
-            BoidsInfoOptions::Cohesion => updater.cohesion_weight = new_val,
-            BoidsInfoOptions::NeighborRadius => {
-                updater.neighbor_radius = new_val;
-                updater.neighbor_exit_radius = new_val * 1.05
-            }
-        }
+    let dx = cursor.x - drag.start_x;
+    let new_val = drag.start_val + dx * drag.sensitivity;
 
-        // update the matching Text
-        if let Some((mut txt, _)) = q_txt.iter_mut().find(|(_txt, &info)| info == drag.info) {
-            txt.0 = format!("{:.1}", new_val);
+    // write into your updater
+    match drag.info {
+        BoidsInfoOptions::Separation => updater.separation_weight = new_val,
+        BoidsInfoOptions::Alignment => updater.alignment_weight = new_val,
+        BoidsInfoOptions::Cohesion => updater.cohesion_weight = new_val,
+        BoidsInfoOptions::NeighborRadius => {
+            updater.neighbor_radius = new_val;
+            updater.neighbor_exit_radius = new_val * 1.05
         }
     }
+
+    // update the matching Text
+    if let Some((mut txt, _)) = q_txt.iter_mut().find(|(_txt, &info)| info == drag.info) {
+        txt.0 = format!("{:.1}", new_val);
+    }
+}
+
+fn update_cursor_icon_grab(mut q_cursor: Query<&mut CursorIcon>) {
+    let Ok(mut cursor) = q_cursor.single_mut() else {
+        return;
+    };
+
+    *cursor = SystemCursorIcon::Grabbing.into();
+}
+
+fn update_cursor_icon_default(mut q_cursor: Query<&mut CursorIcon>) {
+    let Ok(mut cursor) = q_cursor.single_mut() else {
+        return;
+    };
+
+    *cursor = SystemCursorIcon::Default.into();
 }
