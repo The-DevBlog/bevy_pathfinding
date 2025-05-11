@@ -23,6 +23,8 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
+                    slider_drag_start_end.before(slider_drag_update),
+                    slider_drag_update.run_if(resource_exists::<DragState>),
                     handle_dropdown_interaction,
                     handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
@@ -105,6 +107,14 @@ struct BoidsInfoCtr;
 
 #[derive(Component)]
 struct BoidsSliderValue;
+
+#[derive(Resource)]
+struct DragState {
+    info: BoidsInfoOptions,
+    start_x: f32,
+    start_val: f32,
+    sensitivity: f32, // units per pixel
+}
 
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 enum BoidsInfoOptions {
@@ -647,6 +657,7 @@ fn draw_ui_box(
             Text::new(val),
             TextColor::from(CLR_TXT),
             TextFont::from_font_size(FONT_SIZE),
+            Button::default(),
             Name::new("Boids Option Slider Value"),
         )
     };
@@ -866,6 +877,87 @@ fn handle_slider_arrow_interaction(
                 background_clr.0 = CLR_BACKGROUND_1.into();
                 border_clr.0 = CLR_BORDER.into();
             }
+        }
+    }
+}
+
+fn slider_drag_start_end(
+    mut cmds: Commands,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    input: Res<ButtonInput<MouseButton>>,
+    mut q: Query<(&Interaction, &BoidsInfoOptions), (With<BoidsSliderValue>, Changed<Interaction>)>,
+    mut updater: Query<&mut BoidsInfoUpdater>,
+) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+
+    let Ok(updater) = updater.single_mut() else {
+        return;
+    };
+
+    for (interaction, boids_info) in q.iter_mut() {
+        match *interaction {
+            Interaction::Pressed if input.just_pressed(MouseButton::Left) => {
+                println!("Drag STARTED");
+                let start_val = match boids_info {
+                    BoidsInfoOptions::Separation => updater.separation_weight,
+                    BoidsInfoOptions::Alignment => updater.alignment_weight,
+                    BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                    BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                };
+                cmds.insert_resource(DragState {
+                    info: *boids_info,
+                    start_x: cursor_pos.x,
+                    start_val,
+                    sensitivity: 0.1, // e.g. 0.1 units per pixel
+                });
+            }
+            Interaction::None if input.just_released(MouseButton::Left) => {
+                println!("Drag ENDED");
+                cmds.remove_resource::<DragState>();
+            }
+            _ => {}
+        }
+    }
+}
+
+fn slider_drag_update(
+    drag: Res<DragState>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    mut updater: Query<&mut BoidsInfoUpdater>,
+    mut q_txt: Query<(&mut Text, &BoidsInfoOptions), With<BoidsSliderValue>>,
+) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+
+    let Ok(mut updater) = updater.single_mut() else {
+        return;
+    };
+
+    if let Some(cursor) = window.cursor_position() {
+        let dx = cursor.x - drag.start_x;
+        let new_val = drag.start_val + dx * drag.sensitivity;
+
+        // write into your updater
+        match drag.info {
+            BoidsInfoOptions::Separation => updater.separation_weight = new_val,
+            BoidsInfoOptions::Alignment => updater.alignment_weight = new_val,
+            BoidsInfoOptions::Cohesion => updater.cohesion_weight = new_val,
+            BoidsInfoOptions::NeighborRadius => {
+                updater.neighbor_radius = new_val;
+                updater.neighbor_exit_radius = new_val * 1.05
+            }
+        }
+
+        // update the matching Text
+        if let Some((mut txt, _)) = q_txt.iter_mut().find(|(_txt, &info)| info == drag.info) {
+            txt.0 = format!("{:.1}", new_val);
         }
     }
 }
