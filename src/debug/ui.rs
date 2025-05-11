@@ -6,7 +6,6 @@ use super::resources::*;
 
 use bevy::color::palettes::css::WHITE;
 use bevy::window::SystemCursorIcon;
-use bevy::window::WindowFocused;
 use bevy::winit::cursor::CursorIcon;
 use bevy::{prelude::*, window::PrimaryWindow};
 
