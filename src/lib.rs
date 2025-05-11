@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use components::Boid;
 
 use crate::debug::DebugPlugin;
 use crate::events::*;
