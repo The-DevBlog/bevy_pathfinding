@@ -11,6 +11,7 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "bevy_render",
     "bevy_ui",
     "bevy_window",
+    "bevy_winit"
 ] }
 bytemuck = "1.21.0"
 image = "0.25.5"

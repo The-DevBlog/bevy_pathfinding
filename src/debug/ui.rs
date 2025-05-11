@@ -1,7 +1,13 @@
+use crate::components::BoidsInfoUpdater;
+
 use super::components::*;
 use super::resources;
 use super::resources::*;
 
+use bevy::color::palettes::css::WHITE;
+use bevy::window::SystemCursorIcon;
+use bevy::window::WindowFocused;
+use bevy::winit::cursor::CursorIcon;
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -20,17 +26,25 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_dropdown_click,
+                    update_cursor_icon_grab.run_if(resource_added::<DragState>),
+                    update_cursor_icon_default.run_if(resource_removed::<DragState>),
+                    slider_drag_start_end.before(slider_drag_update),
+                    slider_drag_update.run_if(resource_exists::<DragState>),
+                    remove_drag_on_win_focus_lost.run_if(resource_exists::<DragState>),
+                    handle_dropdown_interaction,
+                    handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
                     handle_draw_grid_interaction,
+                    handle_slider_arrow_interaction,
                     handle_drag,
                 ),
             )
             .add_observer(hide_options)
             .add_observer(toggle_dbg_visibility)
             .add_observer(toggle_dropdown_visibility)
-            .add_observer(update_active_dropdown_option);
+            .add_observer(update_active_dropdown_option)
+            .add_observer(toggle_boids_dropdown_visibility);
     }
 }
 
@@ -38,7 +52,13 @@ impl Plugin for UiPlugin {
 struct ToggleDbgVisibilityEv(bool);
 
 #[derive(Event)]
+struct ToggleBoidsDropdown;
+
+#[derive(Event)]
 struct HideOptionsEv;
+
+#[derive(Component)]
+struct BoidsDropwdownOptions;
 
 #[derive(Bundle)]
 struct DropDownBtnBundle {
@@ -47,7 +67,6 @@ struct DropDownBtnBundle {
     btn: Button,
     background_clr: BackgroundColor,
     border_clr: BorderColor,
-    border_radius: BorderRadius,
     node: Node,
     name: Name,
 }
@@ -79,12 +98,42 @@ struct OptionBoxCtr {
 
 #[derive(Bundle)]
 struct DropdownOptionsCtr {
-    comp: DropdownOptions,
     visible_node: VisibleNode,
     background_clr: BackgroundColor,
     border_radius: BorderRadius,
     node: Node,
     name: Name,
+}
+
+#[derive(Component)]
+struct BoidsDropdownOptionsCtr;
+
+#[derive(Component)]
+struct BoidsInfoCtr;
+
+#[derive(Component)]
+struct BoidsSliderValue;
+
+#[derive(Resource)]
+struct DragState {
+    info: BoidsInfoOptions,
+    start_x: f32,
+    start_val: f32,
+    sensitivity: f32, // units per pixel
+}
+
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
+enum BoidsInfoOptions {
+    Separation,
+    Alignment,
+    Cohesion,
+    NeighborRadius,
+}
+
+#[derive(Component)]
+enum BoidsSliderBtn {
+    Left,
+    Right,
 }
 
 #[derive(Bundle)]
@@ -165,29 +214,37 @@ fn handle_hide_dbg_interaction(
 fn toggle_dbg_visibility(
     trigger: Trigger<ToggleDbgVisibilityEv>,
     mut q_node: Query<&mut Node, With<VisibleNode>>,
-    mut q_title_bar: Query<&mut BorderRadius, With<TitleBar>>,
+    mut q_border: Query<&mut BorderRadius, With<BoidsInfoCtr>>,
+    mut q_border_root: Query<&mut Node, (With<RootCtr>, Without<VisibleNode>)>,
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
-    let Ok(mut title_bar) = q_title_bar.single_mut() else {
+
+    let Ok(mut border) = q_border.single_mut() else {
+        return;
+    };
+
+    let Ok(mut border_root) = q_border_root.single_mut() else {
         return;
     };
 
     for mut node in q_node.iter_mut() {
         if visible {
+            *border = BorderRadius::bottom(Val::Px(10.0));
+            border_root.border.bottom = Val::Px(1.0);
             node.display = Display::Flex;
-            *title_bar = BorderRadius::all(Val::Px(0.0));
             cmds.trigger(HideOptionsEv);
         } else {
+            *border = BorderRadius::all(Val::Px(10.0));
+            border_root.border.bottom = Val::Px(5.0);
             node.display = Display::None;
-            *title_bar = BorderRadius::bottom(Val::Px(10.0));
         }
     }
 }
 
 fn hide_options(
     _trigger: Trigger<HideOptionsEv>,
-    mut q_node: Query<&mut Node, With<DropdownOptions>>,
+    mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropdownOptionsCtr>)>>,
 ) {
     for mut node in q_node.iter_mut() {
         node.display = Display::None;
@@ -209,18 +266,51 @@ fn update_active_dropdown_option(
     }
 }
 
-fn handle_dropdown_click(
+fn handle_dropdown_interaction(
     mut cmds: Commands,
-    mut q_btn: Query<
-        (&Interaction, &DropdownBtn, &mut BackgroundColor),
-        (Changed<Interaction>, With<DropdownBtn>),
-    >,
+    mut q_btn: Query<(&Interaction, &DropdownBtn, &mut BackgroundColor), Changed<Interaction>>,
 ) {
     for (interaction, dropdown, mut background) in q_btn.iter_mut() {
         match interaction {
             Interaction::Pressed => cmds.trigger(ToggleModeEv(dropdown.0)),
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn handle_boids_dropdown_interaction(
+    mut cmds: Commands,
+    mut q_btn: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<BoidsInfoCtr>),
+    >,
+) {
+    for (interaction, mut background) in q_btn.iter_mut() {
+        match interaction {
+            Interaction::Pressed => cmds.trigger(ToggleBoidsDropdown),
+            Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
+        }
+    }
+}
+
+fn toggle_boids_dropdown_visibility(
+    _trigger: Trigger<ToggleBoidsDropdown>,
+    mut q_node: Query<&mut Node, With<BoidsDropdownOptionsCtr>>,
+    mut q_border: Query<&mut BorderRadius, (With<BoidsInfoCtr>, Without<BoidsDropdownOptionsCtr>)>,
+) {
+    let Ok(mut border) = q_border.single_mut() else {
+        return;
+    };
+
+    for mut dropdown in q_node.iter_mut() {
+        if dropdown.display == Display::Flex {
+            dropdown.display = Display::None;
+            *border = BorderRadius::bottom(Val::Px(10.0));
+        } else if dropdown.display == Display::None {
+            *border = BorderRadius::bottom(Val::Px(0.0));
+            dropdown.display = Display::Flex
         }
     }
 }
@@ -286,19 +376,24 @@ fn toggle_dropdown_visibility(
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
-                dropdown.display = Display::Flex
+                dropdown.display = Display::Flex;
             }
         } else if option == OptionsSet::Two && dropdown_options.0.to_num() == 2 {
             if dropdown.display == Display::Flex {
                 dropdown.display = Display::None;
             } else if dropdown.display == Display::None {
-                dropdown.display = Display::Flex
+                dropdown.display = Display::Flex;
             }
         }
     }
 }
 
-fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>) {
+fn draw_ui_box(
+    mut cmds: Commands,
+    dbg: Res<DbgOptions>,
+    dbg_icon: Res<DbgIcon>,
+    mut q_boids_info: Query<&BoidsInfoUpdater>,
+) {
     let root_ctr = (
         RootCtr,
         Node {
@@ -355,7 +450,6 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         BorderColor::from(CLR_BORDER),
         Node {
             padding: UiRect::all(Val::Px(5.0)),
-            border: UiRect::bottom(Val::Px(1.0)),
             ..default()
         },
         Name::new("Draw Grid Button"),
@@ -369,81 +463,62 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         Name::new("Draw Grid Txt"),
     );
 
-    let dropdown_btn = |set: OptionsSet, border: UiRect| -> DropDownBtnBundle {
-        let radius = match set {
-            OptionsSet::One => BorderRadius::ZERO,
-            OptionsSet::Two => BorderRadius::bottom(Val::Px(10.0)),
-        };
-        DropDownBtnBundle {
-            comp: DropdownBtn(set),
-            visible_node: VisibleNode,
-            btn: Button::default(),
-            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-            border_clr: BorderColor::from(CLR_BORDER),
-            border_radius: radius,
-            node: Node {
-                border,
-                ..default()
-            },
-            name: Name::new("Dropdown Button"),
-        }
+    let dropdown_btn = |set: OptionsSet| DropDownBtnBundle {
+        comp: DropdownBtn(set),
+        visible_node: VisibleNode,
+        btn: Button::default(),
+        background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+        border_clr: BorderColor::from(CLR_BORDER),
+        node: Node {
+            border: UiRect::top(Val::Px(1.0)),
+            ..default()
+        },
+        name: Name::new("Dropdown Button"),
     };
 
-    let active_option_ctr = || -> ActiveOptionCtrBundle {
-        ActiveOptionCtrBundle {
-            comp: ActiveOptionCtr,
-            border_clr: BorderColor::from(CLR_BORDER),
-            node: Node {
-                padding: UiRect::all(Val::Px(5.0)),
-                ..default()
-            },
-            name: Name::new("Draw Mode Container"),
-        }
+    let active_option_ctr = || ActiveOptionCtrBundle {
+        comp: ActiveOptionCtr,
+        border_clr: BorderColor::from(CLR_BORDER),
+        node: Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            ..default()
+        },
+        name: Name::new("Draw Mode Container"),
     };
 
-    let draw_mode_txt = |txt: String| -> DrawModeTxtCtr {
-        DrawModeTxtCtr {
-            comp: DrawModeTxt,
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-            name: Name::new("Draw Mode Text"),
-        }
+    let draw_mode_txt = |txt: String| DrawModeTxtCtr {
+        comp: DrawModeTxt,
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_clr: TextColor::from(CLR_TXT),
+        name: Name::new("Draw Mode Text"),
     };
 
-    let active_option = |txt: String, set: OptionsSet| -> OptionBoxCtr {
-        OptionBoxCtr {
-            comp: OptionBox(set),
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-        }
+    let active_option = |txt: String, set: OptionsSet| OptionBoxCtr {
+        comp: OptionBox(set),
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE),
+        txt_clr: TextColor::from(CLR_TXT),
     };
 
     let options_container =
-        |radius: Option<BorderRadius>, options_set: OptionsSet| -> DropdownOptionsCtr {
-            let radius = match radius {
-                Some(r) => r,
-                None => BorderRadius::ZERO,
-            };
-            DropdownOptionsCtr {
-                comp: DropdownOptions(options_set),
-                visible_node: VisibleNode,
-                background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-                border_radius: radius,
-                node: Node {
-                    flex_direction: FlexDirection::Column,
-                    display: Display::None,
-                    ..default()
-                },
-                name: Name::new("Options Container"),
-            }
+        |border_radius: BorderRadius, padding: Option<f32>| DropdownOptionsCtr {
+            visible_node: VisibleNode,
+            background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
+            border_radius,
+            node: Node {
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::bottom(match padding {
+                    Some(p) => Val::Px(p),
+                    None => Val::Px(0.0),
+                }),
+                display: Display::None,
+                ..default()
+            },
+            name: Name::new("Options Container"),
         };
 
-    let btn_option = |set: OptionsSet,
-                      txt: String,
-                      radius: Option<BorderRadius>|
-     -> (SetActiveOption, BorderRadius, Node) {
+    let btn_option = |set: OptionsSet, txt: String, radius: Option<BorderRadius>| {
         let radius = match radius {
             Some(r) => r,
             None => BorderRadius::ZERO,
@@ -454,18 +529,143 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             radius,
             Node {
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                margin: UiRect::left(Val::Px(5.0)),
                 ..default()
             },
         )
     };
 
-    let option_txt = |txt: String| -> OptionTxtCtr {
-        OptionTxtCtr {
-            comp: OptionTxt,
-            txt: Text::new(txt),
-            txt_font: TextFont::from_font_size(FONT_SIZE),
-            txt_clr: TextColor::from(CLR_TXT),
-        }
+    let option_txt = |txt: String| OptionTxtCtr {
+        comp: OptionTxt,
+        txt: Text::new(txt),
+        txt_font: TextFont::from_font_size(FONT_SIZE - 1.0),
+        txt_clr: TextColor::from(CLR_TXT),
+    };
+
+    let boids_dropdown_txt_ctr = (
+        VisibleNode,
+        BoidsInfoCtr,
+        Button::default(),
+        BackgroundColor::from(CLR_BACKGROUND_2),
+        BorderRadius::bottom(Val::Px(10.0)),
+        BorderColor::from(CLR_BORDER),
+        Node {
+            padding: UiRect::all(Val::Px(5.0)),
+            border: UiRect::top(Val::Px(1.0)),
+            ..default()
+        },
+        Name::new("Boids Info Dropdown Button"),
+    );
+
+    let boids_info_dropwdown_txt = (
+        TextFont::from_font_size(FONT_SIZE),
+        TextColor::from(CLR_TXT),
+        Text::new("Boids Info"),
+        Name::new("Boids Info Dropdown Text"),
+    );
+
+    let boids_option_btn = |txt: String, radius: Option<BorderRadius>| {
+        let radius = match radius {
+            Some(r) => r,
+            None => BorderRadius::ZERO,
+        };
+
+        (
+            Button::default(),
+            radius,
+            Node {
+                margin: UiRect::horizontal(Val::Px(5.0)),
+                padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            Name::new(format!("Boids Option Btn {}", txt)),
+        )
+    };
+
+    let Ok(boids_info) = q_boids_info.single_mut() else {
+        return;
+    };
+
+    let labels = &[
+        (
+            "Separation",
+            boids_info.separation_weight,
+            BoidsInfoOptions::Separation,
+            None,
+        ),
+        (
+            "Alignment",
+            boids_info.alignment_weight,
+            BoidsInfoOptions::Alignment,
+            None,
+        ),
+        (
+            "Cohesion",
+            boids_info.cohesion_weight,
+            BoidsInfoOptions::Cohesion,
+            None,
+        ),
+        (
+            "Neighbor Radius",
+            boids_info.neighbor_radius,
+            BoidsInfoOptions::NeighborRadius,
+            Some(BorderRadius::top(Val::Px(10.0))),
+        ),
+    ];
+
+    let boids_slider_ctr = || {
+        (
+            Node {
+                width: Val::Percent(38.0),
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            Name::new("Boids Option Slider"),
+        )
+    };
+
+    let boids_option_slider_arrow_btn = |boid: BoidsInfoOptions, arrow: BoidsSliderBtn| {
+        (
+            BackgroundColor::from(CLR_BACKGROUND_1),
+            BorderColor::from(CLR_BORDER),
+            BorderRadius::all(Val::Px(10.0)),
+            boid,
+            arrow,
+            Node {
+                border: UiRect::all(Val::Px(1.0)),
+                padding: UiRect::horizontal(Val::Px(5.0)),
+                ..default()
+            },
+            Button::default(),
+            Name::new(format!("Boids Option Slider Btn")),
+        )
+    };
+
+    let boids_option_slider_arrow_txt = |txt: String| {
+        (
+            Text::new(txt.clone()),
+            TextColor::from(CLR_TXT),
+            TextFont::from_font_size(FONT_SIZE - 1.0),
+            Name::new(format!("Boids Option Slider txt")),
+        )
+    };
+
+    let boids_option_slider_value = |val: String, boid: BoidsInfoOptions| {
+        (
+            BoidsSliderValue,
+            boid,
+            Node {
+                margin: UiRect::horizontal(Val::Px(2.5)),
+                top: Val::Px(2.0),
+                ..default()
+            },
+            Text::new(val),
+            TextColor::from(CLR_TXT),
+            TextFont::from_font_size(FONT_SIZE - 1.0),
+            Button::default(),
+            Name::new("Boids Option Slider Value"),
+        )
     };
 
     // Root Container
@@ -482,7 +682,7 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
         });
 
         // Draw Mode 1 Container
-        ctr.spawn(dropdown_btn(OptionsSet::One, UiRect::bottom(Val::Px(0.5))))
+        ctr.spawn(dropdown_btn(OptionsSet::One))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(active_option_ctr())
@@ -494,42 +694,45 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(None, OptionsSet::One))
-            // Dropdown Options
-            .with_children(|options| {
-                options
-                    .spawn(btn_option(OptionsSet::One, "None".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> None".to_string()));
-                    });
-                options
-                    .spawn(btn_option(
-                        OptionsSet::One,
-                        "IntegrationField".to_string(),
-                        None,
-                    ))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> IntegrationField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "FlowField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> FlowField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "CostField".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> CostField".to_string()));
-                    });
-                options
-                    .spawn(btn_option(OptionsSet::One, "Index".to_string(), None))
-                    .with_children(|btn| {
-                        btn.spawn(option_txt("> Index".to_string()));
-                    });
-            });
+        ctr.spawn((
+            options_container(BorderRadius::all(Val::ZERO), None),
+            DropdownOptions(OptionsSet::One),
+        ))
+        // Dropdown Options
+        .with_children(|options| {
+            options
+                .spawn(btn_option(OptionsSet::One, "None".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> None".to_string()));
+                });
+            options
+                .spawn(btn_option(
+                    OptionsSet::One,
+                    "IntegrationField".to_string(),
+                    None,
+                ))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> IntegrationField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "FlowField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> FlowField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "CostField".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> CostField".to_string()));
+                });
+            options
+                .spawn(btn_option(OptionsSet::One, "Index".to_string(), None))
+                .with_children(|btn| {
+                    btn.spawn(option_txt("> Index".to_string()));
+                });
+        });
 
         // Draw Mode 2 Container
-        ctr.spawn(dropdown_btn(OptionsSet::Two, UiRect::top(Val::Px(0.5))))
+        ctr.spawn(dropdown_btn(OptionsSet::Two))
             .with_children(|dropdown| {
                 dropdown
                     .spawn(active_option_ctr())
@@ -541,9 +744,9 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
             });
 
         // Dropdown Options Container
-        ctr.spawn(options_container(
-            Some(BorderRadius::bottom(Val::Px(10.0))),
-            OptionsSet::Two,
+        ctr.spawn((
+            options_container(BorderRadius::all(Val::ZERO), None),
+            DropdownOptions(OptionsSet::Two),
         ))
         // Dropdown Options
         .with_children(|options| {
@@ -572,14 +775,232 @@ fn draw_ui_box(mut cmds: Commands, dbg: Res<DbgOptions>, dbg_icon: Res<DbgIcon>)
                     btn.spawn(option_txt("> CostField".to_string()));
                 });
             options
-                .spawn(btn_option(
-                    OptionsSet::Two,
-                    "Index".to_string(),
-                    Some(BorderRadius::bottom(Val::Px(10.0))),
-                ))
+                .spawn(btn_option(OptionsSet::Two, "Index".to_string(), None))
                 .with_children(|btn| {
                     btn.spawn(option_txt("> Index".to_string()));
                 });
         });
+
+        // Boids Info Dropdown Button
+        ctr.spawn(boids_dropdown_txt_ctr).with_children(|dropdown| {
+            dropdown.spawn(boids_info_dropwdown_txt);
+        });
+
+        // Boids Info Dropdown Options Ctr
+        ctr.spawn((
+            BoidsDropdownOptionsCtr,
+            options_container(BorderRadius::bottom(Val::Px(10.0)), Some(5.0)),
+        ))
+        .with_children(|options| {
+            // Boids Info Dropdown Options
+            for (label, val, info, radius) in labels {
+                options
+                    .spawn(boids_option_btn(label.to_string(), *radius))
+                    .with_children(|btn| {
+                        // Options Txt
+                        btn.spawn(option_txt(label.to_string()));
+
+                        // Slider
+                        btn.spawn(boids_slider_ctr()).with_children(|slider| {
+                            slider
+                                .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Left))
+                                .with_child(boids_option_slider_arrow_txt("<".to_string()));
+                            slider.spawn(boids_option_slider_value(format!("{:.1}", val), *info));
+                            slider
+                                .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Right))
+                                .with_child(boids_option_slider_arrow_txt(">".to_string()));
+                        });
+                    });
+            }
+        });
     });
+}
+
+fn handle_slider_arrow_interaction(
+    mut boids_updater: Query<&mut BoidsInfoUpdater>,
+    mut q_slider: Query<
+        (
+            &Interaction,
+            &BoidsSliderBtn,
+            &BoidsInfoOptions,
+            &mut BackgroundColor,
+            &mut BorderColor,
+        ),
+        Changed<Interaction>,
+    >,
+    mut q_txt: Query<
+        (&mut Text, &BoidsInfoOptions),
+        (With<BoidsSliderValue>, Without<BoidsSliderBtn>),
+    >,
+) {
+    let Ok(mut updater) = boids_updater.single_mut() else {
+        return;
+    };
+
+    for (interaction, slider, boids_info, mut background_clr, mut border_clr) in q_slider.iter_mut()
+    {
+        match interaction {
+            Interaction::Pressed => {
+                if let Some((mut txt, _)) =
+                    q_txt.iter_mut().find(|(_txt, info2)| *info2 == boids_info)
+                {
+                    // grab the old value…
+                    let mut val = match boids_info {
+                        BoidsInfoOptions::Separation => updater.separation_weight,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                    };
+
+                    // bump it
+                    match slider {
+                        BoidsSliderBtn::Left => val -= 0.1,
+                        BoidsSliderBtn::Right => val += 0.1,
+                    }
+
+                    // update BoidsUpdater
+                    match boids_info {
+                        BoidsInfoOptions::Separation => updater.separation_weight = val,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight = val,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
+                        BoidsInfoOptions::NeighborRadius => {
+                            updater.neighbor_radius = val;
+                            updater.neighbor_exit_radius = val * 1.05
+                        }
+                    }
+                    txt.0 = format!("{:.1}", val);
+                }
+
+                background_clr.0 = CLR_BTN_HOVER.into();
+                border_clr.0 = WHITE.into();
+            }
+            Interaction::Hovered => {
+                background_clr.0 = CLR_BTN_HOVER.into();
+                border_clr.0 = WHITE.into();
+            }
+            Interaction::None => {
+                background_clr.0 = CLR_BACKGROUND_1.into();
+                border_clr.0 = CLR_BORDER.into();
+            }
+        }
+    }
+}
+
+fn slider_drag_start_end(
+    mut cmds: Commands,
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    input: Res<ButtonInput<MouseButton>>,
+    mut q: Query<
+        (&Interaction, &mut BackgroundColor, &BoidsInfoOptions),
+        (With<BoidsSliderValue>, Changed<Interaction>),
+    >,
+    mut q_updater: Query<&mut BoidsInfoUpdater>,
+    mut q_cursor: Query<&mut CursorIcon>,
+) {
+    let Ok(window) = q_window.single() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+
+    let Ok(mut cursor) = q_cursor.single_mut() else {
+        return;
+    };
+
+    let Ok(updater) = q_updater.single_mut() else {
+        return;
+    };
+
+    for (interaction, mut background_clr, boids_info) in q.iter_mut() {
+        match *interaction {
+            Interaction::Pressed => {
+                if input.just_pressed(MouseButton::Left) {
+                    let start_val = match boids_info {
+                        BoidsInfoOptions::Separation => updater.separation_weight,
+                        BoidsInfoOptions::Alignment => updater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                    };
+                    cmds.insert_resource(DragState {
+                        info: *boids_info,
+                        start_x: cursor_pos.x,
+                        start_val,
+                        sensitivity: 0.1,
+                    });
+                }
+            }
+
+            Interaction::Hovered => {
+                background_clr.0 = CLR_BTN_HOVER.into();
+                *cursor = SystemCursorIcon::Grabbing.into();
+            }
+
+            Interaction::None => {
+                background_clr.0 = CLR_BACKGROUND_1.into();
+                *cursor = SystemCursorIcon::Default.into();
+            }
+        }
+    }
+}
+
+fn slider_drag_update(
+    drag: Res<DragState>,
+    window_q: Query<&Window, With<PrimaryWindow>>,
+    mut updater: Query<&mut BoidsInfoUpdater>,
+    mut q_txt: Query<(&mut Text, &BoidsInfoOptions), With<BoidsSliderValue>>,
+) {
+    let Ok(window) = window_q.single() else {
+        return;
+    };
+
+    let Ok(mut updater) = updater.single_mut() else {
+        return;
+    };
+
+    let Some(cursor) = window.cursor_position() else {
+        return;
+    };
+
+    let dx = cursor.x - drag.start_x;
+    let new_val = drag.start_val + dx * drag.sensitivity;
+
+    // write into your updater
+    match drag.info {
+        BoidsInfoOptions::Separation => updater.separation_weight = new_val,
+        BoidsInfoOptions::Alignment => updater.alignment_weight = new_val,
+        BoidsInfoOptions::Cohesion => updater.cohesion_weight = new_val,
+        BoidsInfoOptions::NeighborRadius => {
+            updater.neighbor_radius = new_val;
+            updater.neighbor_exit_radius = new_val * 1.05
+        }
+    }
+
+    // update the matching Text
+    if let Some((mut txt, _)) = q_txt.iter_mut().find(|(_txt, &info)| info == drag.info) {
+        txt.0 = format!("{:.1}", new_val);
+    }
+}
+
+fn update_cursor_icon_grab(mut q_cursor: Query<&mut CursorIcon>) {
+    let Ok(mut cursor) = q_cursor.single_mut() else {
+        return;
+    };
+
+    *cursor = SystemCursorIcon::Grabbing.into();
+}
+
+fn update_cursor_icon_default(mut q_cursor: Query<&mut CursorIcon>) {
+    let Ok(mut cursor) = q_cursor.single_mut() else {
+        return;
+    };
+
+    *cursor = SystemCursorIcon::Default.into();
+}
+
+fn remove_drag_on_win_focus_lost(input: Res<ButtonInput<MouseButton>>, mut cmds: Commands) {
+    if input.just_released(MouseButton::Left) {
+        cmds.remove_resource::<DragState>();
+    }
 }
