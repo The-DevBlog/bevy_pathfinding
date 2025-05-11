@@ -106,10 +106,7 @@ struct BoidsInfoCtr;
 #[derive(Component)]
 struct BoidsSliderValue;
 
-#[derive(Component)]
-struct BoidsInfo(BoidsInfoOptions);
-
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
 enum BoidsInfoOptions {
     Separation,
     Alignment,
@@ -117,9 +114,7 @@ enum BoidsInfoOptions {
 }
 
 #[derive(Component)]
-struct BoidsSliderBtn(BoidsSliderBtnOptions);
-
-enum BoidsSliderBtnOptions {
+enum BoidsSliderBtn {
     Left,
     Right,
 }
@@ -607,13 +602,13 @@ fn draw_ui_box(
         )
     };
 
-    let boids_option_slider_arrow_btn = |info: BoidsInfoOptions, arrow: BoidsSliderBtnOptions| {
+    let boids_option_slider_arrow_btn = |boid: BoidsInfoOptions, arrow: BoidsSliderBtn| {
         (
             BackgroundColor::from(CLR_BACKGROUND_1),
             BorderColor::from(CLR_BORDER),
             BorderRadius::all(Val::Px(10.0)),
-            BoidsInfo(info),
-            BoidsSliderBtn(arrow),
+            boid,
+            arrow,
             Node {
                 border: UiRect::all(Val::Px(1.0)),
                 padding: UiRect::horizontal(Val::Px(5.0)),
@@ -633,10 +628,10 @@ fn draw_ui_box(
         )
     };
 
-    let boids_option_slider_value = |val: String, info: BoidsInfoOptions| {
+    let boids_option_slider_value = |val: String, boid: BoidsInfoOptions| {
         (
             BoidsSliderValue,
-            BoidsInfo(info),
+            boid,
             Node {
                 margin: UiRect::horizontal(Val::Px(2.5)),
                 top: Val::Px(2.0),
@@ -784,17 +779,11 @@ fn draw_ui_box(
                         // Slider
                         btn.spawn(boids_slider_ctr()).with_children(|slider| {
                             slider
-                                .spawn(boids_option_slider_arrow_btn(
-                                    *info,
-                                    BoidsSliderBtnOptions::Left,
-                                ))
+                                .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Left))
                                 .with_child(boids_option_slider_arrow_txt("<".to_string()));
                             slider.spawn(boids_option_slider_value(value.to_string(), *info));
                             slider
-                                .spawn(boids_option_slider_arrow_btn(
-                                    *info,
-                                    BoidsSliderBtnOptions::Right,
-                                ))
+                                .spawn(boids_option_slider_arrow_btn(*info, BoidsSliderBtn::Right))
                                 .with_child(boids_option_slider_arrow_txt(">".to_string()));
                         });
                     });
@@ -809,13 +798,16 @@ fn handle_slider_arrow_interaction(
         (
             &Interaction,
             &BoidsSliderBtn,
-            &BoidsInfo,
+            &BoidsInfoOptions,
             &mut BackgroundColor,
             &mut BorderColor,
         ),
         Changed<Interaction>,
     >,
-    mut q_txt: Query<(&mut Text, &BoidsInfo), (With<BoidsSliderValue>, Without<BoidsSliderBtn>)>,
+    mut q_txt: Query<
+        (&mut Text, &BoidsInfoOptions),
+        (With<BoidsSliderValue>, Without<BoidsSliderBtn>),
+    >,
 ) {
     let Ok(mut updater) = boids_updater.single_mut() else {
         return;
@@ -825,25 +817,24 @@ fn handle_slider_arrow_interaction(
     {
         match interaction {
             Interaction::Pressed => {
-                if let Some((mut txt, _)) = q_txt
-                    .iter_mut()
-                    .find(|(_txt, info2)| info2.0 == boids_info.0)
+                if let Some((mut txt, _)) =
+                    q_txt.iter_mut().find(|(_txt, info2)| *info2 == boids_info)
                 {
                     // grab the old value…
-                    let mut val = match boids_info.0 {
+                    let mut val = match boids_info {
                         BoidsInfoOptions::Separation => updater.separation_weight,
                         BoidsInfoOptions::Alignment => updater.alignment_weight,
                         BoidsInfoOptions::Cohesion => updater.cohesion_weight,
                     };
 
                     // bump it
-                    match slider.0 {
-                        BoidsSliderBtnOptions::Left => val -= 1.0,
-                        BoidsSliderBtnOptions::Right => val += 1.0,
+                    match slider {
+                        BoidsSliderBtn::Left => val -= 1.0,
+                        BoidsSliderBtn::Right => val += 1.0,
                     }
 
                     // update BoidsUpdater
-                    match boids_info.0 {
+                    match boids_info {
                         BoidsInfoOptions::Separation => updater.separation_weight = val,
                         BoidsInfoOptions::Alignment => updater.alignment_weight = val,
                         BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
