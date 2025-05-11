@@ -1,4 +1,4 @@
-use crate::BoidsInfoUpdater;
+use crate::components::BoidsInfoUpdater;
 
 use super::components::*;
 use super::resources;
