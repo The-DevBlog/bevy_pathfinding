@@ -111,6 +111,7 @@ enum BoidsInfoOptions {
     Separation,
     Alignment,
     Cohesion,
+    NeighborRadius,
 }
 
 #[derive(Component)]
@@ -587,6 +588,13 @@ fn draw_ui_box(
             "Cohesion",
             boids_info.cohesion_weight,
             BoidsInfoOptions::Cohesion,
+            None,
+            // Some(BorderRadius::top(Val::Px(10.0))),
+        ),
+        (
+            "Neighbor Radius",
+            boids_info.neighbor_radius,
+            BoidsInfoOptions::NeighborRadius,
             Some(BorderRadius::top(Val::Px(10.0))),
         ),
     ];
@@ -825,6 +833,7 @@ fn handle_slider_arrow_interaction(
                         BoidsInfoOptions::Separation => updater.separation_weight,
                         BoidsInfoOptions::Alignment => updater.alignment_weight,
                         BoidsInfoOptions::Cohesion => updater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
                     };
 
                     // bump it
@@ -838,6 +847,10 @@ fn handle_slider_arrow_interaction(
                         BoidsInfoOptions::Separation => updater.separation_weight = val,
                         BoidsInfoOptions::Alignment => updater.alignment_weight = val,
                         BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
+                        BoidsInfoOptions::NeighborRadius => {
+                            updater.neighbor_radius = val;
+                            updater.neighbor_exit_radius = val * 1.05
+                        }
                     }
 
                     txt.0 = val.to_string();

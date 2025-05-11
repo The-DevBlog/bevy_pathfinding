@@ -72,7 +72,6 @@ impl Default for BoidsInfo {
 // used for debugging purposes
 #[derive(Component, Reflect)]
 pub struct BoidsInfoUpdater {
-    pub velocity: Vec3,            // start at rest
     pub separation_weight: f32,    // push apart
     pub alignment_weight: f32,     // match heading
     pub cohesion_weight: f32,      // pull toward center
@@ -84,10 +83,9 @@ impl Default for BoidsInfoUpdater {
     fn default() -> Self {
         let neighbor_radius = 45.0;
         Self {
-            velocity: Vec3::ZERO,
-            separation_weight: 50.0, // strongest urge to avoid collisions
-            alignment_weight: 0.0,   // medium urge to line up
-            cohesion_weight: 0.0,    // medium urge to stay together
+            separation_weight: 50.0,          // strongest urge to avoid collisions
+            alignment_weight: 0.0,            // medium urge to line up
+            cohesion_weight: 0.0,             // medium urge to stay together
             neighbor_radius: neighbor_radius, // in world‐units (tweak to taste)
             neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
         }
@@ -109,6 +107,5 @@ fn change_boids(mut q_boids: Query<&mut Boid>, q_boid_values: Query<&BoidsInfoUp
         boid.info.cohesion = new_boids_info.cohesion_weight;
         boid.info.neighbor_radius = new_boids_info.neighbor_radius;
         boid.info.neighbor_exit_radius = new_boids_info.neighbor_exit_radius;
-        boid.velocity = new_boids_info.velocity;
     }
 }
