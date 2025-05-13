@@ -216,12 +216,12 @@ fn flowfield_group_stop_system(
     tf_query: Query<&Transform>,
 ) {
     for (ff_ent, mut ff) in query.iter_mut() {
-        // 1) skip empty or already‐stopped fields
+        // skip empty or already‐stopped fields
         if ff.arrived || ff.units.is_empty() {
             continue;
         }
 
-        // 2) compute centroid of the group
+        // compute centroid of the group
         let (sum, count) = ff
             .units
             .iter()
@@ -232,20 +232,19 @@ fn flowfield_group_stop_system(
         }
         let centroid = sum / count as f32;
 
-        // 3) compare centroid to the world‐space goal
+        // compare centroid to the world‐space goal
         let goal = ff.destination_cell.world_pos;
         if (centroid - goal).length() < ff.destination_radius {
             // → only _now_ do we stop the entire group
             ff.arrived = true;
             ff.steering_map.clear();
 
-            // 4) remove Destination from each unit
-            for &unit in &ff.units {
-                cmds.entity(unit).remove::<Destination>();
+            for &unit_ent in &ff.units {
+                cmds.entity(unit_ent).remove::<Destination>();
             }
+
             ff.units.clear();
 
-            // 6) if you want to despawn the flowfield itself
             cmds.entity(ff_ent).despawn();
         }
     }
@@ -282,6 +281,11 @@ fn initialize_flowfield(
     let units = trigger.event().0.clone();
     if units.is_empty() {
         return;
+    }
+
+    // insert Destination component to all units
+    for unit in units.iter() {
+        cmds.entity(*unit).insert(Destination);
     }
 
     // Remove existing flowfields that contain any of the units

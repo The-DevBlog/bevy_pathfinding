@@ -124,6 +124,7 @@ fn spawn_units(
     cmds.spawn(unit);
 }
 
+// THIS
 fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,
@@ -135,7 +136,6 @@ fn set_unit_destination(
 
     let mut units = Vec::new();
     for unit_entity in q_units.iter_mut() {
-        cmds.entity(unit_entity).insert(Destination);
         units.push(unit_entity);
     }
 
