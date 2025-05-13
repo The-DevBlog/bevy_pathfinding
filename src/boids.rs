@@ -120,9 +120,9 @@ fn clear_boids(mut q_vel: Query<&mut Boid>, mut removed: RemovedComponents<Desti
     for ent in ents {
         if let Ok(mut boid) = q_vel.get_mut(ent) {
             boid.velocity = Vec3::ZERO;
-            // boid.steering = Vec3::ZERO;
-            // boid.prev_neighbors.clear();
-            // boid.prev_steer = Vec3::ZERO;
+            boid.steering = Vec3::ZERO;
+            boid.prev_neighbors.clear();
+            boid.prev_steer = Vec3::ZERO;
         }
     }
 }
