@@ -4,7 +4,7 @@ use crate::debug::DebugPlugin;
 use crate::events::*;
 use crate::resources::*;
 
-mod boids;
+pub mod boids;
 mod cell;
 pub mod components;
 pub mod debug;

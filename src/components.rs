@@ -30,6 +30,7 @@ pub struct RtsObj;
 
 #[derive(Component, Debug)]
 pub struct Boid {
+    pub steering: Vec3,
     pub prev_neighbors: HashSet<Entity>, // store last frame's neighbors
     pub velocity: Vec3,
     pub prev_steer: Vec3, // start at rest
@@ -39,6 +40,7 @@ pub struct Boid {
 impl Default for Boid {
     fn default() -> Self {
         Self {
+            steering: Vec3::ZERO,
             prev_neighbors: HashSet::new(),
             velocity: Vec3::ZERO,
             prev_steer: Vec3::ZERO, // start at rest

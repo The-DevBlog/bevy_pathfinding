@@ -15,7 +15,7 @@ impl Plugin for BoidsPlugin {
 // New code. Bucketing for performance (big gains), but jittery
 pub fn calculate_boid_steering(
     time: Res<Time>,
-    mut q_boids: Query<(Entity, &mut Transform, &mut Boid)>,
+    mut q_boids: Query<(Entity, &Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
     mut _gizmos: Gizmos,
@@ -60,7 +60,7 @@ pub fn calculate_boid_steering(
         let mut pending: Vec<(Entity, Vec3)> = Vec::new();
 
         for &unit in &ff.units {
-            if let Ok((_, mut tf, mut boid)) = q_boids.get_mut(unit) {
+            if let Ok((_, tf, mut boid)) = q_boids.get_mut(unit) {
                 // Boid's own cell
                 let cx = ((tf.translation.x - origin.x) / bucket_size).floor() as i32;
                 let cy = ((tf.translation.z - origin.y) / bucket_size).floor() as i32;
@@ -97,11 +97,11 @@ pub fn calculate_boid_steering(
                 let raw = sep + ali + coh + flow_force;
                 let alpha = 0.1;
                 let smooth = boid.prev_steer.lerp(raw, alpha);
-                boid.prev_steer = smooth;
 
                 // Apply to velocity & position
+                boid.prev_steer = smooth;
+                boid.steering = smooth;
                 boid.velocity += smooth * dt;
-                tf.translation += boid.velocity * dt;
 
                 pending.push((unit, smooth));
                 boid.prev_neighbors = current_neighbors;
