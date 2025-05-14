@@ -23,6 +23,7 @@ const CELL_SIZE: f32 = 10.0;
 const MAP_GRID: IVec2 = IVec2::new(50, 50);
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
+const UNIT_COUNT: usize = 25;
 
 fn main() {
     let mut app = App::new();
@@ -120,17 +121,35 @@ fn spawn_units(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let unit = (
-        Mesh3d(meshes.add(Cuboid::new(5.0, 5.0, 5.0))),
-        MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
-        Transform::from_xyz(0.0, 2.5, 0.0),
-        Speed(25.0),
-        Boid::default(), // THIS
-        Unit,
-        Name::new("Unit"),
-    );
+    let mut unit = |pos: Vec3| {
+        (
+            Mesh3d(meshes.add(Cuboid::new(5.0, 5.0, 5.0))),
+            MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
+            Transform::from_translation(pos),
+            Speed(25.0),
+            Boid::default(), // THIS
+            Unit,
+            Name::new("Unit"),
+        )
+    };
 
-    cmds.spawn(unit);
+    let side = (UNIT_COUNT as f32).sqrt().ceil() as u32;
+
+    // spacing between units
+    let spacing = 10.0;
+
+    // offset to center the whole formation on (0,0)
+    let half = (side as f32 - 1.0) * spacing * 0.5;
+
+    for idx in 0..UNIT_COUNT {
+        let col = (idx as u32) % side;
+        let row = (idx as u32) / side;
+
+        let x = col as f32 * spacing - half;
+        let z = row as f32 * spacing - half;
+
+        cmds.spawn(unit(Vec3::new(x, 2.5, z)));
+    }
 }
 
 fn spawn_obstacles(
