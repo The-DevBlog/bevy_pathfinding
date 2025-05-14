@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -254,31 +254,13 @@ fn initialize_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
     grid: ResMut<Grid>,
-    q_windows: Query<&Window, With<PrimaryWindow>>,
-    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
-    q_map_base: Query<&GlobalTransform, With<MapBase>>,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     mut _meshes: ResMut<Assets<Mesh>>, // TODO: Remove
     mut _materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
 ) {
-    let Ok(window) = q_windows.single() else {
-        return;
-    };
-
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-
-    let Ok(cam) = q_cam.single() else {
-        return;
-    };
-
-    let Ok(map_base) = q_map_base.single() else {
-        return;
-    };
-
-    let units = trigger.event().0.clone();
+    let destination_pos = trigger.event().destination_pos;
+    let units = trigger.event().entities.clone();
     if units.is_empty() {
         return;
     }
@@ -310,8 +292,8 @@ fn initialize_flowfield(
         }
     }
 
-    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, cursor_pos);
-    let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
+    // let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, cursor_pos);
+    let destination_cell = grid.get_cell_from_world_position(destination_pos);
 
     let mut ff = FlowField::new(grid.size, units.clone(), units.len() as f32, Vec3::ZERO);
 

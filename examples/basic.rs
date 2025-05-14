@@ -8,12 +8,14 @@ use bevy::{
     math::bounding::Aabb2d,
     prelude::*,
     time::common_conditions::once_after_delay,
+    window::PrimaryWindow,
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 use bevy_rts_pathfinding::{
     components::{Boid, Destination, GameCamera, MapBase, RtsObj},
     events::InitializeFlowFieldEv,
     grid::Grid,
+    utils::get_world_pos,
     BevyRtsPathFindingPlugin,
 };
 
@@ -152,10 +154,29 @@ fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,
     mut q_units: Query<Entity, With<Unit>>,
+    q_map: Query<&GlobalTransform, With<MapBase>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
 ) {
     if !input.just_pressed(MouseButton::Left) {
         return;
     }
+
+    let Ok(map_tf) = q_map.single() else {
+        return;
+    };
+
+    let Ok((cam, cam_transform)) = q_cam.single() else {
+        return;
+    };
+
+    let Ok(window) = q_window.single() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
 
     // THIS
     let mut units = Vec::new();
@@ -163,7 +184,11 @@ fn set_unit_destination(
         units.push(unit_entity);
     }
 
-    cmds.trigger(InitializeFlowFieldEv(units));
+    let destination_pos = get_world_pos(map_tf, cam_transform, cam, cursor_pos);
+    cmds.trigger(InitializeFlowFieldEv {
+        entities: units,
+        destination_pos,
+    });
 }
 
 // THIS
