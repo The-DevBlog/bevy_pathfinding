@@ -38,8 +38,8 @@ impl Default for DbgOptions {
             draw_grid: true,
             draw_spatial_hashing_grid: false,
             print_statements: true,
-            draw_mode_1: DrawMode::None,
-            draw_mode_2: DrawMode::CostField,
+            draw_mode_1: DrawMode::FlowField,
+            draw_mode_2: DrawMode::None,
             boids_info: BoidsInfo::default(),
         }
     }

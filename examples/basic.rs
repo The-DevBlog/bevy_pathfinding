@@ -139,15 +139,20 @@ fn spawn_obstacles(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let size = Vec3::new(25.0, 10.0, 25.0);
-    let obstacle = (
-        Mesh3d(meshes.add(Cuboid::from_size(size))),
-        MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
-        Transform::from_xyz(0.0, 5.0, 50.0),
-        RtsObj(size.xz()), // THIS
-        Name::new("Obstacle"),
-    );
+    let mut obstacle = |pos: Vec3| {
+        (
+            Mesh3d(meshes.add(Cuboid::from_size(size))),
+            MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
+            Transform::from_translation(pos),
+            RtsObj(size.xz()), // THIS
+            Name::new("Obstacle"),
+        )
+    };
 
-    cmds.spawn(obstacle);
+    cmds.spawn(obstacle(Vec3::new(-100.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(100.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, 100.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, -100.0)));
 }
 
 fn set_unit_destination(
