@@ -1,7 +1,13 @@
+use std::time::Duration;
+
 use bevy::{
-    color::palettes::tailwind::{BLUE_500, GREEN_600},
+    color::palettes::{
+        css::GREY,
+        tailwind::{BLUE_500, GREEN_600},
+    },
     math::bounding::Aabb2d,
     prelude::*,
+    time::common_conditions::on_timer,
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 use bevy_rts_pathfinding::{
@@ -30,6 +36,7 @@ fn main() {
             Update,
             (
                 set_unit_destination,
+                spawn_obstacles.run_if(on_timer(Duration::from_millis(100))),
                 move_unit.run_if(any_with_component::<Destination>),
                 count_dest,
             ),
@@ -116,7 +123,7 @@ fn spawn_units(
         MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
         Transform::from_xyz(0.0, 2.5, 0.0),
         Speed(25.0),
-        RtsObj, // THIS
+        Boid::default(), // THIS
         Unit,
         Name::new("Unit"),
     );
@@ -124,7 +131,23 @@ fn spawn_units(
     cmds.spawn(unit);
 }
 
-// THIS
+fn spawn_obstacles(
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let obstacle = (
+        Mesh3d(meshes.add(Cuboid::new(25.0, 10.0, 25.0))),
+        MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
+        Transform::from_xyz(0.0, 5.0, 50.0),
+        RtsObj,
+        Unit,
+        Name::new("Obstacle"),
+    );
+
+    cmds.spawn(obstacle);
+}
+
 fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,

@@ -25,7 +25,6 @@ pub struct Destination;
 pub struct RtsObjSize(pub Vec3);
 
 #[derive(Component, Default)]
-#[require(Boid)]
 pub struct RtsObj;
 
 #[derive(Component, Debug)]

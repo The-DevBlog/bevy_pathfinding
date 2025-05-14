@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     cell::Cell,
-    components::{Destination, RtsObj, RtsObjSize},
+    components::{RtsObj, RtsObjSize},
     events::UpdateCostEv,
     utils,
 };
@@ -14,11 +14,7 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>().add_systems(
             Update,
-            (
-                update_costfield_on_add,
-                update_costfield_on_remove,
-                remove_rts_obj,
-            ),
+            (update_costfield_on_add, update_costfield_on_remove),
         );
     }
 }
@@ -181,16 +177,5 @@ fn update_costfield_on_remove(
     if !objs.is_empty() {
         grid.reset_cell_costs(objs);
         cmds.trigger(UpdateCostEv);
-    }
-}
-
-fn remove_rts_obj(mut cmds: Commands, q_units: Query<Entity, Added<Destination>>) {
-    let units = q_units.iter().collect::<Vec<_>>();
-    if units.is_empty() {
-        return;
-    }
-
-    for ent in units.iter() {
-        cmds.entity(*ent).remove::<RtsObj>();
     }
 }
