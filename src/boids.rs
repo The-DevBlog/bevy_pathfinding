@@ -115,6 +115,7 @@ pub fn calculate_boid_steering(
     }
 }
 
+// TODO: DO I need this?
 fn clear_boids(mut q_vel: Query<&mut Boid>, mut removed: RemovedComponents<Destination>) {
     // let ents: Vec<Entity> = removed.read().collect();
     // for ent in ents {
