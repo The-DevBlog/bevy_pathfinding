@@ -150,6 +150,9 @@ fn spawn_units(
 
         cmds.spawn(unit(Vec3::new(x, 2.5, z)));
     }
+
+    // cmds.spawn(unit(Vec3::new(50.0, 2.5, 0.0)));
+    // cmds.spawn(unit(Vec3::new(-50.0, 2.5, 0.0)));
 }
 
 fn spawn_obstacles(

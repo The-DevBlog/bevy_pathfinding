@@ -1,3 +1,4 @@
+use bevy::math::FloatPow;
 use bevy::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -39,7 +40,7 @@ impl FlowField {
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
         FlowField {
-            destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
+            destination_radius: (units.len() as f32 * unit_count).sqrt() * 3.0,
             offset,
             size,
             steering_map,
@@ -210,43 +211,133 @@ impl FlowField {
     }
 }
 
+// fn flowfield_group_stop_system(
+//     mut cmds: Commands,
+//     mut q_ff: Query<(Entity, &mut FlowField)>,
+//     q_tf: Query<(&Transform, &Boid)>,
+//     q_dest: Query<&Destination>,
+// ) {
+//     for (ff_ent, mut ff) in q_ff.iter_mut() {
+//         let mut unit_has_arrived = ff.arrived;
+
+//         for unit in ff.units.iter() {
+//             let Ok((unit_tf, boid)) = q_tf.get(*unit) else {
+//                 continue;
+//             };
+
+//             let distance = unit_tf
+//                 .translation
+//                 .distance_squared(ff.destination_cell.world_pos);
+
+//             // TODO: Need to make 25.0 not a magic number
+//             if !unit_has_arrived && distance < 25.0 {
+//                 println!("Unit has arrived at destination");
+//                 cmds.entity(*unit).remove::<Destination>();
+//                 unit_has_arrived = true;
+//                 continue;
+//             }
+
+//             // if unit is making contact with another boid in the flowfield group that does NOT have a destination component, then remove the destination component
+
+//             // 2) contact check: compare against *any* other boid in this group
+//             //    that no longer has a Destination
+//             for &other in &ff.units {
+//                 if other == *unit {
+//                     continue;
+//                 }
+//                 // skip anyone who *still* has a Destination
+//                 if q_dest.get(*unit).is_ok() {
+//                     continue;
+//                 }
+//                 // get the other boid’s transform
+//                 let Ok((other_tf, other_boid)) = q_tf.get(other) else {
+//                     continue;
+//                 };
+
+//                 let contact_dist2 = unit_tf.translation.distance_squared(other_tf.translation);
+//                 // if they’re “touching” (within the same radius), drop this unit’s Destination
+
+//                 if contact_dist2 <= boid.info.neighbor_radius {
+//                     println!("Secondary unit has arrived at destination");
+//                     cmds.entity(*unit).remove::<Destination>();
+//                     break;
+//                 }
+//             }
+//         }
+
+//         ff.arrived = unit_has_arrived;
+
+//         // if unit_has_arrived {
+//         //     for &unit in &ff.units {
+//         //         cmds.entity(unit).remove::<Destination>();
+//         //     }
+//         //     cmds.entity(ff_ent).despawn();
+//         // }
+//     }
+// }
+
 fn flowfield_group_stop_system(
     mut cmds: Commands,
-    mut query: Query<(Entity, &mut FlowField)>,
-    tf_query: Query<&Transform>,
+    mut q_ff: Query<(Entity, &mut FlowField)>,
+    q_tf: Query<(&Transform, &Boid)>,
+    q_dest: Query<&Destination>,
 ) {
-    for (ff_ent, mut ff) in query.iter_mut() {
-        // skip empty or already‐stopped fields
-        if ff.arrived || ff.units.is_empty() {
-            continue;
-        }
+    for (_ff_ent, mut ff) in q_ff.iter_mut() {
+        // 1) Have we already marked one arrival?
+        let mut any_arrived = ff.arrived;
 
-        // compute centroid of the group
-        let (sum, count) = ff
+        // 2) Build a list of boids that have NO Destination (i.e. have arrived)
+        let mut arrived_list: Vec<Entity> = ff
             .units
             .iter()
-            .filter_map(|&u| tf_query.get(u).ok().map(|tf| tf.translation))
-            .fold((Vec3::ZERO, 0), |(sum, count), pos| (sum + pos, count + 1));
-        if count == 0 {
-            continue;
-        }
-        let centroid = sum / count as f32;
+            .copied()
+            .filter(|&u| q_dest.get(u).is_err())
+            .collect();
 
-        // compare centroid to the world‐space goal
-        let goal = ff.destination_cell.world_pos;
-        if (centroid - goal).length() < ff.destination_radius {
-            // → only _now_ do we stop the entire group
-            ff.arrived = true;
-            ff.steering_map.clear();
-
-            for &unit_ent in &ff.units {
-                cmds.entity(unit_ent).remove::<Destination>();
+        // 3) If nobody’s arrived yet, look for the first winner
+        if !any_arrived {
+            // let threshold2 = ff.destination_radius.powi(2);
+            let threshold2 = 25.0; // TODO: Make this not a magic number
+            if let Some(&winner) = ff.units.iter().find(|&&u| {
+                if let Ok((tf, _)) = q_tf.get(u) {
+                    tf.translation
+                        .distance_squared(ff.destination_cell.world_pos)
+                        < threshold2
+                } else {
+                    false
+                }
+            }) {
+                // remove *that* unit’s destination
+                cmds.entity(winner).remove::<Destination>();
+                arrived_list.push(winner);
+                any_arrived = true;
             }
-
-            ff.units.clear();
-
-            cmds.entity(ff_ent).despawn();
         }
+
+        // 4) Now for every unit that still *has* a Destination, check contact
+        for &u in &ff.units {
+            // skip the ones that have already arrived
+            if q_dest.get(u).is_err() {
+                continue;
+            }
+            // load its transform & boid info
+            if let Ok((tf_u, boid_u)) = q_tf.get(u) {
+                let nr2 = boid_u.info.neighbor_radius + 80.0;
+                // let nr2 = boid_u.info.neighbor_radius.powi(2);
+                // if it’s within radius of ANY arrived boid, drop its Dest too
+                for &a in &arrived_list {
+                    if let Ok((tf_a, _)) = q_tf.get(a) {
+                        if tf_u.translation.distance_squared(tf_a.translation) < nr2 {
+                            cmds.entity(u).remove::<Destination>();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5) record that “someone” has arrived, so we don’t re-run step 3
+        ff.arrived = any_arrived;
     }
 }
 
