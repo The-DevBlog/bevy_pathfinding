@@ -7,7 +7,7 @@ use bevy::{
     },
     math::bounding::Aabb2d,
     prelude::*,
-    time::common_conditions::on_timer,
+    time::common_conditions::once_after_delay,
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 use bevy_rts_pathfinding::{
@@ -36,7 +36,7 @@ fn main() {
             Update,
             (
                 set_unit_destination,
-                spawn_obstacles.run_if(on_timer(Duration::from_millis(100))),
+                spawn_obstacles.run_if(once_after_delay(Duration::from_millis(100))),
                 move_unit.run_if(any_with_component::<Destination>),
                 count_dest,
             ),
@@ -136,11 +136,12 @@ fn spawn_obstacles(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let size = Vec3::new(25.0, 10.0, 25.0);
     let obstacle = (
-        Mesh3d(meshes.add(Cuboid::new(25.0, 10.0, 25.0))),
+        Mesh3d(meshes.add(Cuboid::from_size(size))),
         MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
         Transform::from_xyz(0.0, 5.0, 50.0),
-        RtsObj,
+        RtsObj(size.xz()), // THIS
         Unit,
         Name::new("Obstacle"),
     );

@@ -21,11 +21,8 @@ pub struct GameCamera;
 #[derive(Component)]
 pub struct Destination;
 
-#[derive(Component)]
-pub struct RtsObjSize(pub Vec3);
-
 #[derive(Component, Default)]
-pub struct RtsObj;
+pub struct RtsObj(pub Vec2);
 
 #[derive(Component, Debug)]
 pub struct Boid {
