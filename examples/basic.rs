@@ -142,7 +142,6 @@ fn spawn_obstacles(
         MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
         Transform::from_xyz(0.0, 5.0, 50.0),
         RtsObj(size.xz()), // THIS
-        Unit,
         Name::new("Obstacle"),
     );
 
