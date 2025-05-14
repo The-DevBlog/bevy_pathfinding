@@ -45,7 +45,7 @@ fn main() {
 }
 
 fn count_dest(q: Query<&Destination>) {
-    println!("dest count: {}", q.iter().count());
+    // println!("dest count: {}", q.iter().count());
 }
 
 #[derive(Component)]
@@ -157,6 +157,7 @@ fn set_unit_destination(
         return;
     }
 
+    // THIS
     let mut units = Vec::new();
     for unit_entity in q_units.iter_mut() {
         units.push(unit_entity);
