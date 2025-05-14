@@ -211,71 +211,6 @@ impl FlowField {
     }
 }
 
-// fn flowfield_group_stop_system(
-//     mut cmds: Commands,
-//     mut q_ff: Query<(Entity, &mut FlowField)>,
-//     q_tf: Query<(&Transform, &Boid)>,
-//     q_dest: Query<&Destination>,
-// ) {
-//     for (ff_ent, mut ff) in q_ff.iter_mut() {
-//         let mut unit_has_arrived = ff.arrived;
-
-//         for unit in ff.units.iter() {
-//             let Ok((unit_tf, boid)) = q_tf.get(*unit) else {
-//                 continue;
-//             };
-
-//             let distance = unit_tf
-//                 .translation
-//                 .distance_squared(ff.destination_cell.world_pos);
-
-//             // TODO: Need to make 25.0 not a magic number
-//             if !unit_has_arrived && distance < 25.0 {
-//                 println!("Unit has arrived at destination");
-//                 cmds.entity(*unit).remove::<Destination>();
-//                 unit_has_arrived = true;
-//                 continue;
-//             }
-
-//             // if unit is making contact with another boid in the flowfield group that does NOT have a destination component, then remove the destination component
-
-//             // 2) contact check: compare against *any* other boid in this group
-//             //    that no longer has a Destination
-//             for &other in &ff.units {
-//                 if other == *unit {
-//                     continue;
-//                 }
-//                 // skip anyone who *still* has a Destination
-//                 if q_dest.get(*unit).is_ok() {
-//                     continue;
-//                 }
-//                 // get the other boid’s transform
-//                 let Ok((other_tf, other_boid)) = q_tf.get(other) else {
-//                     continue;
-//                 };
-
-//                 let contact_dist2 = unit_tf.translation.distance_squared(other_tf.translation);
-//                 // if they’re “touching” (within the same radius), drop this unit’s Destination
-
-//                 if contact_dist2 <= boid.info.neighbor_radius {
-//                     println!("Secondary unit has arrived at destination");
-//                     cmds.entity(*unit).remove::<Destination>();
-//                     break;
-//                 }
-//             }
-//         }
-
-//         ff.arrived = unit_has_arrived;
-
-//         // if unit_has_arrived {
-//         //     for &unit in &ff.units {
-//         //         cmds.entity(unit).remove::<Destination>();
-//         //     }
-//         //     cmds.entity(ff_ent).despawn();
-//         // }
-//     }
-// }
-
 fn flowfield_group_stop_system(
     mut cmds: Commands,
     mut q_ff: Query<(Entity, &mut FlowField)>,
@@ -296,7 +231,6 @@ fn flowfield_group_stop_system(
 
         // 3) If nobody’s arrived yet, look for the first winner
         if !any_arrived {
-            // let threshold2 = ff.destination_radius.powi(2);
             let threshold2 = 25.0; // TODO: Make this not a magic number
             if let Some(&winner) = ff.units.iter().find(|&&u| {
                 if let Ok((tf, _)) = q_tf.get(u) {
@@ -322,8 +256,8 @@ fn flowfield_group_stop_system(
             }
             // load its transform & boid info
             if let Ok((tf_u, boid_u)) = q_tf.get(u) {
-                let nr2 = boid_u.info.neighbor_radius + 80.0;
-                // let nr2 = boid_u.info.neighbor_radius.powi(2);
+                let nr2 = boid_u.info.neighbor_radius + 80.0; // TODO: Make this not a magic number
+
                 // if it’s within radius of ANY arrived boid, drop its Dest too
                 for &a in &arrived_list {
                     if let Ok((tf_a, _)) = q_tf.get(a) {
