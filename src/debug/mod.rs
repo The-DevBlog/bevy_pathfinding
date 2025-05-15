@@ -5,9 +5,9 @@ use resources::ResourcesPlugin;
 use shader::ShaderPlugin;
 use ui::UiPlugin;
 
-pub mod components;
+mod components;
 pub mod draw;
-mod resources;
+pub mod resources;
 mod shader;
 mod ui;
 

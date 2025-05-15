@@ -12,11 +12,7 @@ use bevy::{
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 use bevy_rts_pathfinding::{
-    components::{Boid, Destination, GameCamera, MapBase, RtsObj},
-    debug::components::DebugUI,
-    events::InitializeFlowFieldEv,
-    grid::Grid,
-    utils::get_world_pos,
+    components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
     BevyRtsPathFindingPlugin,
 };
 
@@ -42,14 +38,9 @@ fn main() {
                 set_unit_destination,
                 spawn_obstacles.run_if(once_after_delay(Duration::from_millis(100))),
                 move_unit.run_if(any_with_component::<Destination>),
-                count_dest,
             ),
         )
         .run();
-}
-
-fn count_dest(q: Query<&Destination>) {
-    // println!("dest count: {}", q.iter().count());
 }
 
 #[derive(Component)]
@@ -185,14 +176,10 @@ fn set_unit_destination(
     q_map: Query<&GlobalTransform, With<MapBase>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_window: Query<&Window, With<PrimaryWindow>>,
-    q_dbg_ui: Query<&Interaction, With<DebugUI>>,
+    dbg_options: ResMut<DbgOptions>,
 ) {
-    for interaction in q_dbg_ui.iter() {
-        println!("dbg ui: {:?}", interaction);
-        if *interaction != Interaction::None {
-            println!("RETURNING");
-            return;
-        }
+    if dbg_options.hover {
+        return;
     }
 
     if !input.just_pressed(MouseButton::Left) {
@@ -221,7 +208,7 @@ fn set_unit_destination(
         units.push(unit_entity);
     }
 
-    let destination_pos = get_world_pos(map_tf, cam_transform, cam, cursor_pos);
+    let destination_pos = utils::get_world_pos(map_tf, cam_transform, cam, cursor_pos);
     cmds.trigger(InitializeFlowFieldEv {
         entities: units,
         destination_pos,

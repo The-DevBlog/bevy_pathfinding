@@ -22,25 +22,27 @@ pub struct DbgIcon(pub Handle<Image>);
 #[derive(Reflect, Resource, Clone, Copy)]
 #[reflect(Resource)]
 pub struct DbgOptions {
-    pub hide: bool,
+    pub boids_info: BoidsInfo,
     pub draw_grid: bool,
     pub draw_spatial_hashing_grid: bool,
-    pub print_statements: bool,
     pub draw_mode_1: DrawMode,
     pub draw_mode_2: DrawMode,
-    pub boids_info: BoidsInfo,
+    pub hide: bool,
+    pub hover: bool,
+    pub print_statements: bool,
 }
 
 impl Default for DbgOptions {
     fn default() -> Self {
         DbgOptions {
-            hide: false,
+            boids_info: BoidsInfo::default(),
             draw_grid: true,
             draw_spatial_hashing_grid: false,
-            print_statements: true,
             draw_mode_1: DrawMode::FlowField,
             draw_mode_2: DrawMode::None,
-            boids_info: BoidsInfo::default(),
+            hide: false,
+            hover: false,
+            print_statements: true,
         }
     }
 }

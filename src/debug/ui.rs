@@ -1,4 +1,5 @@
 use crate::components::BoidsInfoUpdater;
+use crate::events::DrawAllEv;
 
 use super::components::*;
 use super::resources;
@@ -25,6 +26,7 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
+                    set_dbg_ui_hover,
                     update_cursor_icon_grab.run_if(resource_added::<DragState>),
                     update_cursor_icon_default.run_if(resource_removed::<DragState>),
                     slider_drag_start_end.before(slider_drag_update),
@@ -159,6 +161,7 @@ fn handle_drawmode_option_interaction(
                     OptionsSet::Two => dbg.draw_mode_2 = DrawMode::cast(option.txt.clone()),
                 }
 
+                cmds.trigger(DrawAllEv);
                 cmds.trigger(UpdateDropdownOptionEv);
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -168,6 +171,7 @@ fn handle_drawmode_option_interaction(
 }
 
 fn handle_draw_grid_interaction(
+    mut cmds: Commands,
     mut q_draw_grid: Query<
         (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<DrawGridBtn>),
@@ -179,6 +183,7 @@ fn handle_draw_grid_interaction(
         match interaction {
             Interaction::Pressed => {
                 dbg.draw_grid = !dbg.draw_grid;
+                cmds.trigger(DrawAllEv);
 
                 if let Ok(mut txt) = q_txt.single_mut() {
                     txt.0 = format!("Grid: {}", dbg.draw_grid);
@@ -202,6 +207,7 @@ fn handle_hide_dbg_interaction(
         match interaction {
             Interaction::Pressed => {
                 cmds.trigger(ToggleDbgVisibilityEv(dbg.hide));
+                cmds.trigger(DrawAllEv);
                 dbg.hide = !dbg.hide;
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -990,5 +996,38 @@ fn update_cursor_icon_default(mut q_cursor: Query<&mut CursorIcon>) {
 fn remove_drag_on_win_focus_lost(input: Res<ButtonInput<MouseButton>>, mut cmds: Commands) {
     if input.just_released(MouseButton::Left) {
         cmds.remove_resource::<DragState>();
+    }
+}
+
+fn set_dbg_ui_hover(
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    mut q_root_ctr: Query<(&GlobalTransform, &ComputedNode), With<RootCtr>>,
+    mut dbg_options: ResMut<DbgOptions>,
+) {
+    let Ok(window) = q_window.single() else {
+        return;
+    };
+
+    let Some(cursor) = window.cursor_position() else {
+        return;
+    };
+
+    for (tf, style) in q_root_ctr.iter_mut() {
+        let (w, h) = (style.content_size.x, style.content_size.y);
+
+        // compute box corners in window‐space
+        // Bevy UI positions are in “pixels from the bottom‐left” by default
+        let pos = tf.translation();
+        let min_x = pos.x - w * 0.5;
+        let max_x = pos.x + w * 0.5;
+        let min_y = pos.y - h * 0.5;
+        let max_y = pos.y + h * 0.5;
+
+        // simple AABB test
+        if cursor.x >= min_x && cursor.x <= max_x && cursor.y >= min_y && cursor.y <= max_y {
+            dbg_options.hover = true;
+        } else {
+            dbg_options.hover = false;
+        }
     }
 }
