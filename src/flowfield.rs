@@ -10,14 +10,10 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (flowfield_group_stop_system, count_ff))
+        app.add_systems(Update, flowfield_group_stop_system)
             .add_observer(update_fields)
             .add_observer(initialize_flowfield);
     }
-}
-
-fn count_ff(q: Query<&FlowField>) {
-    println!("FlowField count: {}", q.iter().count());
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
