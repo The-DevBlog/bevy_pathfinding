@@ -11,7 +11,8 @@ pub struct DrawPlugin;
 
 impl Plugin for DrawPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(trigger_events)
+        app.add_systems(PostStartup, draw_on_startup)
+            .add_observer(trigger_events)
             .add_observer(draw_grid)
             .add_observer(set_active_dbg_flowfield)
             .add_observer(draw_costfield)
@@ -23,6 +24,10 @@ impl Plugin for DrawPlugin {
 
 #[derive(Component)]
 struct GridLine;
+
+fn draw_on_startup(mut cmds: Commands) {
+    cmds.trigger(DrawAllEv);
+}
 
 fn set_active_dbg_flowfield(
     trigger: Trigger<SetActiveFlowfieldEv>,
