@@ -894,25 +894,20 @@ fn slider_drag_start_end(
         (With<BoidsSliderValue>, Changed<Interaction>),
     >,
     mut q_updater: Query<&mut BoidsInfoUpdater>,
-    mut q_cursor: Query<&mut CursorIcon>,
 ) {
-    let Ok(window) = q_window.single() else {
-        return;
-    };
-
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-
-    let Ok(mut cursor) = q_cursor.single_mut() else {
-        return;
-    };
-
-    let Ok(updater) = q_updater.single_mut() else {
-        return;
-    };
-
     for (interaction, mut background_clr, boids_info) in q.iter_mut() {
+        let Ok(window) = q_window.single() else {
+            return;
+        };
+
+        let Some(cursor_pos) = window.cursor_position() else {
+            return;
+        };
+
+        let Ok(updater) = q_updater.single_mut() else {
+            return;
+        };
+
         match *interaction {
             Interaction::Pressed => {
                 if input.just_pressed(MouseButton::Left) {
@@ -931,15 +926,8 @@ fn slider_drag_start_end(
                 }
             }
 
-            Interaction::Hovered => {
-                background_clr.0 = CLR_BTN_HOVER.into();
-                *cursor = SystemCursorIcon::Grabbing.into();
-            }
-
-            Interaction::None => {
-                background_clr.0 = CLR_BACKGROUND_1.into();
-                *cursor = SystemCursorIcon::Default.into();
-            }
+            Interaction::Hovered => background_clr.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background_clr.0 = CLR_BACKGROUND_1.into(),
         }
     }
 }
