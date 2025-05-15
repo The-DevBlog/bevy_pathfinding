@@ -10,10 +10,14 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (flowfield_group_stop_system,))
+        app.add_systems(Update, (flowfield_group_stop_system, count_ff))
             .add_observer(update_fields)
             .add_observer(initialize_flowfield);
     }
+}
+
+fn count_ff(q: Query<&FlowField>) {
+    println!("FlowField count: {}", q.iter().count());
 }
 
 // TODO: Remove. This is just for visualizing the destination radius
@@ -216,7 +220,7 @@ fn flowfield_group_stop_system(
     q_tf: Query<(&Transform, &Boid)>,
     q_dest: Query<&Destination>,
 ) {
-    for (_ff_ent, mut ff) in q_ff.iter_mut() {
+    for (ff_ent, mut ff) in q_ff.iter_mut() {
         // 1) Have we already marked one arrival?
         let mut any_arrived = ff.arrived;
 
@@ -271,6 +275,12 @@ fn flowfield_group_stop_system(
 
         // 5) record that “someone” has arrived, so we don’t re-run step 3
         ff.arrived = any_arrived;
+
+        // 6) if *no* unit still has a Destination, despawn the flow‐field entity
+        let any_left = ff.units.iter().any(|&u| q_dest.get(u).is_ok());
+        if !any_left {
+            cmds.entity(ff_ent).despawn();
+        }
     }
 }
 
