@@ -474,6 +474,7 @@ fn draw_ui_box(
             BorderColor::from(CLR_BORDER),
             Node {
                 padding: UiRect::all(Val::Px(5.0)),
+                border: UiRect::top(Val::Px(1.0)),
                 ..default()
             },
             Name::new("Draw Grid Button"),
