@@ -173,21 +173,38 @@ fn handle_drawmode_option_interaction(
 fn handle_draw_grid_interaction(
     mut cmds: Commands,
     mut q_draw_grid: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<DrawGridBtn>),
+        (&Interaction, &mut BackgroundColor, &DrawGridBtn),
+        Changed<Interaction>,
     >,
-    mut q_txt: Query<&mut Text, With<DrawGridTxt>>,
+    mut q_txt: Query<(&mut Text, &DrawGridTxt)>,
     mut dbg: ResMut<DbgOptions>,
 ) {
-    for (interaction, mut background) in q_draw_grid.iter_mut() {
+    for (interaction, mut background, draw_grid_btn) in q_draw_grid.iter_mut() {
         match interaction {
             Interaction::Pressed => {
-                dbg.draw_grid = !dbg.draw_grid;
-                cmds.trigger(DrawAllEv);
-
-                if let Ok(mut txt) = q_txt.single_mut() {
-                    txt.0 = format!("Grid: {}", dbg.draw_grid);
+                match draw_grid_btn {
+                    DrawGridBtn::Grid => dbg.draw_grid = !dbg.draw_grid,
+                    DrawGridBtn::SpatialGrid => dbg.draw_spatial_grid = !dbg.draw_spatial_grid,
                 }
+
+                for (mut txt, txt_type) in q_txt.iter_mut() {
+                    if (draw_grid_btn == &DrawGridBtn::Grid && *txt_type == DrawGridTxt::Grid)
+                        || (draw_grid_btn == &DrawGridBtn::SpatialGrid
+                            && *txt_type == DrawGridTxt::SpatialGrid)
+                    {
+                        match *txt_type {
+                            DrawGridTxt::Grid => {
+                                txt.0 = format!("Grid: {}", dbg.draw_grid);
+                            }
+                            DrawGridTxt::SpatialGrid => {
+                                txt.0 = format!("Spatial Grid: {}", dbg.draw_spatial_grid);
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                cmds.trigger(DrawAllEv);
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
@@ -449,25 +466,36 @@ fn draw_ui_box(
         TextColor::from(CLR_TITLE),
     );
 
-    let draw_grid_btn = (
-        DrawGridBtn,
-        VisibleNode,
-        BackgroundColor::from(CLR_BACKGROUND_2),
-        BorderColor::from(CLR_BORDER),
-        Node {
-            padding: UiRect::all(Val::Px(5.0)),
-            ..default()
-        },
-        Name::new("Draw Grid Button"),
-    );
+    let draw_grid_btn = |draw_grid_btn: DrawGridBtn| {
+        (
+            draw_grid_btn,
+            VisibleNode,
+            BackgroundColor::from(CLR_BACKGROUND_2),
+            BorderColor::from(CLR_BORDER),
+            Node {
+                padding: UiRect::all(Val::Px(5.0)),
+                ..default()
+            },
+            Name::new("Draw Grid Button"),
+        )
+    };
 
-    let draw_grid_txt = (
-        DrawGridTxt,
-        Text::new(format!("Grid: {}", dbg.draw_grid)),
-        TextFont::from_font_size(FONT_SIZE),
-        TextColor::from(CLR_TXT),
-        Name::new("Draw Grid Txt"),
-    );
+    let draw_grid_txt = |draw_grid_txt: DrawGridTxt, draw_grid: bool| {
+        let txt = match draw_grid_txt {
+            DrawGridTxt::Grid => "Grid",
+            DrawGridTxt::SpatialGrid => "Spatial Grid",
+        };
+
+        (
+            draw_grid_txt,
+            // Text::new(format!("Grid: {}", dbg.draw_grid)),
+            // Text::new(format!("{}: {}", txt, draw_grid)),
+            Text::new(format!("{}: {}", txt, draw_grid)),
+            TextFont::from_font_size(FONT_SIZE),
+            TextColor::from(CLR_TXT),
+            Name::new("Draw Grid Txt"),
+        )
+    };
 
     let dropdown_btn = |set: OptionsSet| DropDownBtnBundle {
         comp: DropdownBtn(set),
@@ -683,9 +711,19 @@ fn draw_ui_box(
         });
 
         // Draw Grid
-        ctr.spawn(draw_grid_btn).with_children(|ctr| {
-            ctr.spawn(draw_grid_txt);
-        });
+        ctr.spawn(draw_grid_btn(DrawGridBtn::Grid))
+            .with_children(|ctr| {
+                ctr.spawn(draw_grid_txt(DrawGridTxt::Grid, dbg.draw_grid));
+            });
+
+        // Draw Spatial Grid
+        ctr.spawn(draw_grid_btn(DrawGridBtn::SpatialGrid))
+            .with_children(|ctr| {
+                ctr.spawn(draw_grid_txt(
+                    DrawGridTxt::SpatialGrid,
+                    dbg.draw_spatial_grid,
+                ));
+            });
 
         // Draw Mode 1 Container
         ctr.spawn(dropdown_btn(OptionsSet::One))

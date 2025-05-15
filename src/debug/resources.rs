@@ -24,6 +24,7 @@ pub struct DbgIcon(pub Handle<Image>);
 pub struct DbgOptions {
     pub boids_info: BoidsInfo,
     pub draw_grid: bool,
+    pub draw_spatial_grid: bool,
     pub draw_spatial_hashing_grid: bool,
     pub draw_mode_1: DrawMode,
     pub draw_mode_2: DrawMode,
@@ -37,6 +38,7 @@ impl Default for DbgOptions {
         DbgOptions {
             boids_info: BoidsInfo::default(),
             draw_grid: true,
+            draw_spatial_grid: false,
             draw_spatial_hashing_grid: false,
             draw_mode_1: DrawMode::FlowField,
             draw_mode_2: DrawMode::None,

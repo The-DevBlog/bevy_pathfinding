@@ -1,8 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    f32::consts::PI,
+};
 
-use bevy::prelude::*;
+use bevy::{color::palettes::css::YELLOW, prelude::*};
 
-use crate::{components::*, flowfield::FlowField, grid::Grid};
+use crate::{components::*, debug::resources::DbgOptions, flowfield::FlowField, grid::Grid};
 
 pub struct BoidsPlugin;
 
@@ -18,7 +21,8 @@ pub fn calculate_boid_steering(
     mut q_boids: Query<(Entity, &Transform, &mut Boid)>,
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
-    mut _gizmos: Gizmos,
+    mut gizmos: Gizmos,
+    dbg_options: Res<DbgOptions>,
 ) {
     let dt = time.delta_secs();
 
@@ -38,13 +42,15 @@ pub fn calculate_boid_steering(
     let origin = grid.grid[columns / 2][rows / 2].world_pos; // assume Vec2 or Vec3 with x/z
 
     // draw bucket grid
-    // let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
-    // _gizmos.grid(
-    //     Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
-    //     UVec2::new(bucket_size as u32, bucket_size as u32),
-    //     Vec2::new(spacing, spacing),
-    //     YELLOW,
-    // );
+    if dbg_options.draw_spatial_grid {
+        let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
+        gizmos.grid(
+            Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
+            UVec2::new(bucket_size as u32, bucket_size as u32),
+            Vec2::new(spacing, spacing),
+            YELLOW,
+        );
+    }
 
     for (ent, pos, vel) in &snapshot {
         let cell_x = ((pos.x - origin.x) / bucket_size).floor() as i32;

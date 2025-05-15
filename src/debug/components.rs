@@ -14,12 +14,18 @@ pub struct HideDbgBtn;
 #[derive(Component)]
 pub struct DebugUI;
 
-#[derive(Component)]
+#[derive(Component, PartialEq)]
 #[require(Button)]
-pub struct DrawGridBtn;
+pub enum DrawGridBtn {
+    Grid,
+    SpatialGrid,
+}
 
-#[derive(Component)]
-pub struct DrawGridTxt;
+#[derive(Component, PartialEq)]
+pub enum DrawGridTxt {
+    Grid,
+    SpatialGrid,
+}
 
 #[derive(Component)]
 #[require(Button)]
