@@ -13,6 +13,7 @@ use bevy::{
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 use bevy_rts_pathfinding::{
     components::{Boid, Destination, GameCamera, MapBase, RtsObj},
+    debug::components::DebugUI,
     events::InitializeFlowFieldEv,
     grid::Grid,
     utils::get_world_pos,
@@ -184,7 +185,16 @@ fn set_unit_destination(
     q_map: Query<&GlobalTransform, With<MapBase>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_window: Query<&Window, With<PrimaryWindow>>,
+    q_dbg_ui: Query<&Interaction, With<DebugUI>>,
 ) {
+    for interaction in q_dbg_ui.iter() {
+        println!("dbg ui: {:?}", interaction);
+        if *interaction != Interaction::None {
+            println!("RETURNING");
+            return;
+        }
+    }
+
     if !input.just_pressed(MouseButton::Left) {
         return;
     }

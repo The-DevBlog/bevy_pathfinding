@@ -400,6 +400,7 @@ fn draw_ui_box(
             border: UiRect::all(Val::Px(1.0)),
             ..default()
         },
+        Button::default(),
         BorderColor::from(CLR_BORDER),
         BorderRadius::all(Val::Px(10.0)),
         BackgroundColor::from(CLR_BACKGROUND_1),
