@@ -17,6 +17,7 @@ use bevy_rts_pathfinding::{
 };
 
 const CELL_SIZE: f32 = 10.0;
+const BUCKETS: f32 = 5.0;
 const MAP_GRID: IVec2 = IVec2::new(50, 50);
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
@@ -25,7 +26,7 @@ const UNIT_COUNT: usize = 25;
 fn main() {
     let mut app = App::new();
 
-    app.insert_resource(Grid::new(MAP_GRID, CELL_SIZE)) // THIS
+    app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // THIS
         .add_plugins((
             DefaultPlugins,
             RtsCameraPlugin,

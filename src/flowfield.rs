@@ -329,7 +329,6 @@ fn initialize_flowfield(
 
     ff.create_integration_field(grid.grid.clone(), destination_cell.idx);
     ff.create_flowfield();
-
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
     let _ff_ent = cmds

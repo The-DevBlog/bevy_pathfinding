@@ -17,6 +17,7 @@ impl Plugin for GridPlugin {
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct Grid {
+    pub buckets: f32,
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
@@ -27,8 +28,9 @@ pub struct Grid {
 impl Grid {
     // creates the grid and the costfield
     // all flowfields will share the same costfield
-    pub fn new(size: IVec2, cell_diameter: f32) -> Self {
+    pub fn new(buckets: f32, size: IVec2, cell_diameter: f32) -> Self {
         let mut grid = Grid {
+            buckets,
             cell_diameter,
             cell_radius: cell_diameter / 2.0,
             grid: Vec::default(),
