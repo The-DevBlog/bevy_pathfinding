@@ -26,85 +26,90 @@ pub fn calculate_boid_steering(
 ) {
     let dt = time.delta_secs();
 
-    // 1) Snapshot all boid positions & velocities
+    // → WORLD dimensions (in world‐units), given cell_diameter and grid.size
+    let world_width = grid.size.x as f32 * grid.cell_diameter;
+    let world_depth = grid.size.y as f32 * grid.cell_diameter;
+
+    // → Number of buckets per axis
+    const BUCKETS_X: u32 = 10;
+    const BUCKETS_Y: u32 = 10;
+
+    // → Size of each bucket in world‐space
+    let bucket_size_x = world_width / BUCKETS_X as f32;
+    let bucket_size_y = world_depth / BUCKETS_Y as f32;
+
+    // → Find the “center” origin same as your bucket math
+    let cols = grid.grid.len();
+    let rows = grid.grid[0].len();
+    let origin = grid.grid[cols / 2][rows / 2].world_pos;
+
+    // 1) Snapshot all positions & velocities
     let snapshot: Vec<(Entity, Vec3, Vec3)> = q_boids
         .iter()
         .map(|(e, tf, b)| (e, tf.translation, b.velocity))
         .collect();
 
-    // 2) Build local bucket map: (cell_x, cell_y) -> Vec<(Entity, pos, vel)>
-    let mut buckets: HashMap<(i32, i32), Vec<(Entity, Vec3, Vec3)>> =
-        HashMap::with_capacity(snapshot.len());
-
-    let bucket_size: f32 = (grid.size.x as f32) / 10.0;
-    let columns = grid.grid.len();
-    let rows = grid.grid[0].len();
-    let origin = grid.grid[columns / 2][rows / 2].world_pos; // assume Vec2 or Vec3 with x/z
-
-    // draw bucket grid
+    // 2) Draw the spatial‐grid gizmo if requested
     if dbg_options.draw_spatial_grid {
-        let spacing = grid.grid.len() as f32 * grid.cell_diameter / 10.0;
         gizmos.grid(
             Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
-            UVec2::new(bucket_size as u32, bucket_size as u32),
-            Vec2::new(spacing, spacing),
+            UVec2::new(BUCKETS_X, BUCKETS_Y),
+            Vec2::new(bucket_size_x, bucket_size_y),
             YELLOW,
         );
     }
 
-    for (ent, pos, vel) in &snapshot {
-        let cell_x = ((pos.x - origin.x) / bucket_size).floor() as i32;
-        let cell_y = ((pos.z - origin.z) / bucket_size).floor() as i32;
-        buckets
-            .entry((cell_x, cell_y))
-            .or_default()
-            .push((*ent, *pos, *vel));
+    // 3) Build bucket map: (bx,by) → list of boids in that cell
+    let mut buckets: HashMap<(i32, i32), Vec<(Entity, Vec3, Vec3)>> =
+        HashMap::with_capacity(snapshot.len());
+
+    for &(ent, pos, vel) in &snapshot {
+        let bx = ((pos.x - origin.x) / bucket_size_x).floor() as i32;
+        let by = ((pos.z - origin.y) / bucket_size_y).floor() as i32;
+        buckets.entry((bx, by)).or_default().push((ent, pos, vel));
     }
 
-    // 3) For each flow-field, steer only against boids in the 3×3 neighbor cells
+    // 4) For each FlowField, compute steering only against 3×3 neighbor buckets
     for mut ff in q_ff.iter_mut() {
-        let mut pending: Vec<(Entity, Vec3)> = Vec::new();
+        let mut pending: Vec<(Entity, Vec3)> = Vec::with_capacity(ff.units.len());
 
         for &unit in &ff.units {
             if let Ok((_, tf, mut boid)) = q_boids.get_mut(unit) {
-                // Boid's own cell
-                let cx = ((tf.translation.x - origin.x) / bucket_size).floor() as i32;
-                let cy = ((tf.translation.z - origin.y) / bucket_size).floor() as i32;
+                // determine which bucket this boid is in
+                let bx = ((tf.translation.x - origin.x) / bucket_size_x).floor() as i32;
+                let by = ((tf.translation.z - origin.y) / bucket_size_y).floor() as i32;
 
-                // Gather neighbor data with hysteresis
+                // gather neighbors with hysteresis
                 let enter_r2 = boid.info.neighbor_radius.powi(2);
                 let exit_r2 = boid.info.neighbor_exit_radius.powi(2);
                 let mut current_neighbors = HashSet::new();
-                let mut neighbor_data = Vec::new();
+                let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
 
                 for dx in -1..=1 {
                     for dy in -1..=1 {
-                        if let Some(bucket) = buckets.get(&(cx + dx, cy + dy)) {
-                            for &(other_ent, other_pos, other_vel) in bucket {
-                                let dist2 = tf.translation.distance_squared(other_pos);
-                                let was_neighbor = boid.prev_neighbors.contains(&other_ent);
+                        if let Some(bucket) = buckets.get(&(bx + dx, by + dy)) {
+                            for &(_e, pos, vel) in bucket {
+                                let dist2 = tf.translation.distance_squared(pos);
+                                let was_neighbor = boid.prev_neighbors.contains(&_e);
                                 if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
-                                    current_neighbors.insert(other_ent);
-                                    neighbor_data.push((other_pos, other_vel));
+                                    current_neighbors.insert(_e);
+                                    neighbor_data.push((pos, vel));
                                 }
                             }
                         }
                     }
                 }
 
-                // Compute boid forces
+                // compute classic boid forces
                 let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
 
-                // Sample flow-field
+                // sample your flow‐field
                 let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // Smooth steering
+                // smooth and integrate
                 let raw = sep + ali + coh + flow_force;
-                let alpha = 0.1;
-                let smooth = boid.prev_steer.lerp(raw, alpha);
-
-                // Apply to velocity & position
+                let smooth = boid.prev_steer.lerp(raw, 0.1);
                 boid.prev_steer = smooth;
                 boid.steering = smooth;
                 boid.velocity += smooth * dt;
@@ -114,13 +119,12 @@ pub fn calculate_boid_steering(
             }
         }
 
-        // Write all steering values back to the flow-field
+        // 5) write back into the FlowField if you still need it
         for (unit, steer) in pending {
             ff.steering_map.insert(unit, steer);
         }
     }
 }
-
 // TODO: DO I need this?
 fn clear_boids(mut q_vel: Query<&mut Boid>, mut removed: RemovedComponents<Destination>) {
     // let ents: Vec<Entity> = removed.read().collect();
