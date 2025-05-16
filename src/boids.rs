@@ -31,12 +31,11 @@ pub fn calculate_boid_steering(
     let world_depth = grid.size.y as f32 * grid.cell_diameter;
 
     // → Number of buckets per axis
-    const BUCKETS_X: u32 = 10;
-    const BUCKETS_Y: u32 = 10;
+    const BUCKETS: u32 = 10;
 
     // → Size of each bucket in world‐space
-    let bucket_size_x = world_width / BUCKETS_X as f32;
-    let bucket_size_y = world_depth / BUCKETS_Y as f32;
+    let bucket_size_x = world_width / BUCKETS as f32;
+    let bucket_size_y = world_depth / BUCKETS as f32;
 
     // → Find the “center” origin same as your bucket math
     let cols = grid.grid.len();
@@ -53,7 +52,7 @@ pub fn calculate_boid_steering(
     if dbg_options.draw_spatial_grid {
         gizmos.grid(
             Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
-            UVec2::new(BUCKETS_X, BUCKETS_Y),
+            UVec2::new(BUCKETS, BUCKETS),
             Vec2::new(bucket_size_x, bucket_size_y),
             YELLOW,
         );
