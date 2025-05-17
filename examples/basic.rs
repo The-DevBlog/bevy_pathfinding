@@ -10,11 +10,11 @@ use bevy::{
     time::common_conditions::once_after_delay,
     window::PrimaryWindow,
 };
-use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
-use bevy_rts_pathfinding::{
+use bevy_pathfinding::{
     components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
-    BevyRtsPathFindingPlugin,
+    BevyPathFindingPlugin,
 };
+use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 
 const CELL_SIZE: f32 = 10.0;
 const BUCKETS: f32 = 5.0;
@@ -30,7 +30,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             RtsCameraPlugin,
-            BevyRtsPathFindingPlugin, // THIS
+            BevyPathFindingPlugin, // THIS
         ))
         .add_systems(Startup, (camera, setup, spawn_units))
         .add_systems(

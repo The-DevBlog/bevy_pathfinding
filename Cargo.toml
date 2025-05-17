@@ -1,5 +1,5 @@
 [package]
-name = "bevy_rts_pathfinding"
+name = "bevy_pathfinding"
 version = "0.1.0"
 edition = "2021"
 
