@@ -1,6 +1,6 @@
 # Bevy Pathfinding
 
-A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-based collision avoidance** to move units smoothly.
+A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-based collision avoidance** to move units smoothly. Great for RTS games!
 
 ![demo](assets/demo.gif)
 
@@ -70,6 +70,11 @@ cargo run --example basic --features bevy_pathfinding/debug
   - **Radius** : how far each boid “sees” before applying the above factors  
 
 ![debug UI demo](assets/debug_ui_demo.gif)
+
+## FAQ
+
+- Why wouldn't I use the **A-Star** pathfinding technique?
+  - Flowfield pathfinding is extremely efficient when dealing with a large number of entities. This is great for RTS games!
 
 ## Bevy Version Compatibility
 
