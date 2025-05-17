@@ -12,6 +12,10 @@ A grid-based navigation technique that first calculates the minimum “cost” f
 
 A lightweight, local steering technique where each unit blends three factors—steering away from too-close neighbors (separation), matching their heading (alignment), and moving toward the group’s center (cohesion)—to naturally avoid collisions and maintain smooth, flock-like motion.
 
+### Sounds cool, but woudln't apploying those forces be exponentially expensive? 
+
+Actually, no. The Bevy Pathfinding crate features a powerful spatial partioning (or bucketing) optimization. When you initialize the grid using: `app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE));`, you include a **BUCKETS** value. The grid is split equally into this BUCKETS value, so each boid is applying forces against other boids in the **same bucket**. *Nice.*
+
 ## Getting Started
 
 Add the **bevy_pathfinding** crate:
