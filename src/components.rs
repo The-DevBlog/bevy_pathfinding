@@ -7,6 +7,7 @@ pub struct ComponentsPlugin;
 impl Plugin for ComponentsPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<BoidsInfoUpdater>()
+            .init_resource::<BoidsInfoUpdater>()
             .add_systems(PreStartup, spawn_boids_updater)
             .add_systems(Update, change_boids);
     }
@@ -104,7 +105,7 @@ impl Default for BoidsInfo {
 }
 
 /// DO NOT USE. This component is updated whenever the boids info in the debug UI menu changes.
-#[derive(Component, Reflect)]
+#[derive(Resource, Reflect)]
 pub struct BoidsInfoUpdater {
     pub separation_weight: f32,    // push apart
     pub alignment_weight: f32,     // match heading
@@ -127,19 +128,20 @@ impl Default for BoidsInfoUpdater {
 }
 
 fn spawn_boids_updater(mut cmds: Commands) {
-    cmds.spawn((BoidsInfoUpdater::default(), Name::new("Boids Info")));
+    // cmds.spawn((BoidsInfoUpdater::default(), Name::new("Boids Info")));
 }
 
-fn change_boids(mut q_boids: Query<&mut Boid>, q_boid_values: Query<&BoidsInfoUpdater>) {
-    let Ok(new_boids_info) = q_boid_values.single() else {
-        return;
-    };
+// fn change_boids(mut q_boids: Query<&mut Boid>, q_boid_values: Query<&BoidsInfoUpdater>) {
+fn change_boids(mut q_boids: Query<&mut Boid>, boid_updater: Res<BoidsInfoUpdater>) {
+    // let Ok(new_boids_info) = boid_updater.single() else {
+    //     return;
+    // };
 
     for mut boid in q_boids.iter_mut() {
-        boid.info.separation = new_boids_info.separation_weight;
-        boid.info.alignment = new_boids_info.alignment_weight;
-        boid.info.cohesion = new_boids_info.cohesion_weight;
-        boid.info.neighbor_radius = new_boids_info.neighbor_radius;
-        boid.info.neighbor_exit_radius = new_boids_info.neighbor_exit_radius;
+        boid.info.separation = boid_updater.separation_weight;
+        boid.info.alignment = boid_updater.alignment_weight;
+        boid.info.cohesion = boid_updater.cohesion_weight;
+        boid.info.neighbor_radius = boid_updater.neighbor_radius;
+        boid.info.neighbor_exit_radius = boid_updater.neighbor_exit_radius;
     }
 }

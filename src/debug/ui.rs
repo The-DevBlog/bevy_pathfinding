@@ -416,7 +416,7 @@ fn draw_ui_box(
     mut cmds: Commands,
     dbg: Res<DbgOptions>,
     dbg_icon: Res<DbgIcon>,
-    mut q_boids_info: Query<&BoidsInfoUpdater>,
+    boids_updater: Res<BoidsInfoUpdater>,
 ) {
     let root_ctr = (
         RootCtr,
@@ -630,32 +630,28 @@ fn draw_ui_box(
         )
     };
 
-    let Ok(boids_info) = q_boids_info.single_mut() else {
-        return;
-    };
-
     let labels = &[
         (
             "Separation",
-            boids_info.separation_weight,
+            boids_updater.separation_weight,
             BoidsInfoOptions::Separation,
             None,
         ),
         (
             "Alignment",
-            boids_info.alignment_weight,
+            boids_updater.alignment_weight,
             BoidsInfoOptions::Alignment,
             None,
         ),
         (
             "Cohesion",
-            boids_info.cohesion_weight,
+            boids_updater.cohesion_weight,
             BoidsInfoOptions::Cohesion,
             None,
         ),
         (
             "Radius",
-            boids_info.neighbor_radius,
+            boids_updater.neighbor_radius,
             BoidsInfoOptions::NeighborRadius,
             Some(BorderRadius::top(Val::Px(10.0))),
         ),
@@ -894,7 +890,7 @@ fn draw_ui_box(
 }
 
 fn handle_slider_arrow_interaction(
-    mut boids_updater: Query<&mut BoidsInfoUpdater>,
+    mut boids_udpater: ResMut<BoidsInfoUpdater>,
     mut q_slider: Query<
         (
             &Interaction,
@@ -910,10 +906,6 @@ fn handle_slider_arrow_interaction(
         (With<BoidsSliderValue>, Without<BoidsSliderBtn>),
     >,
 ) {
-    let Ok(mut updater) = boids_updater.single_mut() else {
-        return;
-    };
-
     for (interaction, slider, boids_info, mut background_clr, mut border_clr) in q_slider.iter_mut()
     {
         match interaction {
@@ -923,10 +915,10 @@ fn handle_slider_arrow_interaction(
                 {
                     // grab the old value…
                     let mut val = match boids_info {
-                        BoidsInfoOptions::Separation => updater.separation_weight,
-                        BoidsInfoOptions::Alignment => updater.alignment_weight,
-                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
-                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                        BoidsInfoOptions::Separation => boids_udpater.separation_weight,
+                        BoidsInfoOptions::Alignment => boids_udpater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => boids_udpater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => boids_udpater.neighbor_radius,
                     };
 
                     // bump it
@@ -937,12 +929,12 @@ fn handle_slider_arrow_interaction(
 
                     // update BoidsUpdater
                     match boids_info {
-                        BoidsInfoOptions::Separation => updater.separation_weight = val,
-                        BoidsInfoOptions::Alignment => updater.alignment_weight = val,
-                        BoidsInfoOptions::Cohesion => updater.cohesion_weight = val,
+                        BoidsInfoOptions::Separation => boids_udpater.separation_weight = val,
+                        BoidsInfoOptions::Alignment => boids_udpater.alignment_weight = val,
+                        BoidsInfoOptions::Cohesion => boids_udpater.cohesion_weight = val,
                         BoidsInfoOptions::NeighborRadius => {
-                            updater.neighbor_radius = val;
-                            updater.neighbor_exit_radius = val * 1.05
+                            boids_udpater.neighbor_radius = val;
+                            boids_udpater.neighbor_exit_radius = val * 1.05
                         }
                     }
                     txt.0 = format!("{:.1}", val);
@@ -971,7 +963,7 @@ fn slider_drag_start_end(
         (&Interaction, &mut BackgroundColor, &BoidsInfoOptions),
         (With<BoidsSliderValue>, Changed<Interaction>),
     >,
-    mut q_updater: Query<&mut BoidsInfoUpdater>,
+    boids_udpater: Res<BoidsInfoUpdater>,
 ) {
     for (interaction, mut background_clr, boids_info) in q.iter_mut() {
         let Ok(window) = q_window.single() else {
@@ -982,18 +974,14 @@ fn slider_drag_start_end(
             return;
         };
 
-        let Ok(updater) = q_updater.single_mut() else {
-            return;
-        };
-
         match *interaction {
             Interaction::Pressed => {
                 if input.just_pressed(MouseButton::Left) {
                     let start_val = match boids_info {
-                        BoidsInfoOptions::Separation => updater.separation_weight,
-                        BoidsInfoOptions::Alignment => updater.alignment_weight,
-                        BoidsInfoOptions::Cohesion => updater.cohesion_weight,
-                        BoidsInfoOptions::NeighborRadius => updater.neighbor_radius,
+                        BoidsInfoOptions::Separation => boids_udpater.separation_weight,
+                        BoidsInfoOptions::Alignment => boids_udpater.alignment_weight,
+                        BoidsInfoOptions::Cohesion => boids_udpater.cohesion_weight,
+                        BoidsInfoOptions::NeighborRadius => boids_udpater.neighbor_radius,
                     };
                     cmds.insert_resource(DragState {
                         info: *boids_info,
@@ -1013,14 +1001,10 @@ fn slider_drag_start_end(
 fn slider_drag_update(
     drag: Res<DragState>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut updater: Query<&mut BoidsInfoUpdater>,
+    mut boids_udpater: ResMut<BoidsInfoUpdater>,
     mut q_txt: Query<(&mut Text, &BoidsInfoOptions), With<BoidsSliderValue>>,
 ) {
     let Ok(window) = window_q.single() else {
-        return;
-    };
-
-    let Ok(mut updater) = updater.single_mut() else {
         return;
     };
 
@@ -1033,12 +1017,12 @@ fn slider_drag_update(
 
     // write into your updater
     match drag.info {
-        BoidsInfoOptions::Separation => updater.separation_weight = new_val,
-        BoidsInfoOptions::Alignment => updater.alignment_weight = new_val,
-        BoidsInfoOptions::Cohesion => updater.cohesion_weight = new_val,
+        BoidsInfoOptions::Separation => boids_udpater.separation_weight = new_val,
+        BoidsInfoOptions::Alignment => boids_udpater.alignment_weight = new_val,
+        BoidsInfoOptions::Cohesion => boids_udpater.cohesion_weight = new_val,
         BoidsInfoOptions::NeighborRadius => {
-            updater.neighbor_radius = new_val;
-            updater.neighbor_exit_radius = new_val * 1.05
+            boids_udpater.neighbor_radius = new_val;
+            boids_udpater.neighbor_exit_radius = new_val * 1.05
         }
     }
 
