@@ -12,15 +12,19 @@ impl Plugin for ComponentsPlugin {
     }
 }
 
+/// A marker component for the map base
 #[derive(Component)]
 pub struct MapBase;
 
+/// A marker component for the primary camera
 #[derive(Component)]
 pub struct GameCamera;
 
+/// Destination marker for the boids
 #[derive(Component)]
 pub struct Destination;
 
+/// Determines the size of obstacles
 #[derive(Component, Default)]
 pub struct RtsObj(pub Vec2);
 
