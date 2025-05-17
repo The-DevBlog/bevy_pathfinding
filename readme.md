@@ -24,6 +24,8 @@ See the [example](examples/basic.rs) for full setup instructions.
 
 ## Examples
 
+**Note**: When viewing examples, be sure to view all lines that have the `// ADD THIS!` comment, as this indicates what you will need to add in your own project.
+
 - basic
 
 ```
@@ -51,7 +53,7 @@ What do all of these settings do?
     - Separation -> separation weight (how strongly it steers away)
     - Cohesion -> cohesion weight (how strongly it steers inward)
     - Alignment ->  alignment weight (how strongly it matches neighbor heading)
-    - Radius -> how far each boid “sees” before applying above factors
+    - Radius -> how far each boid “sees” before applying above the factors
 
 ![debug UI demo](assets/debug_ui_demo.gif)
 

@@ -1,3 +1,7 @@
+/*
+This example uses a simple point-and-click movement system to move units around the map.
+*/
+
 use std::time::Duration;
 
 use bevy::{
