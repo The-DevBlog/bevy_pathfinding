@@ -5,6 +5,7 @@ edition = "2021"
 description = "A simple 3D Bevy plugin that combines flowfield pathfinding with boid-based collision avoidance to move units smoothly. Great for RTS games!"
 keywords = ["bevy", "pathfinding", "rts"]
 categories = ["game-development"]
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/The-DevBlog/bevy_pathfinding"
 homepage = "https://github.com/The-DevBlog/bevy_pathfinding"
 readme = "README.md"
