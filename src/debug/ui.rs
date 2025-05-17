@@ -468,13 +468,19 @@ fn draw_ui_box(
         TextColor::from(CLR_TITLE),
     );
 
-    let draw_grid_btn = |draw_grid_btn: DrawBtn| {
+    let draw_btn = |draw_btn: DrawBtn, margin: Option<UiRect>| {
+        let margin = match margin {
+            Some(m) => m,
+            None => UiRect::DEFAULT,
+        };
+
         (
-            draw_grid_btn,
+            draw_btn,
             VisibleNode,
             BackgroundColor::from(CLR_BACKGROUND_2),
             BorderColor::from(CLR_BORDER),
             Node {
+                margin,
                 padding: UiRect::all(Val::Px(5.0)),
                 border: UiRect::top(Val::Px(1.0)),
                 ..default()
@@ -713,13 +719,13 @@ fn draw_ui_box(
         });
 
         // Draw Grid
-        ctr.spawn(draw_grid_btn(DrawBtn::Grid))
+        ctr.spawn(draw_btn(DrawBtn::Grid, None))
             .with_children(|ctr| {
                 ctr.spawn(draw_grid_txt(DrawGridTxt::Grid, dbg.draw_grid));
             });
 
         // Draw Spatial Grid
-        ctr.spawn(draw_grid_btn(DrawBtn::SpatialGrid))
+        ctr.spawn(draw_btn(DrawBtn::SpatialGrid, None))
             .with_children(|ctr| {
                 ctr.spawn(draw_grid_txt(
                     DrawGridTxt::SpatialGrid,
@@ -838,9 +844,12 @@ fn draw_ui_box(
             options_container(BorderRadius::bottom(Val::Px(10.0)), Some(5.0)),
         ))
         .with_children(|options| {
-            // Draw Grid
+            // Draw Radius
             options
-                .spawn(draw_grid_btn(DrawBtn::Radius))
+                .spawn(draw_btn(
+                    DrawBtn::Radius,
+                    Some(UiRect::horizontal(Val::Px(5.0))),
+                ))
                 .with_children(|ctr| {
                     ctr.spawn(draw_grid_txt(DrawGridTxt::Radius, dbg.draw_radius));
                 });
