@@ -8,7 +8,6 @@ impl Plugin for ComponentsPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<BoidsInfoUpdater>()
             .init_resource::<BoidsInfoUpdater>()
-            .add_systems(PreStartup, spawn_boids_updater)
             .add_systems(Update, change_boids);
     }
 }
@@ -127,16 +126,7 @@ impl Default for BoidsInfoUpdater {
     }
 }
 
-fn spawn_boids_updater(mut cmds: Commands) {
-    // cmds.spawn((BoidsInfoUpdater::default(), Name::new("Boids Info")));
-}
-
-// fn change_boids(mut q_boids: Query<&mut Boid>, q_boid_values: Query<&BoidsInfoUpdater>) {
 fn change_boids(mut q_boids: Query<&mut Boid>, boid_updater: Res<BoidsInfoUpdater>) {
-    // let Ok(new_boids_info) = boid_updater.single() else {
-    //     return;
-    // };
-
     for mut boid in q_boids.iter_mut() {
         boid.info.separation = boid_updater.separation_weight;
         boid.info.alignment = boid_updater.alignment_weight;
