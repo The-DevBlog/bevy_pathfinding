@@ -42,6 +42,8 @@ cargo run --example basic --features bevy_pathfinding/debug
 
 When using the debug UI settings, it will automatically update every boid in the scene with the values displayed in the UI. If you have multiple different units that require separate settings, this will be an issue. The debug UI is meant only for development purposes to easily visualize the behavior of the flowfield and boids. This will help you pin point the exact settings that are ideal for you.
 
+**Important Note!** - If you have your own shaders applied, the debug UI may cause conflicts with them. It is recommended to disable your shaders while using the debug UI.
+
 To run your project with the debug UI: 
 
 ```
