@@ -1,5 +1,7 @@
 # Bevy Pathfinding
 
+A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-based collision avoidance** to move units smoothly.
+
 ![demo](assets/demo.gif)
 
 ## Getting Started
@@ -37,7 +39,11 @@ What do all of these settings do?
 - Draw Mode 1 -> Draw the flowfield/costfield/inegration field/cell indexes
 - Draw Mode 2 -> Draw the flowfield/costfield/inegration field/cell indexes (secondary slot)
 - Boids Info: 
-    - Radius -> 
+    - Radius -> Draw boid radius
+    - Separation -> separation weight (how strongly it steers away)
+    - Cohesion -> cohesion weight (how strongly it steers inward)
+    - Alignment ->  alignment weight (how strongly it matches neighbor heading)
+    - Radius -> how far each boid “sees” before applying above factors
 
 ## Bevy Version Compatbility
 
