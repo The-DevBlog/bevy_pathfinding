@@ -1,7 +1,7 @@
 use bevy::{image::*, prelude::*, render::render_resource::*};
 use image::ImageFormat;
 
-use crate::components::BoidsInfo;
+use crate::components::{Boid, BoidsInfo};
 
 const DBG_ICON: &[u8] = include_bytes!("../../assets/imgs/dbg_icon.png");
 
@@ -11,8 +11,11 @@ impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DbgOptions>()
             .init_resource::<DbgIcon>()
+            .init_resource::<BoidsUpdater>()
             .register_type::<DbgOptions>()
-            .add_systems(Startup, load_dbg_icon);
+            .register_type::<BoidsUpdater>()
+            .add_systems(Startup, load_dbg_icon)
+            .add_systems(Update, update_boids);
     }
 }
 
@@ -85,15 +88,6 @@ impl DbgOptions {
     }
 }
 
-// pub struct BoidsInfo {
-//     pub max_force: f32,         // how quickly you can turn
-//     pub separation_weight: f32, // push apart
-//     pub alignment_weight: f32,  // match heading
-//     pub cohesion_weight: f32,   // pull toward center
-//     pub max_speed: f32,         // top movement speed
-//     pub neighbor_radius: f32,   // how far you “see” neighbors
-// }
-
 #[derive(Reflect, PartialEq, Clone, Copy)]
 pub enum DrawMode {
     None,
@@ -113,6 +107,39 @@ impl DrawMode {
             "Index" => DrawMode::Index,
             _ => DrawMode::None,
         }
+    }
+}
+
+/// DO NOT USE. This component is updated whenever the boids info in the debug UI menu changes.
+#[derive(Resource, Reflect)]
+pub struct BoidsUpdater {
+    pub separation_weight: f32,    // push apart
+    pub alignment_weight: f32,     // match heading
+    pub cohesion_weight: f32,      // pull toward center
+    pub neighbor_radius: f32,      // how far you “see” neighbors
+    pub neighbor_exit_radius: f32, // new: slightly larger
+}
+
+impl Default for BoidsUpdater {
+    fn default() -> Self {
+        let neighbor_radius = 5.0;
+        Self {
+            separation_weight: 50.0,          // strongest urge to avoid collisions
+            alignment_weight: 0.0,            // medium urge to line up
+            cohesion_weight: 0.0,             // medium urge to stay together
+            neighbor_radius: neighbor_radius, // in world‐units (tweak to taste)
+            neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
+        }
+    }
+}
+
+fn update_boids(mut q_boids: Query<&mut Boid>, boid_updater: Res<BoidsUpdater>) {
+    for mut boid in q_boids.iter_mut() {
+        boid.info.separation = boid_updater.separation_weight;
+        boid.info.alignment = boid_updater.alignment_weight;
+        boid.info.cohesion = boid_updater.cohesion_weight;
+        boid.info.neighbor_radius = boid_updater.neighbor_radius;
+        boid.info.neighbor_exit_radius = boid_updater.neighbor_exit_radius;
     }
 }
 

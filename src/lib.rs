@@ -16,7 +16,6 @@ pub mod resources;
 pub mod utils;
 
 use boids::BoidsPlugin;
-use components::ComponentsPlugin;
 use flowfield::FlowfieldPlugin;
 use grid::GridPlugin;
 use resources::ResourcesPlugin;
@@ -27,7 +26,6 @@ impl Plugin for BevyPathfindingPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             BoidsPlugin,
-            ComponentsPlugin,
             FlowfieldPlugin,
             ResourcesPlugin,
             GridPlugin,

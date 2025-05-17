@@ -25,7 +25,7 @@ pub fn calculate_boid_steering(
     mut q_ff: Query<&mut FlowField>,
     grid: Res<Grid>,
     mut gizmos: Gizmos,
-    dbg_options: Res<DbgOptions>,
+    dbg_options: Option<Res<DbgOptions>>,
 ) {
     let dt = time.delta_secs();
 
@@ -48,23 +48,25 @@ pub fn calculate_boid_steering(
         .map(|(e, tf, b)| (e, tf.translation, b.velocity))
         .collect();
 
-    // 2) Draw the spatial‐grid gizmo if requested
-    if dbg_options.draw_spatial_grid {
-        gizmos.grid(
-            Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
-            UVec2::new(grid.buckets as u32, grid.buckets as u32),
-            Vec2::new(bucket_size_x, bucket_size_y),
-            YELLOW,
-        );
-    }
+    // 2) Draw the grid(s) (optional)
+    if let Some(dbg) = dbg_options {
+        if dbg.draw_spatial_grid {
+            gizmos.grid(
+                Isometry3d::from_rotation(Quat::from_rotation_x(PI / 2.0)),
+                UVec2::new(grid.buckets as u32, grid.buckets as u32),
+                Vec2::new(bucket_size_x, bucket_size_y),
+                YELLOW,
+            );
+        }
 
-    if dbg_options.draw_radius {
-        for (_, tf, boid) in q_boids.iter() {
-            let pos: Vec3 = tf.translation;
-            let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
-            let iso = Isometry3d::new(pos, rot);
+        if dbg.draw_radius {
+            for (_, tf, boid) in q_boids.iter() {
+                let pos: Vec3 = tf.translation;
+                let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
+                let iso = Isometry3d::new(pos, rot);
 
-            gizmos.circle(iso, boid.info.neighbor_radius, RED);
+                gizmos.circle(iso, boid.info.neighbor_radius, RED);
+            }
         }
     }
 

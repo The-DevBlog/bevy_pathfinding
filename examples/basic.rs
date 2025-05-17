@@ -141,11 +141,14 @@ fn set_unit_destination(
     q_map: Query<&GlobalTransform, With<MapBase>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_window: Query<&Window, With<PrimaryWindow>>,
-    dbg_options: ResMut<DbgOptions>,
+    dbg_options: Option<ResMut<DbgOptions>>,
 ) {
-    if dbg_options.hover {
-        return;
-    }
+    // if hovering over the debug UI, then do not set the destination
+    if let Some(dbg) = dbg_options {
+        if dbg.hover {
+            return;
+        }
+    };
 
     if !input.just_pressed(MouseButton::Left) {
         return;

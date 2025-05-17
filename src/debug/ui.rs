@@ -1,4 +1,3 @@
-use crate::components::BoidsInfoUpdater;
 use crate::events::DrawAllEv;
 
 use super::components::*;
@@ -416,7 +415,7 @@ fn draw_ui_box(
     mut cmds: Commands,
     dbg: Res<DbgOptions>,
     dbg_icon: Res<DbgIcon>,
-    boids_updater: Res<BoidsInfoUpdater>,
+    boids_updater: Res<BoidsUpdater>,
 ) {
     let root_ctr = (
         RootCtr,
@@ -890,7 +889,7 @@ fn draw_ui_box(
 }
 
 fn handle_slider_arrow_interaction(
-    mut boids_udpater: ResMut<BoidsInfoUpdater>,
+    mut boids_udpater: ResMut<BoidsUpdater>,
     mut q_slider: Query<
         (
             &Interaction,
@@ -963,7 +962,7 @@ fn slider_drag_start_end(
         (&Interaction, &mut BackgroundColor, &BoidsInfoOptions),
         (With<BoidsSliderValue>, Changed<Interaction>),
     >,
-    boids_udpater: Res<BoidsInfoUpdater>,
+    boids_udpater: Res<BoidsUpdater>,
 ) {
     for (interaction, mut background_clr, boids_info) in q.iter_mut() {
         let Ok(window) = q_window.single() else {
@@ -1001,7 +1000,7 @@ fn slider_drag_start_end(
 fn slider_drag_update(
     drag: Res<DragState>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut boids_udpater: ResMut<BoidsInfoUpdater>,
+    mut boids_udpater: ResMut<BoidsUpdater>,
     mut q_txt: Query<(&mut Text, &BoidsInfoOptions), With<BoidsSliderValue>>,
 ) {
     let Ok(window) = window_q.single() else {
