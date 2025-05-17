@@ -255,12 +255,12 @@ fn flowfield_group_stop_system(
             }
             // load its transform & boid info
             if let Ok((tf_u, boid_u)) = q_tf.get(u) {
-                let nr2 = boid_u.info.neighbor_radius + 80.0; // TODO: Make this not a magic number
+                let nr2 = boid_u.info.neighbor_radius;
 
                 // if it’s within radius of ANY arrived boid, drop its Dest too
                 for &a in &arrived_list {
                     if let Ok((tf_a, _)) = q_tf.get(a) {
-                        if tf_u.translation.distance_squared(tf_a.translation) < nr2 {
+                        if tf_u.translation.distance(tf_a.translation) <= nr2 {
                             cmds.entity(u).remove::<Destination>();
                             break;
                         }
