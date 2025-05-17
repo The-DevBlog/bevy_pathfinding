@@ -36,7 +36,7 @@ impl Plugin for UiPlugin {
                     handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
-                    handle_draw_grid_interaction,
+                    handle_draw_btn_interaction,
                     handle_slider_arrow_interaction,
                     handle_drag,
                 ),
@@ -170,7 +170,7 @@ fn handle_drawmode_option_interaction(
     }
 }
 
-fn handle_draw_grid_interaction(
+fn handle_draw_btn_interaction(
     mut cmds: Commands,
     mut q_draw_grid: Query<(&Interaction, &mut BackgroundColor, &DrawBtn), Changed<Interaction>>,
     mut q_txt: Query<(&mut Text, &DrawGridTxt)>,
@@ -189,6 +189,7 @@ fn handle_draw_grid_interaction(
                     if (draw_grid_btn == &DrawBtn::Grid && *txt_type == DrawGridTxt::Grid)
                         || (draw_grid_btn == &DrawBtn::SpatialGrid
                             && *txt_type == DrawGridTxt::SpatialGrid)
+                        || (draw_grid_btn == &DrawBtn::Radius && *txt_type == DrawGridTxt::Radius)
                     {
                         match *txt_type {
                             DrawGridTxt::Grid => {
