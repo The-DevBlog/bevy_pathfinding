@@ -14,20 +14,41 @@ impl Plugin for GridPlugin {
     }
 }
 
+/// The Grid struct represents a grid of cells used for pathfinding.
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct Grid {
+    /// The number of buckets for spatial partitioning.
     pub buckets: f32,
+    /// The radius of each cell in the grid.
     pub cell_radius: f32,
+    /// The diameter of each cell in the grid.
     pub cell_diameter: f32,
+    /// 2D vector of cells representing the grid.
     pub grid: Vec<Vec<Cell>>,
-    pub size: IVec2, // 'x' represents rows, 'y' represents columns
+    /// The size of the grid in terms of rows and columns. 'x' represents rows, 'y' represents columns.
+    pub size: IVec2,
+    /// DONT SET. A HashMap that stores the occupied cells for each entity.
     pub occupied_cells: HashMap<u32, Vec<IVec2>>,
 }
 
 impl Grid {
     // creates the grid and the costfield
     // all flowfields will share the same costfield
+
+    /// Creates a new Grid instance.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let grid = Grid::new(10.0, IVec2::new(25, 25), 10.0);
+    /// ```
+    ///
+    /// # Parameters
+    ///
+    /// * `buckets`: The number of buckets for spatial partitioning.
+    /// * `size`: The size of the grid in terms of rows and columns.
+    /// * `cell_diameter`: The diameter of each cell in the grid.
     pub fn new(buckets: f32, size: IVec2, cell_diameter: f32) -> Self {
         let mut grid = Grid {
             buckets,

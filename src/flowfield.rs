@@ -16,7 +16,7 @@ impl Plugin for FlowfieldPlugin {
     }
 }
 
-// TODO: Remove. This is just for visualizing the destination radius
+// TODO: Remove. This is just for visualizing the destination radius. (Dont think this is currently working as intended)
 #[derive(Component)]
 pub struct DestinationRadius(pub u32);
 
