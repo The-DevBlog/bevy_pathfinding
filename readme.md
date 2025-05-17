@@ -1,6 +1,6 @@
 # Bevy Pathfinding
 
-![demo](assets/demo/demo.gif)
+![demo](assets/demo.gif)
 
 ## Getting Started
 
@@ -19,6 +19,16 @@ See the [example](examples/basic.rs) for full setup instructions.
 ```
 cargo run --example <example name>
 ```
+
+or to run with the debug UI: 
+
+```
+cargo run --example basic --features bevy_pathfinding/debug
+```
+
+## Using the Debug Settings
+
+![debug UI](assets/debugUI.png)
 
 ## Bevy Version Compatbility
 
