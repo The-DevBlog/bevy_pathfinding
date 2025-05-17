@@ -28,7 +28,16 @@ cargo run --example basic --features bevy_pathfinding/debug
 
 ## Using the Debug Settings
 
-![debug UI](assets/debugUI.png)
+![debug UI](assets/debug_ui.png)
+
+What do all of these settings do?
+
+- Grid -> Draw the map grid
+- Spatial Grid -> Draw the spatial partitioning grid
+- Draw Mode 1 -> Draw the flowfield/costfield/inegration field/cell indexes
+- Draw Mode 2 -> Draw the flowfield/costfield/inegration field/cell indexes (secondary slot)
+- Boids Info: 
+    - Radius -> 
 
 ## Bevy Version Compatbility
 
