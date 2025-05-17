@@ -3,6 +3,12 @@ name = "bevy_pathfinding"
 version = "0.1.0"
 edition = "2021"
 
+exclude = [
+  "assets/debug*",
+  "assets/demo*",
+  ".vscode/**",
+]
+
 [dependencies]
 bevy = { version = "0.16.0", default-features = false, features = [
     "bevy_asset",
