@@ -46,7 +46,7 @@ impl Default for DbgOptions {
             draw_mode_2: DrawMode::None,
             hide: false,
             hover: false,
-            print_statements: true,
+            print_statements: false,
         }
     }
 }
