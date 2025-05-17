@@ -40,20 +40,28 @@ cargo run --example basic --features bevy_pathfinding/debug
 
 ## Using the Debug Settings
 
+When using the debug UI settings, it will automatically update every boid in the scene with the values displayed in the UI. If you have multiple different units that require separate settings, this will be an issue. The debug UI is meant only for development purposes to easily visualize the behavior of the flowfield and boids. This will help you pin point the exact settings that are ideal for you.
+
+To run your project with the debug UI: 
+
+```
+cargo run --example basic --features bevy_pathfinding/debug
+```
+
 ![debug UI](assets/debug_ui.png)
 
-What do all of these settings do?
+### What do all of these settings do?
 
-- Grid -> Draw the map grid
-- Spatial Grid -> Draw the spatial partitioning grid
-- Draw Mode 1 -> Draw the flowfield/costfield/inegration field/cell indexes
-- Draw Mode 2 -> Draw the flowfield/costfield/inegration field/cell indexes (secondary slot)
+- **Grid** : Draw the map grid
+- **Spatial Grid** : Draw the spatial partitioning grid
+- **Draw Mode 1** : Draw the flowfield/costfield/inegration field/cell indexes
+- **Draw Mode 2** : Draw the flowfield/costfield/inegration field/cell indexes (secondary slot)
 - Boids Info: 
-    - Radius -> Draw boid radius
-    - Separation -> separation weight (how strongly it steers away)
-    - Cohesion -> cohesion weight (how strongly it steers inward)
-    - Alignment ->  alignment weight (how strongly it matches neighbor heading)
-    - Radius -> how far each boid “sees” before applying above the factors
+    - **Radius** : Draw boid radius
+    - **Separation** : separation weight (how strongly it steers away)
+    - **Cohesion** : cohesion weight (how strongly it steers inward)
+    - **Alignment** :  alignment weight (how strongly it matches neighbor heading)
+    - **Radius** : how far each boid “sees” before applying above the factors
 
 ![debug UI demo](assets/debug_ui_demo.gif)
 
