@@ -8,7 +8,7 @@ A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-base
 
 A grid-based navigation technique that first calculates the minimum “cost” from every cell to a target, then turns those costs into a field of simple direction vectors. Units just sample the vector under their feet each step to follow an optimal path with almost no per-unit computation.
 
-### Okay, but what the heck is **Boid Collision Avoidance**?
+### Okay, but what the heck is **Boid-Based Collision Avoidance**?
 
 A lightweight, local steering technique where each unit blends three factors—steering away from too-close neighbors (separation), matching their heading (alignment), and moving toward the group’s center (cohesion)—to naturally avoid collisions and maintain smooth, flock-like motion.
 
