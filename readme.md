@@ -1,6 +1,6 @@
 # Bevy Pathfinding
 
-Add demo
+[demo](assets/demo/demo.mp4)
 
 ## Getting Started
 
