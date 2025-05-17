@@ -12,7 +12,6 @@ A grid-based navigation technique that first calculates the minimum “cost” f
 
 A lightweight, local steering technique where each unit blends three factors—steering away from too-close neighbors (separation), matching their heading (alignment), and moving toward the group’s center (cohesion)—to naturally avoid collisions and maintain smooth, flock-like motion.
 
-
 ## Getting Started
 
 Add the **bevy_pathfinding** crate:
