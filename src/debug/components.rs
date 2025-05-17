@@ -23,7 +23,7 @@ pub enum DrawBtn {
 }
 
 #[derive(Component, PartialEq)]
-pub enum DrawGridTxt {
+pub enum DrawTxt {
     Grid,
     SpatialGrid,
     Radius,

@@ -173,7 +173,7 @@ fn handle_drawmode_option_interaction(
 fn handle_draw_btn_interaction(
     mut cmds: Commands,
     mut q_draw_grid: Query<(&Interaction, &mut BackgroundColor, &DrawBtn), Changed<Interaction>>,
-    mut q_txt: Query<(&mut Text, &DrawGridTxt)>,
+    mut q_txt: Query<(&mut Text, &DrawTxt)>,
     mut dbg: ResMut<DbgOptions>,
 ) {
     for (interaction, mut background, draw_grid_btn) in q_draw_grid.iter_mut() {
@@ -186,19 +186,19 @@ fn handle_draw_btn_interaction(
                 }
 
                 for (mut txt, txt_type) in q_txt.iter_mut() {
-                    if (draw_grid_btn == &DrawBtn::Grid && *txt_type == DrawGridTxt::Grid)
+                    if (draw_grid_btn == &DrawBtn::Grid && *txt_type == DrawTxt::Grid)
                         || (draw_grid_btn == &DrawBtn::SpatialGrid
-                            && *txt_type == DrawGridTxt::SpatialGrid)
-                        || (draw_grid_btn == &DrawBtn::Radius && *txt_type == DrawGridTxt::Radius)
+                            && *txt_type == DrawTxt::SpatialGrid)
+                        || (draw_grid_btn == &DrawBtn::Radius && *txt_type == DrawTxt::Radius)
                     {
                         match *txt_type {
-                            DrawGridTxt::Grid => {
+                            DrawTxt::Grid => {
                                 txt.0 = format!("Grid: {}", dbg.draw_grid);
                             }
-                            DrawGridTxt::SpatialGrid => {
+                            DrawTxt::SpatialGrid => {
                                 txt.0 = format!("Spatial Grid: {}", dbg.draw_spatial_grid);
                             }
-                            DrawGridTxt::Radius => {
+                            DrawTxt::Radius => {
                                 txt.0 = format!("Radius: {}", dbg.draw_radius);
                             }
                         }
@@ -468,10 +468,15 @@ fn draw_ui_box(
         TextColor::from(CLR_TITLE),
     );
 
-    let draw_btn = |draw_btn: DrawBtn, margin: Option<UiRect>| {
+    let draw_btn = |draw_btn: DrawBtn, margin: Option<UiRect>, border: Option<UiRect>| {
         let margin = match margin {
             Some(m) => m,
             None => UiRect::DEFAULT,
+        };
+
+        let border = match border {
+            Some(b) => b,
+            None => UiRect::top(Val::Px(1.0)),
         };
 
         (
@@ -482,18 +487,18 @@ fn draw_ui_box(
             Node {
                 margin,
                 padding: UiRect::all(Val::Px(5.0)),
-                border: UiRect::top(Val::Px(1.0)),
+                border: border,
                 ..default()
             },
             Name::new("Draw Grid Button"),
         )
     };
 
-    let draw_grid_txt = |draw_grid_txt: DrawGridTxt, draw_grid: bool| {
+    let draw_txt = |draw_grid_txt: DrawTxt, draw_grid: bool| {
         let txt = match draw_grid_txt {
-            DrawGridTxt::Grid => "Grid",
-            DrawGridTxt::SpatialGrid => "Spatial Grid",
-            DrawGridTxt::Radius => "Radius",
+            DrawTxt::Grid => "Grid",
+            DrawTxt::SpatialGrid => "Spatial Grid",
+            DrawTxt::Radius => "Radius",
         };
 
         (
@@ -719,19 +724,24 @@ fn draw_ui_box(
         });
 
         // Draw Grid
-        ctr.spawn(draw_btn(DrawBtn::Grid, None))
-            .with_children(|ctr| {
-                ctr.spawn(draw_grid_txt(DrawGridTxt::Grid, dbg.draw_grid));
-            });
+        ctr.spawn(draw_btn(
+            DrawBtn::Grid,
+            None,
+            Some(UiRect::top(Val::Px(1.0))),
+        ))
+        .with_children(|ctr| {
+            ctr.spawn(draw_txt(DrawTxt::Grid, dbg.draw_grid));
+        });
 
         // Draw Spatial Grid
-        ctr.spawn(draw_btn(DrawBtn::SpatialGrid, None))
-            .with_children(|ctr| {
-                ctr.spawn(draw_grid_txt(
-                    DrawGridTxt::SpatialGrid,
-                    dbg.draw_spatial_grid,
-                ));
-            });
+        ctr.spawn(draw_btn(
+            DrawBtn::SpatialGrid,
+            None,
+            Some(UiRect::top(Val::Px(1.0))),
+        ))
+        .with_children(|ctr| {
+            ctr.spawn(draw_txt(DrawTxt::SpatialGrid, dbg.draw_spatial_grid));
+        });
 
         // Draw Mode 1 Container
         ctr.spawn(dropdown_btn(OptionsSet::One))
@@ -849,9 +859,10 @@ fn draw_ui_box(
                 .spawn(draw_btn(
                     DrawBtn::Radius,
                     Some(UiRect::horizontal(Val::Px(5.0))),
+                    None,
                 ))
                 .with_children(|ctr| {
-                    ctr.spawn(draw_grid_txt(DrawGridTxt::Radius, dbg.draw_radius));
+                    ctr.spawn(draw_txt(DrawTxt::Radius, dbg.draw_radius));
                 });
 
             // Boids Info Dropdown Options
