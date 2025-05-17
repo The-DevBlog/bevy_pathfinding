@@ -10,8 +10,17 @@ pub fn get_world_pos(
 ) -> Vec3 {
     let plane_origin = map_base_trans.translation();
     let plane = InfinitePlane3d::new(map_base_trans.up());
-    let ray = cam.viewport_to_world(cam_transform, cursor_pos).unwrap();
-    let distance = ray.intersect_plane(plane_origin, plane).unwrap();
+    // let ray = cam.viewport_to_world(cam_transform, cursor_pos).unwrap();
+
+    let Ok(ray) = cam.viewport_to_world(cam_transform, cursor_pos) else {
+        return Vec3::ZERO;
+    };
+
+    let Some(distance) = ray.intersect_plane(plane_origin, plane) else {
+        return Vec3::ZERO;
+    };
+
+    // let distance = ray.intersect_plane(plane_origin, plane).unwrap();
     return ray.get_point(distance);
 }
 

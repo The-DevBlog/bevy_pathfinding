@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -10,7 +10,7 @@ pub struct FlowfieldPlugin;
 
 impl Plugin for FlowfieldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (flowfield_group_stop_system,))
+        app.add_systems(Update, flowfield_group_stop_system)
             .add_observer(update_fields)
             .add_observer(initialize_flowfield);
     }
@@ -39,7 +39,7 @@ impl FlowField {
             units.iter().map(|&unit| (unit, Vec3::ZERO)).collect();
 
         FlowField {
-            destination_radius: (units.len() as f32 * unit_count).sqrt() * 5.0,
+            destination_radius: (units.len() as f32 * unit_count).sqrt() * 3.0,
             offset,
             size,
             steering_map,
@@ -212,40 +212,69 @@ impl FlowField {
 
 fn flowfield_group_stop_system(
     mut cmds: Commands,
-    mut query: Query<(Entity, &mut FlowField)>,
-    tf_query: Query<&Transform>,
+    mut q_ff: Query<(Entity, &mut FlowField)>,
+    q_tf: Query<(&Transform, &Boid)>,
+    q_dest: Query<&Destination>,
 ) {
-    for (ff_ent, mut ff) in query.iter_mut() {
-        // 1) skip empty or already‐stopped fields
-        if ff.arrived || ff.units.is_empty() {
-            continue;
-        }
+    for (ff_ent, mut ff) in q_ff.iter_mut() {
+        // 1) Have we already marked one arrival?
+        let mut any_arrived = ff.arrived;
 
-        // 2) compute centroid of the group
-        let (sum, count) = ff
+        // 2) Build a list of boids that have NO Destination (i.e. have arrived)
+        let mut arrived_list: Vec<Entity> = ff
             .units
             .iter()
-            .filter_map(|&u| tf_query.get(u).ok().map(|tf| tf.translation))
-            .fold((Vec3::ZERO, 0), |(sum, count), pos| (sum + pos, count + 1));
-        if count == 0 {
-            continue;
-        }
-        let centroid = sum / count as f32;
+            .copied()
+            .filter(|&u| q_dest.get(u).is_err())
+            .collect();
 
-        // 3) compare centroid to the world‐space goal
-        let goal = ff.destination_cell.world_pos;
-        if (centroid - goal).length() < ff.destination_radius {
-            // → only _now_ do we stop the entire group
-            ff.arrived = true;
-            ff.steering_map.clear();
-
-            // 4) remove Destination from each unit
-            for &unit in &ff.units {
-                cmds.entity(unit).remove::<Destination>();
+        // 3) If nobody’s arrived yet, look for the first winner
+        if !any_arrived {
+            let threshold2 = 25.0; // TODO: Make this not a magic number
+            if let Some(&winner) = ff.units.iter().find(|&&u| {
+                if let Ok((tf, _)) = q_tf.get(u) {
+                    tf.translation
+                        .distance_squared(ff.destination_cell.world_pos)
+                        < threshold2
+                } else {
+                    false
+                }
+            }) {
+                // remove *that* unit’s destination
+                cmds.entity(winner).remove::<Destination>();
+                arrived_list.push(winner);
+                any_arrived = true;
             }
-            ff.units.clear();
+        }
 
-            // 6) if you want to despawn the flowfield itself
+        // 4) Now for every unit that still *has* a Destination, check contact
+        for &u in &ff.units {
+            // skip the ones that have already arrived
+            if q_dest.get(u).is_err() {
+                continue;
+            }
+            // load its transform & boid info
+            if let Ok((tf_u, boid_u)) = q_tf.get(u) {
+                let nr2 = boid_u.info.neighbor_radius * 2.0;
+
+                // if it’s within radius of ANY arrived boid, drop its Dest too
+                for &a in &arrived_list {
+                    if let Ok((tf_a, _)) = q_tf.get(a) {
+                        if tf_u.translation.distance(tf_a.translation) <= nr2 {
+                            cmds.entity(u).remove::<Destination>();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5) record that “someone” has arrived, so we don’t re-run step 3
+        ff.arrived = any_arrived;
+
+        // 6) if *no* unit still has a Destination, despawn the flow‐field entity
+        let any_left = ff.units.iter().any(|&u| q_dest.get(u).is_ok());
+        if !any_left {
             cmds.entity(ff_ent).despawn();
         }
     }
@@ -255,33 +284,20 @@ fn initialize_flowfield(
     trigger: Trigger<InitializeFlowFieldEv>,
     mut cmds: Commands,
     grid: ResMut<Grid>,
-    q_windows: Query<&Window, With<PrimaryWindow>>,
-    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
-    q_map_base: Query<&GlobalTransform, With<MapBase>>,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     mut _meshes: ResMut<Assets<Mesh>>, // TODO: Remove
     mut _materials: ResMut<Assets<StandardMaterial>>, // TODO: Remove
     q_destination_radius: Query<(Entity, &DestinationRadius)>, // TODO: Remove
 ) {
-    let Ok(window) = q_windows.single() else {
-        return;
-    };
-
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-
-    let Ok(cam) = q_cam.single() else {
-        return;
-    };
-
-    let Ok(map_base) = q_map_base.single() else {
-        return;
-    };
-
-    let units = trigger.event().0.clone();
+    let destination_pos = trigger.event().destination_pos;
+    let units = trigger.event().entities.clone();
     if units.is_empty() {
         return;
+    }
+
+    // insert Destination component to all units
+    for unit in units.iter() {
+        cmds.entity(*unit).insert(Destination);
     }
 
     // Remove existing flowfields that contain any of the units
@@ -306,14 +322,13 @@ fn initialize_flowfield(
         }
     }
 
-    let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, cursor_pos);
-    let destination_cell = grid.get_cell_from_world_position(world_mouse_pos);
+    // let world_mouse_pos = utils::get_world_pos(map_base, cam.1, cam.0, cursor_pos);
+    let destination_cell = grid.get_cell_from_world_position(destination_pos);
 
     let mut ff = FlowField::new(grid.size, units.clone(), units.len() as f32, Vec3::ZERO);
 
     ff.create_integration_field(grid.grid.clone(), destination_cell.idx);
     ff.create_flowfield();
-
     // Spawn the new flowfield
     // cmds.spawn(flowfield.clone()); // TODO: Uncomment
     let _ff_ent = cmds
@@ -326,18 +341,18 @@ fn initialize_flowfield(
         .id();
 
     // TODO: Remove (debugging purposes)
-    // {
-    //     let mesh = Mesh3d(_meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
-    //     let material = MeshMaterial3d(_materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
-    //     cmds.entity(_ff_ent).with_children(|parent| {
-    //         parent.spawn((
-    //             DestinationRadius(ff_ent.index()),
-    //             mesh,
-    //             material,
-    //             Transform::from_translation(ff.destination_cell.world_pos),
-    //         ));
-    //     });
-    // }
+    {
+        // let mesh = Mesh3d(_meshes.add(Cylinder::new(ff.destination_radius, 2.0)));
+        // let material = MeshMaterial3d(_materials.add(Color::srgba(1.0, 1.0, 0.33, 0.85)));
+        // cmds.entity(_ff_ent).with_children(|parent| {
+        //     parent.spawn((
+        //         DestinationRadius(_ff_ent.index()),
+        //         mesh,
+        //         material,
+        //         Transform::from_translation(ff.destination_cell.world_pos),
+        //     ));
+        // });
+    }
 
     cmds.trigger(SetActiveFlowfieldEv(Some(ff)));
 }

@@ -1,0 +1,229 @@
+use std::time::Duration;
+
+use bevy::{
+    color::palettes::{
+        css::GREY,
+        tailwind::{BLUE_500, GREEN_600},
+    },
+    math::bounding::Aabb2d,
+    prelude::*,
+    time::common_conditions::once_after_delay,
+    window::PrimaryWindow,
+};
+use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
+use bevy_rts_pathfinding::{
+    components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
+    BevyRtsPathFindingPlugin,
+};
+
+const CELL_SIZE: f32 = 10.0;
+const BUCKETS: f32 = 5.0;
+const MAP_GRID: IVec2 = IVec2::new(50, 50);
+const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
+const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
+const UNIT_COUNT: usize = 25;
+
+fn main() {
+    let mut app = App::new();
+
+    app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // THIS
+        .add_plugins((
+            DefaultPlugins,
+            RtsCameraPlugin,
+            BevyRtsPathFindingPlugin, // THIS
+        ))
+        .add_systems(Startup, (camera, setup, spawn_units))
+        .add_systems(
+            Update,
+            (
+                set_unit_destination,
+                spawn_obstacles.run_if(once_after_delay(Duration::from_millis(100))),
+                move_unit.run_if(any_with_component::<Destination>),
+            ),
+        )
+        .run();
+}
+
+#[derive(Component)]
+struct Unit;
+
+#[derive(Component)]
+struct Speed(f32);
+
+fn camera(mut cmds: Commands) {
+    cmds.spawn((
+        Camera3d::default(),
+        GameCamera, // THIS
+        RtsCamera {
+            bounds: Aabb2d::new(Vec2::ZERO, Vec2::new(MAP_WIDTH, MAP_DEPTH)),
+            min_angle: 60.0f32.to_radians(),
+            height_max: 1000.0,
+            height_min: 30.0,
+            ..default()
+        },
+        RtsCameraControls {
+            edge_pan_width: 0.01,
+            key_left: KeyCode::KeyA,
+            key_right: KeyCode::KeyD,
+            key_up: KeyCode::KeyW,
+            key_down: KeyCode::KeyS,
+            pan_speed: 165.0,
+            zoom_sensitivity: 0.2,
+            ..default()
+        },
+    ));
+}
+
+fn setup(
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let ground = (
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(MAP_WIDTH, MAP_DEPTH))),
+        MeshMaterial3d(materials.add(StandardMaterial::from_color(GREEN_600))),
+        Ground,
+        MapBase, // THIS
+        Name::new("Map Base"),
+    );
+
+    let translation = Vec3::new(0.0, 0.0, 0.0);
+    let rotation = Quat::from_euler(EulerRot::XYZ, -0.7, 0.2, 0.0);
+    let light = (
+        DirectionalLight {
+            illuminance: 5000.0,
+            shadows_enabled: true,
+            shadow_depth_bias: 1.5,
+            shadow_normal_bias: 1.0,
+            ..default()
+        },
+        Transform {
+            translation,
+            rotation,
+            ..default()
+        },
+        Name::new("Sun Light"),
+    );
+
+    cmds.spawn(ground);
+    cmds.spawn(light);
+}
+
+fn spawn_units(
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mut unit = |pos: Vec3| {
+        (
+            Mesh3d(meshes.add(Cuboid::new(5.0, 5.0, 5.0))),
+            MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
+            Transform::from_translation(pos),
+            Speed(25.0),
+            Boid::default(), // THIS
+            Unit,
+            Name::new("Unit"),
+        )
+    };
+
+    let side = (UNIT_COUNT as f32).sqrt().ceil() as u32;
+
+    // spacing between units
+    let spacing = 10.0;
+
+    // offset to center the whole formation on (0,0)
+    let half = (side as f32 - 1.0) * spacing * 0.5;
+
+    for idx in 0..UNIT_COUNT {
+        let col = (idx as u32) % side;
+        let row = (idx as u32) / side;
+
+        let x = col as f32 * spacing - half;
+        let z = row as f32 * spacing - half;
+
+        cmds.spawn(unit(Vec3::new(x, 2.5, z)));
+    }
+
+    // cmds.spawn(unit(Vec3::new(50.0, 2.5, 0.0)));
+    // cmds.spawn(unit(Vec3::new(-50.0, 2.5, 0.0)));
+}
+
+fn spawn_obstacles(
+    mut cmds: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let size = Vec3::new(25.0, 10.0, 25.0);
+    let mut obstacle = |pos: Vec3| {
+        (
+            Mesh3d(meshes.add(Cuboid::from_size(size))),
+            MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
+            Transform::from_translation(pos),
+            RtsObj(size.xz()), // THIS
+            Name::new("Obstacle"),
+        )
+    };
+
+    cmds.spawn(obstacle(Vec3::new(-100.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(100.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, 100.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, -100.0)));
+}
+
+fn set_unit_destination(
+    mut cmds: Commands,
+    input: Res<ButtonInput<MouseButton>>,
+    mut q_units: Query<Entity, With<Unit>>,
+    q_map: Query<&GlobalTransform, With<MapBase>>,
+    q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    dbg_options: ResMut<DbgOptions>,
+) {
+    if dbg_options.hover {
+        return;
+    }
+
+    if !input.just_pressed(MouseButton::Left) {
+        return;
+    }
+
+    let Ok(map_tf) = q_map.single() else {
+        return;
+    };
+
+    let Ok((cam, cam_transform)) = q_cam.single() else {
+        return;
+    };
+
+    let Ok(window) = q_window.single() else {
+        return;
+    };
+
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+
+    // THIS
+    let mut units = Vec::new();
+    for unit_entity in q_units.iter_mut() {
+        units.push(unit_entity);
+    }
+
+    let destination_pos = utils::get_world_pos(map_tf, cam_transform, cam, cursor_pos);
+    cmds.trigger(InitializeFlowFieldEv {
+        entities: units,
+        destination_pos,
+    });
+}
+
+// THIS
+fn move_unit(
+    mut q_units: Query<(&mut Transform, &mut Boid, &Speed), With<Destination>>,
+    time: Res<Time>,
+) {
+    let delta_secs = time.delta_secs();
+
+    for (mut tf, boid, speed) in q_units.iter_mut() {
+        tf.translation += boid.steering.normalize_or_zero() * delta_secs * speed.0;
+    }
+}

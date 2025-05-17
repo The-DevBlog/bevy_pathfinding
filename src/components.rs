@@ -21,15 +21,12 @@ pub struct GameCamera;
 #[derive(Component)]
 pub struct Destination;
 
-#[derive(Component)]
-pub struct RtsObjSize(pub Vec3);
-
 #[derive(Component, Default)]
-#[require(Boid)]
-pub struct RtsObj;
+pub struct RtsObj(pub Vec2);
 
 #[derive(Component, Debug)]
 pub struct Boid {
+    pub steering: Vec3,
     pub prev_neighbors: HashSet<Entity>, // store last frame's neighbors
     pub velocity: Vec3,
     pub prev_steer: Vec3, // start at rest
@@ -39,6 +36,7 @@ pub struct Boid {
 impl Default for Boid {
     fn default() -> Self {
         Self {
+            steering: Vec3::ZERO,
             prev_neighbors: HashSet::new(),
             velocity: Vec3::ZERO,
             prev_steer: Vec3::ZERO, // start at rest
@@ -58,7 +56,7 @@ pub struct BoidsInfo {
 
 impl Default for BoidsInfo {
     fn default() -> Self {
-        let neighbor_radius = 45.0;
+        let neighbor_radius = 8.0;
         Self {
             separation: 50.0,                             // strongest urge to avoid collisions
             alignment: 0.0,                               // medium urge to line up
@@ -81,7 +79,7 @@ pub struct BoidsInfoUpdater {
 
 impl Default for BoidsInfoUpdater {
     fn default() -> Self {
-        let neighbor_radius = 45.0;
+        let neighbor_radius = 8.0;
         Self {
             separation_weight: 50.0,          // strongest urge to avoid collisions
             alignment_weight: 0.0,            // medium urge to line up

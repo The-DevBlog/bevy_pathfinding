@@ -7,7 +7,7 @@ use ui::UiPlugin;
 
 mod components;
 pub mod draw;
-mod resources;
+pub mod resources;
 mod shader;
 mod ui;
 

@@ -1,12 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::{
-    cell::Cell,
-    components::{Destination, RtsObj, RtsObjSize},
-    events::UpdateCostEv,
-    utils,
-};
+use crate::{cell::Cell, components::RtsObj, events::UpdateCostEv, utils};
 
 pub struct GridPlugin;
 
@@ -14,11 +9,7 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Grid>().add_systems(
             Update,
-            (
-                update_costfield_on_add,
-                update_costfield_on_remove,
-                remove_rts_obj,
-            ),
+            (update_costfield_on_add, update_costfield_on_remove),
         );
     }
 }
@@ -26,6 +17,7 @@ impl Plugin for GridPlugin {
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
 pub struct Grid {
+    pub buckets: f32,
     pub cell_radius: f32,
     pub cell_diameter: f32,
     pub grid: Vec<Vec<Cell>>,
@@ -36,8 +28,9 @@ pub struct Grid {
 impl Grid {
     // creates the grid and the costfield
     // all flowfields will share the same costfield
-    pub fn new(size: IVec2, cell_diameter: f32) -> Self {
+    pub fn new(buckets: f32, size: IVec2, cell_diameter: f32) -> Self {
         let mut grid = Grid {
+            buckets,
             cell_diameter,
             cell_radius: cell_diameter / 2.0,
             grid: Vec::default(),
@@ -90,13 +83,14 @@ impl Grid {
         &mut self,
         entity_id: u32,
         obj_transform: &Transform,
-        obj_size: &RtsObjSize,
+        obj_size: &RtsObj,
     ) {
         let cell_size = self.cell_diameter;
         let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
         let grid_offset_y = -self.size.y as f32 * cell_size / 2.0;
 
         let obj_pos = obj_transform.translation;
+        let obj_pos = Vec2::new(obj_pos.x, obj_pos.z);
         let half_extent = obj_size.0 / 2.0;
 
         // Obtain the rotation matrix from the object's rotation.
@@ -104,11 +98,7 @@ impl Grid {
 
         // Compute the absolute value of each column of the rotation matrix.
         // This effectively gives the scaling of the half extents in world space.
-        let abs_rotation = Mat3::from_cols(
-            rotation.x_axis.abs(),
-            rotation.y_axis.abs(),
-            rotation.z_axis.abs(),
-        );
+        let abs_rotation = Mat2::from_cols(rotation.x_axis.xy(), rotation.y_axis.xy());
 
         // Compute the world-space half extents by multiplying with the local half extents.
         let world_half_extent = abs_rotation * half_extent;
@@ -120,8 +110,8 @@ impl Grid {
         // Calculate grid cell indices based on the object's AABB in the xz-plane.
         let min_x = ((aabb_min.x - grid_offset_x) / cell_size).floor() as isize;
         let max_x = ((aabb_max.x - grid_offset_x) / cell_size).floor() as isize;
-        let min_y = ((aabb_min.z - grid_offset_y) / cell_size).floor() as isize;
-        let max_y = ((aabb_max.z - grid_offset_y) / cell_size).floor() as isize;
+        let min_y = ((aabb_min.y - grid_offset_y) / cell_size).floor() as isize;
+        let max_y = ((aabb_max.y - grid_offset_y) / cell_size).floor() as isize;
 
         let mut occupied_cells = Vec::new();
         for y in min_y..=max_y {
@@ -156,7 +146,7 @@ impl Grid {
 fn update_costfield_on_add(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_objects: Query<(Entity, &Transform, &RtsObjSize), Added<RtsObj>>,
+    q_objects: Query<(Entity, &Transform, &RtsObj), Added<RtsObj>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
     if objects.is_empty() {
@@ -181,16 +171,5 @@ fn update_costfield_on_remove(
     if !objs.is_empty() {
         grid.reset_cell_costs(objs);
         cmds.trigger(UpdateCostEv);
-    }
-}
-
-fn remove_rts_obj(mut cmds: Commands, q_units: Query<Entity, Added<Destination>>) {
-    let units = q_units.iter().collect::<Vec<_>>();
-    if units.is_empty() {
-        return;
-    }
-
-    for ent in units.iter() {
-        cmds.entity(*ent).remove::<RtsObj>();
     }
 }

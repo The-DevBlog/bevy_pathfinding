@@ -1,4 +1,5 @@
 use crate::components::BoidsInfoUpdater;
+use crate::events::DrawAllEv;
 
 use super::components::*;
 use super::resources;
@@ -25,6 +26,7 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
+                    set_dbg_ui_hover,
                     update_cursor_icon_grab.run_if(resource_added::<DragState>),
                     update_cursor_icon_default.run_if(resource_removed::<DragState>),
                     slider_drag_start_end.before(slider_drag_update),
@@ -34,7 +36,7 @@ impl Plugin for UiPlugin {
                     handle_boids_dropdown_interaction,
                     handle_hide_dbg_interaction,
                     handle_drawmode_option_interaction,
-                    handle_draw_grid_interaction,
+                    handle_draw_btn_interaction,
                     handle_slider_arrow_interaction,
                     handle_drag,
                 ),
@@ -159,6 +161,7 @@ fn handle_drawmode_option_interaction(
                     OptionsSet::Two => dbg.draw_mode_2 = DrawMode::cast(option.txt.clone()),
                 }
 
+                cmds.trigger(DrawAllEv);
                 cmds.trigger(UpdateDropdownOptionEv);
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -167,22 +170,43 @@ fn handle_drawmode_option_interaction(
     }
 }
 
-fn handle_draw_grid_interaction(
-    mut q_draw_grid: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<DrawGridBtn>),
-    >,
-    mut q_txt: Query<&mut Text, With<DrawGridTxt>>,
+fn handle_draw_btn_interaction(
+    mut cmds: Commands,
+    mut q_draw_grid: Query<(&Interaction, &mut BackgroundColor, &DrawBtn), Changed<Interaction>>,
+    mut q_txt: Query<(&mut Text, &DrawTxt)>,
     mut dbg: ResMut<DbgOptions>,
 ) {
-    for (interaction, mut background) in q_draw_grid.iter_mut() {
+    for (interaction, mut background, draw_grid_btn) in q_draw_grid.iter_mut() {
         match interaction {
             Interaction::Pressed => {
-                dbg.draw_grid = !dbg.draw_grid;
-
-                if let Ok(mut txt) = q_txt.single_mut() {
-                    txt.0 = format!("Grid: {}", dbg.draw_grid);
+                match draw_grid_btn {
+                    DrawBtn::Grid => dbg.draw_grid = !dbg.draw_grid,
+                    DrawBtn::SpatialGrid => dbg.draw_spatial_grid = !dbg.draw_spatial_grid,
+                    DrawBtn::Radius => dbg.draw_radius = !dbg.draw_radius,
                 }
+
+                for (mut txt, txt_type) in q_txt.iter_mut() {
+                    if (draw_grid_btn == &DrawBtn::Grid && *txt_type == DrawTxt::Grid)
+                        || (draw_grid_btn == &DrawBtn::SpatialGrid
+                            && *txt_type == DrawTxt::SpatialGrid)
+                        || (draw_grid_btn == &DrawBtn::Radius && *txt_type == DrawTxt::Radius)
+                    {
+                        match *txt_type {
+                            DrawTxt::Grid => {
+                                txt.0 = format!("Grid: {}", dbg.draw_grid);
+                            }
+                            DrawTxt::SpatialGrid => {
+                                txt.0 = format!("Spatial Grid: {}", dbg.draw_spatial_grid);
+                            }
+                            DrawTxt::Radius => {
+                                txt.0 = format!("Radius: {}", dbg.draw_radius);
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                cmds.trigger(DrawAllEv);
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
             Interaction::None => background.0 = CLR_BACKGROUND_2.into(),
@@ -202,6 +226,7 @@ fn handle_hide_dbg_interaction(
         match interaction {
             Interaction::Pressed => {
                 cmds.trigger(ToggleDbgVisibilityEv(dbg.hide));
+                cmds.trigger(DrawAllEv);
                 dbg.hide = !dbg.hide;
             }
             Interaction::Hovered => background.0 = CLR_BTN_HOVER.into(),
@@ -400,6 +425,7 @@ fn draw_ui_box(
             border: UiRect::all(Val::Px(1.0)),
             ..default()
         },
+        Button::default(),
         BorderColor::from(CLR_BORDER),
         BorderRadius::all(Val::Px(10.0)),
         BackgroundColor::from(CLR_BACKGROUND_1),
@@ -442,25 +468,47 @@ fn draw_ui_box(
         TextColor::from(CLR_TITLE),
     );
 
-    let draw_grid_btn = (
-        DrawGridBtn,
-        VisibleNode,
-        BackgroundColor::from(CLR_BACKGROUND_2),
-        BorderColor::from(CLR_BORDER),
-        Node {
-            padding: UiRect::all(Val::Px(5.0)),
-            ..default()
-        },
-        Name::new("Draw Grid Button"),
-    );
+    let draw_btn = |draw_btn: DrawBtn, margin: Option<UiRect>, border: Option<UiRect>| {
+        let margin = match margin {
+            Some(m) => m,
+            None => UiRect::DEFAULT,
+        };
 
-    let draw_grid_txt = (
-        DrawGridTxt,
-        Text::new(format!("Grid: {}", dbg.draw_grid)),
-        TextFont::from_font_size(FONT_SIZE),
-        TextColor::from(CLR_TXT),
-        Name::new("Draw Grid Txt"),
-    );
+        let border = match border {
+            Some(b) => b,
+            None => UiRect::DEFAULT,
+        };
+
+        (
+            draw_btn,
+            VisibleNode,
+            BackgroundColor::from(CLR_BACKGROUND_2),
+            BorderColor::from(CLR_BORDER),
+            Node {
+                margin,
+                padding: UiRect::all(Val::Px(5.0)),
+                border: border,
+                ..default()
+            },
+            Name::new("Draw Grid Button"),
+        )
+    };
+
+    let draw_txt = |draw_grid_txt: DrawTxt, draw_grid: bool, font_size: f32| {
+        let txt = match draw_grid_txt {
+            DrawTxt::Grid => "Grid",
+            DrawTxt::SpatialGrid => "Spatial Grid",
+            DrawTxt::Radius => "Radius",
+        };
+
+        (
+            draw_grid_txt,
+            Text::new(format!("{}: {}", txt, draw_grid)),
+            TextFont::from_font_size(font_size),
+            TextColor::from(CLR_TXT),
+            Name::new("Draw Grid Txt"),
+        )
+    };
 
     let dropdown_btn = |set: OptionsSet| DropDownBtnBundle {
         comp: DropdownBtn(set),
@@ -606,7 +654,7 @@ fn draw_ui_box(
             None,
         ),
         (
-            "Neighbor Radius",
+            "Radius",
             boids_info.neighbor_radius,
             BoidsInfoOptions::NeighborRadius,
             Some(BorderRadius::top(Val::Px(10.0))),
@@ -676,8 +724,27 @@ fn draw_ui_box(
         });
 
         // Draw Grid
-        ctr.spawn(draw_grid_btn).with_children(|ctr| {
-            ctr.spawn(draw_grid_txt);
+        ctr.spawn(draw_btn(
+            DrawBtn::Grid,
+            None,
+            Some(UiRect::top(Val::Px(1.0))),
+        ))
+        .with_children(|ctr| {
+            ctr.spawn(draw_txt(DrawTxt::Grid, dbg.draw_grid, FONT_SIZE));
+        });
+
+        // Draw Spatial Grid
+        ctr.spawn(draw_btn(
+            DrawBtn::SpatialGrid,
+            None,
+            Some(UiRect::top(Val::Px(1.0))),
+        ))
+        .with_children(|ctr| {
+            ctr.spawn(draw_txt(
+                DrawTxt::SpatialGrid,
+                dbg.draw_spatial_grid,
+                FONT_SIZE,
+            ));
         });
 
         // Draw Mode 1 Container
@@ -791,6 +858,17 @@ fn draw_ui_box(
             options_container(BorderRadius::bottom(Val::Px(10.0)), Some(5.0)),
         ))
         .with_children(|options| {
+            // Draw Radius
+            options
+                .spawn(draw_btn(
+                    DrawBtn::Radius,
+                    Some(UiRect::horizontal(Val::Px(5.0))),
+                    None,
+                ))
+                .with_children(|ctr| {
+                    ctr.spawn(draw_txt(DrawTxt::Radius, dbg.draw_radius, FONT_SIZE - 1.0));
+                });
+
             // Boids Info Dropdown Options
             for (label, val, info, radius) in labels {
                 options
@@ -894,25 +972,20 @@ fn slider_drag_start_end(
         (With<BoidsSliderValue>, Changed<Interaction>),
     >,
     mut q_updater: Query<&mut BoidsInfoUpdater>,
-    mut q_cursor: Query<&mut CursorIcon>,
 ) {
-    let Ok(window) = q_window.single() else {
-        return;
-    };
-
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-
-    let Ok(mut cursor) = q_cursor.single_mut() else {
-        return;
-    };
-
-    let Ok(updater) = q_updater.single_mut() else {
-        return;
-    };
-
     for (interaction, mut background_clr, boids_info) in q.iter_mut() {
+        let Ok(window) = q_window.single() else {
+            return;
+        };
+
+        let Some(cursor_pos) = window.cursor_position() else {
+            return;
+        };
+
+        let Ok(updater) = q_updater.single_mut() else {
+            return;
+        };
+
         match *interaction {
             Interaction::Pressed => {
                 if input.just_pressed(MouseButton::Left) {
@@ -931,15 +1004,8 @@ fn slider_drag_start_end(
                 }
             }
 
-            Interaction::Hovered => {
-                background_clr.0 = CLR_BTN_HOVER.into();
-                *cursor = SystemCursorIcon::Grabbing.into();
-            }
-
-            Interaction::None => {
-                background_clr.0 = CLR_BACKGROUND_1.into();
-                *cursor = SystemCursorIcon::Default.into();
-            }
+            Interaction::Hovered => background_clr.0 = CLR_BTN_HOVER.into(),
+            Interaction::None => background_clr.0 = CLR_BACKGROUND_1.into(),
         }
     }
 }
@@ -1001,5 +1067,38 @@ fn update_cursor_icon_default(mut q_cursor: Query<&mut CursorIcon>) {
 fn remove_drag_on_win_focus_lost(input: Res<ButtonInput<MouseButton>>, mut cmds: Commands) {
     if input.just_released(MouseButton::Left) {
         cmds.remove_resource::<DragState>();
+    }
+}
+
+fn set_dbg_ui_hover(
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    mut q_root_ctr: Query<(&GlobalTransform, &ComputedNode), With<RootCtr>>,
+    mut dbg_options: ResMut<DbgOptions>,
+) {
+    let Ok(window) = q_window.single() else {
+        return;
+    };
+
+    let Some(cursor) = window.cursor_position() else {
+        return;
+    };
+
+    for (tf, style) in q_root_ctr.iter_mut() {
+        let (w, h) = (style.content_size.x, style.content_size.y);
+
+        // compute box corners in window‐space
+        // Bevy UI positions are in “pixels from the bottom‐left” by default
+        let pos = tf.translation();
+        let min_x = pos.x - w * 0.5;
+        let max_x = pos.x + w * 0.5;
+        let min_y = pos.y - h * 0.5;
+        let max_y = pos.y + h * 0.5;
+
+        // simple AABB test
+        if cursor.x >= min_x && cursor.x <= max_x && cursor.y >= min_y && cursor.y <= max_y {
+            dbg_options.hover = true;
+        } else {
+            dbg_options.hover = false;
+        }
     }
 }

@@ -3,7 +3,10 @@ use bevy::prelude::*;
 use crate::flowfield::FlowField;
 
 #[derive(Event)]
-pub struct InitializeFlowFieldEv(pub Vec<Entity>);
+pub struct InitializeFlowFieldEv {
+    pub entities: Vec<Entity>,
+    pub destination_pos: Vec3,
+}
 
 #[derive(Event)]
 pub struct SetActiveFlowfieldEv(pub Option<FlowField>);
