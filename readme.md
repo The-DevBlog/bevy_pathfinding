@@ -2,8 +2,6 @@
 
 A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-based collision avoidance** to move units smoothly. Great for RTS games!
 
-![demo](assets/demo.gif)
-
 ### What is **Flowfield Pathfinding**?
 
 A grid-based navigation technique that first calculates the minimum “cost” from every cell to a target, then turns those costs into a field of simple direction vectors. Units just sample the vector under their feet each step to follow an optimal path with almost no per-unit computation.
@@ -70,8 +68,6 @@ cargo run --example basic --features bevy_pathfinding/debug
   - **Cohesion** : cohesion weight (how strongly it steers inward)  
   - **Alignment** : alignment weight (how strongly it matches neighbor heading)  
   - **Radius** : how far each boid “sees” before applying the above factors  
-
-![debug UI demo](assets/debug_ui_demo.gif)
 
 ## FAQ
 
