@@ -476,7 +476,7 @@ fn draw_ui_box(
 
         let border = match border {
             Some(b) => b,
-            None => UiRect::top(Val::Px(1.0)),
+            None => UiRect::DEFAULT,
         };
 
         (
@@ -494,7 +494,7 @@ fn draw_ui_box(
         )
     };
 
-    let draw_txt = |draw_grid_txt: DrawTxt, draw_grid: bool| {
+    let draw_txt = |draw_grid_txt: DrawTxt, draw_grid: bool, font_size: f32| {
         let txt = match draw_grid_txt {
             DrawTxt::Grid => "Grid",
             DrawTxt::SpatialGrid => "Spatial Grid",
@@ -504,7 +504,7 @@ fn draw_ui_box(
         (
             draw_grid_txt,
             Text::new(format!("{}: {}", txt, draw_grid)),
-            TextFont::from_font_size(FONT_SIZE),
+            TextFont::from_font_size(font_size),
             TextColor::from(CLR_TXT),
             Name::new("Draw Grid Txt"),
         )
@@ -730,7 +730,7 @@ fn draw_ui_box(
             Some(UiRect::top(Val::Px(1.0))),
         ))
         .with_children(|ctr| {
-            ctr.spawn(draw_txt(DrawTxt::Grid, dbg.draw_grid));
+            ctr.spawn(draw_txt(DrawTxt::Grid, dbg.draw_grid, FONT_SIZE));
         });
 
         // Draw Spatial Grid
@@ -740,7 +740,11 @@ fn draw_ui_box(
             Some(UiRect::top(Val::Px(1.0))),
         ))
         .with_children(|ctr| {
-            ctr.spawn(draw_txt(DrawTxt::SpatialGrid, dbg.draw_spatial_grid));
+            ctr.spawn(draw_txt(
+                DrawTxt::SpatialGrid,
+                dbg.draw_spatial_grid,
+                FONT_SIZE,
+            ));
         });
 
         // Draw Mode 1 Container
@@ -862,7 +866,7 @@ fn draw_ui_box(
                     None,
                 ))
                 .with_children(|ctr| {
-                    ctr.spawn(draw_txt(DrawTxt::Radius, dbg.draw_radius));
+                    ctr.spawn(draw_txt(DrawTxt::Radius, dbg.draw_radius, FONT_SIZE - 1.0));
                 });
 
             // Boids Info Dropdown Options
