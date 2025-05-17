@@ -2,46 +2,33 @@
 This example uses a simple point-and-click movement system to move units around the map.
 */
 
-use std::time::Duration;
-
-use bevy::{
-    color::palettes::{
-        css::GREY,
-        tailwind::{BLUE_500, GREEN_600},
-    },
-    prelude::*,
-    time::common_conditions::once_after_delay,
-    window::PrimaryWindow,
-};
+use bevy::{color::palettes::tailwind::*, prelude::*, window::PrimaryWindow};
 use bevy_pathfinding::{
     components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
     BevyPathfindingPlugin,
 };
 
-const CELL_SIZE: f32 = 10.0;
-const BUCKETS: f32 = 5.0;
-const MAP_GRID: IVec2 = IVec2::new(25, 25);
+const CELL_SIZE: f32 = 10.0; // size of each cell in the grid
+const BUCKETS: f32 = 5.0; // size of each bucket (spatial partitioning) in the grid
+const MAP_GRID: IVec2 = IVec2::new(25, 25); // number of cell rows and columns
+
+// size of the map is determined by the grid size and cell size
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
+
 const UNIT_COUNT: usize = 25;
 
 fn main() {
     let mut app = App::new();
 
-    app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // THIS
+    app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // ADD THIS!
         .add_plugins((
             DefaultPlugins,
-            BevyPathfindingPlugin, // THIS
+            BevyPathfindingPlugin, // ADD THIS!
         ))
         .add_systems(Startup, (camera, setup, spawn_units))
-        .add_systems(
-            Update,
-            (
-                set_unit_destination,
-                spawn_obstacles.run_if(once_after_delay(Duration::from_millis(100))),
-                move_unit.run_if(any_with_component::<Destination>),
-            ),
-        )
+        .add_systems(PostStartup, spawn_obstacles)
+        .add_systems(Update, (set_unit_destination, move_unit))
         .run();
 }
 
@@ -54,7 +41,7 @@ struct Speed(f32);
 fn camera(mut cmds: Commands) {
     cmds.spawn((
         Camera3d::default(),
-        GameCamera, // THIS
+        GameCamera, // ADD THIS!
         Transform::from_translation(Vec3::new(0.0, 150.0, 250.0)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
@@ -67,7 +54,7 @@ fn setup(
     let ground = (
         Mesh3d(meshes.add(Plane3d::default().mesh().size(MAP_WIDTH, MAP_DEPTH))),
         MeshMaterial3d(materials.add(StandardMaterial::from_color(GREEN_600))),
-        MapBase, // THIS
+        MapBase, // ADD THIS!
         Name::new("Map Base"),
     );
 
@@ -104,7 +91,7 @@ fn spawn_units(
             MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
             Transform::from_translation(pos),
             Speed(25.0),
-            Boid::default(), // THIS
+            Boid::default(), // ADD THIS!
             Unit,
             Name::new("Unit"),
         )
@@ -138,9 +125,9 @@ fn spawn_obstacles(
     let mut obstacle = |pos: Vec3| {
         (
             Mesh3d(meshes.add(Cuboid::from_size(size))),
-            MeshMaterial3d(materials.add(StandardMaterial::from_color(GREY))),
+            MeshMaterial3d(materials.add(StandardMaterial::from_color(GRAY_400))),
             Transform::from_translation(pos),
-            RtsObj(size.xz()), // THIS
+            RtsObj(size.xz()), // ADD THIS!
             Name::new("Obstacle"),
         )
     };
@@ -184,20 +171,28 @@ fn set_unit_destination(
         return;
     };
 
-    // THIS
-    let mut units = Vec::new();
-    for unit_entity in q_units.iter_mut() {
-        units.push(unit_entity);
-    }
+    // ADD THIS!
+    {
+        // collect all the units you wish to assign to a flowfield
+        let mut units = Vec::new();
+        for unit_entity in q_units.iter_mut() {
+            units.push(unit_entity);
+        }
 
-    let destination_pos = utils::get_world_pos(map_tf, cam_transform, cam, cursor_pos);
-    cmds.trigger(InitializeFlowFieldEv {
-        entities: units,
-        destination_pos,
-    });
+        // get the destination position in world space using the 'get_world_pos' function
+        let destination_pos = utils::get_world_pos(map_tf, cam_transform, cam, cursor_pos);
+
+        // create a flowfield and assign the units and destination position it it
+        cmds.trigger(InitializeFlowFieldEv {
+            entities: units,
+            destination_pos,
+        });
+    }
 }
 
-// THIS
+// ADD THIS!
+// moves all units (boids) that have a destination, towards it
+// if you are using a physics engine, you would want to swap out the 'Transform' here
 fn move_unit(
     mut q_units: Query<(&mut Transform, &mut Boid, &Speed), With<Destination>>,
     time: Res<Time>,
