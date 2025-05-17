@@ -4,6 +4,15 @@ A simple 3D Bevy plugin that combines **flowfield pathfinding** with **boid-base
 
 ![demo](assets/demo.gif)
 
+What is **Flowfield Pathfinding**?
+
+A grid-based navigation technique that first calculates the minimum “cost” from every cell to a target, then turns those costs into a field of simple direction vectors—agents just sample the vector under their feet each step to follow an optimal path with almost no per-agent computation
+
+Okay, but what the heck is **Boid Collision Avoidance**?
+
+   A lightweight, local steering model where each agent blends three rules—steering away from too-close neighbors (separation), matching their heading (alignment), and moving toward the group’s center (cohesion)—to naturally avoid collisions and maintain smooth, flock-like motion.
+
+
 ## Getting Started
 
 Add the **bevy_pathfinding** crate:
