@@ -12,22 +12,23 @@ impl Plugin for ComponentsPlugin {
     }
 }
 
-/// A marker component for the map base
+/// A marker component for the map base. Insert this into your base map entity.
 #[derive(Component)]
 pub struct MapBase;
 
-/// A marker component for the primary camera
+/// A marker component for the primary camera. Insert this into your camera entity.
 #[derive(Component)]
 pub struct GameCamera;
 
-/// Destination marker for the boids
+/// Destination marker. This is dynamically added to every boid entity when the flowfield is initialized.
 #[derive(Component)]
 pub struct Destination;
 
-/// Determines the size of obstacles
+/// The mesh size of the component, only considering the x and y axis.
 #[derive(Component, Default)]
 pub struct RtsObj(pub Vec2);
 
+/// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to control boid behavior and settings.
 #[derive(Component, Debug)]
 pub struct Boid {
     pub steering: Vec3,
@@ -50,6 +51,18 @@ impl Default for Boid {
 }
 
 impl Boid {
+    /// Creates a new boid with the given parameters.
+    ///
+    /// # Example
+    /// ```
+    /// Boid::new(50.0, 1.0, 1.0, 5.0);
+    /// ```
+    ///
+    /// # Parameters
+    /// - `separation`: The separation weight. This determines how much the boid will try to avoid other boids.
+    /// - `alignment`: The alignment weight. This determines how much the boid will try to align its velocity with other boids.
+    /// - `cohesion`: The cohesion weight. This determines how much the boid will try to move towards the center of its neighbors.
+    /// - `radius`: The radius of the boid. This determines how far the boid can see its neighbors before it applies the steering forces.
     pub fn new(separation: f32, alignment: f32, cohesion: f32, radius: f32) -> Self {
         let neighbor_radius = radius;
         Self {
@@ -90,7 +103,7 @@ impl Default for BoidsInfo {
     }
 }
 
-// used for debugging purposes
+/// DO NOT USE. This component is updated whenever the boids info in the debug UI menu changes.
 #[derive(Component, Reflect)]
 pub struct BoidsInfoUpdater {
     pub separation_weight: f32,    // push apart

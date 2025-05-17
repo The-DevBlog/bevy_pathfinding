@@ -31,9 +31,6 @@ fn main() {
 }
 
 #[derive(Component)]
-struct Unit;
-
-#[derive(Component)]
 struct Speed(f32);
 
 fn camera(mut cmds: Commands) {
@@ -90,16 +87,7 @@ fn spawn_units(
             MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
             Transform::from_translation(pos),
             Speed(25.0),
-            Boid::default(), // ADD THIS! - this is where you can set the boid properties (separation, alignment, etc.)
-            /*  example (defaults):
-                Boid::new(
-                    50.0, // separation
-                    0.0,  // alignment
-                    0.0,  // cohesion
-                    5.0,  // radius
-                )
-            */
-            Unit,
+            Boid::default(), // ADD THIS! -  Can also be set with custom parameters `Boid::new(50.0, 0.0, 0.0, 5.0)`
             Name::new("Unit"),
         )
     };
@@ -149,7 +137,7 @@ fn spawn_obstacles(
 fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,
-    mut q_units: Query<Entity, With<Unit>>,
+    mut q_units: Query<Entity, With<Boid>>,
     q_map: Query<&GlobalTransform, With<MapBase>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_window: Query<&Window, With<PrimaryWindow>>,
