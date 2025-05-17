@@ -16,6 +16,8 @@ A lightweight, local steering technique where each unit blends three factors—s
 
 Actually, no. The Bevy Pathfinding crate features a powerful spatial partitioning (or bucketing) optimization. When you initialize the grid using: `app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE));`, you include a **BUCKETS** value. The grid is split equally into this BUCKETS value, so each boid is applying forces against other boids in the **same bucket**. *Nice.*
 
+Be sure to play around with the example(s) and adjust the BUCKETS value. Then use the debug UI to visualize the buckets.
+
 ## Getting Started
 
 Add the **bevy_pathfinding** crate:
