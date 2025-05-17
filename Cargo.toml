@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = [
+bevy = { version = "0.16.0", default-features = false, features = [
     "bevy_asset",
     "bevy_gizmos",
     "bevy_pbr",
@@ -17,7 +17,7 @@ bytemuck = "1.21.0"
 image = "0.25.5"
 
 [dev-dependencies]
-bevy = "0.16"
+bevy = "0.16.0"
 
 [features]
 debug = []
