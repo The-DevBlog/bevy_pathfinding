@@ -38,7 +38,7 @@ cargo run --example basic --features bevy_pathfinding/debug
 
 ## Using the Debug Settings
 
-![debug UI](assets/debug_ui.png)
+![debug UI](debug_ui.png)
 
 What do all of these settings do?
 
@@ -53,7 +53,7 @@ What do all of these settings do?
     - Alignment ->  alignment weight (how strongly it matches neighbor heading)
     - Radius -> how far each boid “sees” before applying above factors
 
-![debug UI demo](assets/debug_ui_demo.gif)
+![debug UI demo](debug_ui_demo.gif)
 
 ## Bevy Version Compatbility
 
