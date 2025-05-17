@@ -46,6 +46,7 @@ fn camera(mut cmds: Commands) {
     ));
 }
 
+// spawn ground and light
 fn setup(
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -138,6 +139,7 @@ fn spawn_obstacles(
     cmds.spawn(obstacle(Vec3::new(0.0, 5.0, -80.0)));
 }
 
+// uses the mouse position to set the destination of all units
 fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,
