@@ -89,7 +89,7 @@ pub fn calculate_boid_steering(
                 let by = ((tf.translation.z - origin.y) / bucket_size_y).floor() as i32;
 
                 // gather neighbors with hysteresis
-                let enter_r2 = boid.info.neighbor_radius.powi(2);
+                let enter_r2 = boid.info.neighbor_radius.powi(2) * 2.0;
                 let exit_r2 = boid.info.neighbor_exit_radius.powi(2);
                 let mut current_neighbors = HashSet::new();
                 let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
