@@ -1,6 +1,6 @@
 # Bevy Pathfinding
 
-[demo](assets/demo/demo.mp4)
+[demo](assets/demo/demo.gif)
 
 ## Getting Started
 
