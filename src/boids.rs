@@ -3,7 +3,10 @@ use std::{
     f32::consts::PI,
 };
 
-use bevy::{color::palettes::css::YELLOW, prelude::*};
+use bevy::{
+    color::palettes::css::{GREEN, RED, YELLOW},
+    prelude::*,
+};
 
 use crate::{components::*, debug::resources::DbgOptions, flowfield::FlowField, grid::Grid};
 
@@ -53,6 +56,19 @@ pub fn calculate_boid_steering(
             Vec2::new(bucket_size_x, bucket_size_y),
             YELLOW,
         );
+    }
+
+    if dbg_options.draw_radius {
+        for (_, tf, boid) in q_boids.iter() {
+            // take the boid’s world‐space translation…
+            let pos: Vec3 = tf.translation;
+            // …and your desired “lay it flat” rotation…
+            let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
+            // …and build a full isometry:
+            let iso = Isometry3d::new(pos, rot);
+
+            gizmos.circle(iso, boid.info.neighbor_radius, RED);
+        }
     }
 
     // 3) Build bucket map: (bx,by) → list of boids in that cell
