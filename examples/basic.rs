@@ -5,20 +5,18 @@ use bevy::{
         css::GREY,
         tailwind::{BLUE_500, GREEN_600},
     },
-    math::bounding::Aabb2d,
     prelude::*,
     time::common_conditions::once_after_delay,
     window::PrimaryWindow,
 };
 use bevy_pathfinding::{
     components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
-    BevyPathFindingPlugin,
+    BevyPathfindingPlugin,
 };
-use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 
 const CELL_SIZE: f32 = 10.0;
 const BUCKETS: f32 = 5.0;
-const MAP_GRID: IVec2 = IVec2::new(50, 50);
+const MAP_GRID: IVec2 = IVec2::new(25, 25);
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
 const UNIT_COUNT: usize = 25;
@@ -29,8 +27,7 @@ fn main() {
     app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // THIS
         .add_plugins((
             DefaultPlugins,
-            RtsCameraPlugin,
-            BevyPathFindingPlugin, // THIS
+            BevyPathfindingPlugin, // THIS
         ))
         .add_systems(Startup, (camera, setup, spawn_units))
         .add_systems(
@@ -54,23 +51,7 @@ fn camera(mut cmds: Commands) {
     cmds.spawn((
         Camera3d::default(),
         GameCamera, // THIS
-        RtsCamera {
-            bounds: Aabb2d::new(Vec2::ZERO, Vec2::new(MAP_WIDTH, MAP_DEPTH)),
-            min_angle: 60.0f32.to_radians(),
-            height_max: 1000.0,
-            height_min: 30.0,
-            ..default()
-        },
-        RtsCameraControls {
-            edge_pan_width: 0.01,
-            key_left: KeyCode::KeyA,
-            key_right: KeyCode::KeyD,
-            key_up: KeyCode::KeyW,
-            key_down: KeyCode::KeyS,
-            pan_speed: 165.0,
-            zoom_sensitivity: 0.2,
-            ..default()
-        },
+        Transform::from_translation(Vec3::new(0.0, 150.0, 250.0)).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
 
@@ -82,7 +63,6 @@ fn setup(
     let ground = (
         Mesh3d(meshes.add(Plane3d::default().mesh().size(MAP_WIDTH, MAP_DEPTH))),
         MeshMaterial3d(materials.add(StandardMaterial::from_color(GREEN_600))),
-        Ground,
         MapBase, // THIS
         Name::new("Map Base"),
     );
@@ -143,9 +123,6 @@ fn spawn_units(
 
         cmds.spawn(unit(Vec3::new(x, 2.5, z)));
     }
-
-    // cmds.spawn(unit(Vec3::new(50.0, 2.5, 0.0)));
-    // cmds.spawn(unit(Vec3::new(-50.0, 2.5, 0.0)));
 }
 
 fn spawn_obstacles(
@@ -153,7 +130,7 @@ fn spawn_obstacles(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let size = Vec3::new(25.0, 10.0, 25.0);
+    let size = Vec3::new(35.0, 10.0, 35.0);
     let mut obstacle = |pos: Vec3| {
         (
             Mesh3d(meshes.add(Cuboid::from_size(size))),
@@ -164,10 +141,10 @@ fn spawn_obstacles(
         )
     };
 
-    cmds.spawn(obstacle(Vec3::new(-100.0, 5.0, 0.0)));
-    cmds.spawn(obstacle(Vec3::new(100.0, 5.0, 0.0)));
-    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, 100.0)));
-    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, -100.0)));
+    cmds.spawn(obstacle(Vec3::new(-80.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(80.0, 5.0, 0.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, 80.0)));
+    cmds.spawn(obstacle(Vec3::new(0.0, 5.0, -80.0)));
 }
 
 fn set_unit_destination(

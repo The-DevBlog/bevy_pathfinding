@@ -21,9 +21,9 @@ use flowfield::FlowfieldPlugin;
 use grid::GridPlugin;
 use resources::ResourcesPlugin;
 
-pub struct BevyPathFindingPlugin;
+pub struct BevyPathfindingPlugin;
 
-impl Plugin for BevyPathFindingPlugin {
+impl Plugin for BevyPathfindingPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
             BoidsPlugin,

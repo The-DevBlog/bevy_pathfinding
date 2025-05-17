@@ -56,7 +56,7 @@ pub struct BoidsInfo {
 
 impl Default for BoidsInfo {
     fn default() -> Self {
-        let neighbor_radius = 8.0;
+        let neighbor_radius = 5.0;
         Self {
             separation: 50.0,                             // strongest urge to avoid collisions
             alignment: 0.0,                               // medium urge to line up
@@ -79,7 +79,7 @@ pub struct BoidsInfoUpdater {
 
 impl Default for BoidsInfoUpdater {
     fn default() -> Self {
-        let neighbor_radius = 8.0;
+        let neighbor_radius = 5.0;
         Self {
             separation_weight: 50.0,          // strongest urge to avoid collisions
             alignment_weight: 0.0,            // medium urge to line up
