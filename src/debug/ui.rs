@@ -172,10 +172,7 @@ fn handle_drawmode_option_interaction(
 
 fn handle_draw_grid_interaction(
     mut cmds: Commands,
-    mut q_draw_grid: Query<
-        (&Interaction, &mut BackgroundColor, &DrawGridBtn),
-        Changed<Interaction>,
-    >,
+    mut q_draw_grid: Query<(&Interaction, &mut BackgroundColor, &DrawBtn), Changed<Interaction>>,
     mut q_txt: Query<(&mut Text, &DrawGridTxt)>,
     mut dbg: ResMut<DbgOptions>,
 ) {
@@ -183,13 +180,14 @@ fn handle_draw_grid_interaction(
         match interaction {
             Interaction::Pressed => {
                 match draw_grid_btn {
-                    DrawGridBtn::Grid => dbg.draw_grid = !dbg.draw_grid,
-                    DrawGridBtn::SpatialGrid => dbg.draw_spatial_grid = !dbg.draw_spatial_grid,
+                    DrawBtn::Grid => dbg.draw_grid = !dbg.draw_grid,
+                    DrawBtn::SpatialGrid => dbg.draw_spatial_grid = !dbg.draw_spatial_grid,
+                    DrawBtn::Radius => dbg.draw_radius = !dbg.draw_radius,
                 }
 
                 for (mut txt, txt_type) in q_txt.iter_mut() {
-                    if (draw_grid_btn == &DrawGridBtn::Grid && *txt_type == DrawGridTxt::Grid)
-                        || (draw_grid_btn == &DrawGridBtn::SpatialGrid
+                    if (draw_grid_btn == &DrawBtn::Grid && *txt_type == DrawGridTxt::Grid)
+                        || (draw_grid_btn == &DrawBtn::SpatialGrid
                             && *txt_type == DrawGridTxt::SpatialGrid)
                     {
                         match *txt_type {
@@ -198,6 +196,9 @@ fn handle_draw_grid_interaction(
                             }
                             DrawGridTxt::SpatialGrid => {
                                 txt.0 = format!("Spatial Grid: {}", dbg.draw_spatial_grid);
+                            }
+                            DrawGridTxt::Radius => {
+                                txt.0 = format!("Radius: {}", dbg.draw_radius);
                             }
                         }
                         break;
@@ -466,7 +467,7 @@ fn draw_ui_box(
         TextColor::from(CLR_TITLE),
     );
 
-    let draw_grid_btn = |draw_grid_btn: DrawGridBtn| {
+    let draw_grid_btn = |draw_grid_btn: DrawBtn| {
         (
             draw_grid_btn,
             VisibleNode,
@@ -485,12 +486,11 @@ fn draw_ui_box(
         let txt = match draw_grid_txt {
             DrawGridTxt::Grid => "Grid",
             DrawGridTxt::SpatialGrid => "Spatial Grid",
+            DrawGridTxt::Radius => "Radius",
         };
 
         (
             draw_grid_txt,
-            // Text::new(format!("Grid: {}", dbg.draw_grid)),
-            // Text::new(format!("{}: {}", txt, draw_grid)),
             Text::new(format!("{}: {}", txt, draw_grid)),
             TextFont::from_font_size(FONT_SIZE),
             TextColor::from(CLR_TXT),
@@ -642,7 +642,7 @@ fn draw_ui_box(
             None,
         ),
         (
-            "Neighbor Radius",
+            "Radius",
             boids_info.neighbor_radius,
             BoidsInfoOptions::NeighborRadius,
             Some(BorderRadius::top(Val::Px(10.0))),
@@ -712,13 +712,13 @@ fn draw_ui_box(
         });
 
         // Draw Grid
-        ctr.spawn(draw_grid_btn(DrawGridBtn::Grid))
+        ctr.spawn(draw_grid_btn(DrawBtn::Grid))
             .with_children(|ctr| {
                 ctr.spawn(draw_grid_txt(DrawGridTxt::Grid, dbg.draw_grid));
             });
 
         // Draw Spatial Grid
-        ctr.spawn(draw_grid_btn(DrawGridBtn::SpatialGrid))
+        ctr.spawn(draw_grid_btn(DrawBtn::SpatialGrid))
             .with_children(|ctr| {
                 ctr.spawn(draw_grid_txt(
                     DrawGridTxt::SpatialGrid,
@@ -837,6 +837,13 @@ fn draw_ui_box(
             options_container(BorderRadius::bottom(Val::Px(10.0)), Some(5.0)),
         ))
         .with_children(|options| {
+            // Draw Grid
+            options
+                .spawn(draw_grid_btn(DrawBtn::Radius))
+                .with_children(|ctr| {
+                    ctr.spawn(draw_grid_txt(DrawGridTxt::Radius, dbg.draw_radius));
+                });
+
             // Boids Info Dropdown Options
             for (label, val, info, radius) in labels {
                 options

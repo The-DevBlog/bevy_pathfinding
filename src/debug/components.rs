@@ -16,15 +16,17 @@ pub struct DebugUI;
 
 #[derive(Component, PartialEq)]
 #[require(Button)]
-pub enum DrawGridBtn {
+pub enum DrawBtn {
     Grid,
     SpatialGrid,
+    Radius,
 }
 
 #[derive(Component, PartialEq)]
 pub enum DrawGridTxt {
     Grid,
     SpatialGrid,
+    Radius,
 }
 
 #[derive(Component)]

@@ -60,11 +60,8 @@ pub fn calculate_boid_steering(
 
     if dbg_options.draw_radius {
         for (_, tf, boid) in q_boids.iter() {
-            // take the boid’s world‐space translation…
             let pos: Vec3 = tf.translation;
-            // …and your desired “lay it flat” rotation…
             let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
-            // …and build a full isometry:
             let iso = Isometry3d::new(pos, rot);
 
             gizmos.circle(iso, boid.info.neighbor_radius, RED);
