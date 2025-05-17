@@ -45,6 +45,25 @@ impl Default for Boid {
     }
 }
 
+impl Boid {
+    pub fn new(separation: f32, alignment: f32, cohesion: f32, radius: f32) -> Self {
+        let neighbor_radius = radius;
+        Self {
+            steering: Vec3::ZERO,
+            prev_neighbors: HashSet::new(),
+            velocity: Vec3::ZERO,
+            prev_steer: Vec3::ZERO,
+            info: BoidsInfo {
+                separation,
+                alignment,
+                cohesion,
+                neighbor_radius: neighbor_radius,
+                neighbor_exit_radius: neighbor_radius * 1.05,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Reflect)]
 pub struct BoidsInfo {
     pub separation: f32,           // push apart

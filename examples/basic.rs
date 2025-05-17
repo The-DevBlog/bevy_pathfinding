@@ -1,6 +1,4 @@
-/*
-This example uses a simple point-and-click movement system to move units around the map.
-*/
+// This example uses a simple point-and-click movement system to move units around the map.
 
 use bevy::{color::palettes::tailwind::*, prelude::*, window::PrimaryWindow};
 use bevy_pathfinding::{
@@ -92,7 +90,15 @@ fn spawn_units(
             MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
             Transform::from_translation(pos),
             Speed(25.0),
-            Boid::default(), // ADD THIS!
+            Boid::default(), // ADD THIS! - this is where you can set the boid properties (separation, alignment, etc.)
+            /*  example (defaults):
+                Boid::new(
+                    50.0, // separation
+                    0.0,  // alignment
+                    0.0,  // cohesion
+                    5.0,  // radius
+                )
+            */
             Unit,
             Name::new("Unit"),
         )
