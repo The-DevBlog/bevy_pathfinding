@@ -54,6 +54,8 @@ What do all of these settings do?
     - Alignment ->  alignment weight (how strongly it matches neighbor heading)
     - Radius -> how far each boid “sees” before applying above factors
 
+![debug UI demo](assets/debug_ui_demo.gif)
+
 ## Bevy Version Compatbility
 
 | bevy | bevy_pathfinding |
