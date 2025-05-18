@@ -33,6 +33,7 @@ See the [example](examples/basic.rs) for full setup instructions.
 **Note**: When viewing examples, be sure to view all lines that have the `// ADD THIS!` comment, as this indicates what you will need to add in your own project.
 
 - basic
+- stress_test
 
 ```
 cargo run --example <example name>
@@ -41,7 +42,7 @@ cargo run --example <example name>
 or to run with the debug UI:
 
 ```
-cargo run --example basic --features bevy_pathfinding/debug
+cargo run --example <example name> --features bevy_pathfinding/debug
 ```
 
 ## Using the Debug Settings
@@ -53,7 +54,7 @@ When using the debug UI settings, it will automatically update every boid in the
 To run your project with the debug UI:
 
 ```
-cargo run --example basic --features bevy_pathfinding/debug
+cargo run <project name> --features bevy_pathfinding/debug
 ```
 
 ![debug UI](assets/debug_ui.png)
