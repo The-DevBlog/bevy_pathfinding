@@ -5,25 +5,29 @@ use bevy::{
     color::palettes::tailwind::*, math::bounding::Aabb2d, prelude::*, window::PrimaryWindow,
 };
 use bevy_pathfinding::{
-    components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
-    BevyPathfindingPlugin,
+    components::*,
+    debug::resources::{BoidUpdater, DbgOptions},
+    events::InitializeFlowFieldEv,
+    grid::Grid,
+    utils, BevyPathfindingPlugin,
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
 
 const CELL_SIZE: f32 = 10.0; // size of each cell in the grid
-const BUCKETS: f32 = 50.0; // size of each bucket (spatial partitioning) in the grid
-const MAP_GRID: IVec2 = IVec2::new(200, 200); // number of cell rows and columns
+const BUCKETS: f32 = 150.0; // size of each bucket (spatial partitioning) in the grid
+const MAP_GRID: IVec2 = IVec2::new(300, 300); // number of cell rows and columns
 
 // size of the map is determined by the grid size and cell size
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
 
-const UNIT_COUNT: usize = 5000;
+const UNIT_COUNT: usize = 10000;
 
 fn main() {
     let mut app = App::new();
 
     app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // ADD THIS!
+        .insert_resource(BoidUpdater::new(10.0, 0.0, 0.0, 5.0))
         .add_plugins((
             DefaultPlugins,
             BevyPathfindingPlugin, // ADD THIS!

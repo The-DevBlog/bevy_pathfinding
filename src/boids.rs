@@ -119,7 +119,14 @@ pub fn calculate_boid_steering(
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
                 // smooth and integrate
-                let raw = sep + ali + coh + flow_force;
+                let sep_w = boid.info.separation; // e.g. 1.5
+                let ali_w = boid.info.alignment; // e.g. 1.0
+                let coh_w = boid.info.cohesion; // e.g. 1.0
+                let flow_w = 0.5; // < 1.0 so flow can’t overwhelm separation
+
+                let raw = sep * sep_w + ali * ali_w + coh * coh_w + flow_force * flow_w;
+
+                // let raw = sep + ali + coh + flow_force;
                 let smooth = boid.prev_steer.lerp(raw, 0.1);
                 boid.prev_steer = smooth;
                 boid.steering = smooth;
