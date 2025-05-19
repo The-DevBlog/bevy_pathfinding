@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::{cell::Cell, components::RtsObj, events::UpdateCostEv, utils};
+use crate::{cell::Cell, components::Obstacle, events::UpdateCostEv, utils};
 
 pub struct GridPlugin;
 
@@ -104,7 +104,7 @@ impl Grid {
         &mut self,
         entity_id: u32,
         obj_transform: &Transform,
-        obj_size: &RtsObj,
+        obj_size: &Obstacle,
     ) {
         let cell_size = self.cell_diameter;
         let grid_offset_x = -self.size.x as f32 * cell_size / 2.0;
@@ -167,7 +167,7 @@ impl Grid {
 fn update_costfield_on_add(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    q_objects: Query<(Entity, &Transform, &RtsObj), Added<RtsObj>>,
+    q_objects: Query<(Entity, &Transform, &Obstacle), Added<Obstacle>>,
 ) {
     let objects = q_objects.iter().collect::<Vec<_>>();
     if objects.is_empty() {
@@ -185,7 +185,7 @@ fn update_costfield_on_add(
 fn update_costfield_on_remove(
     mut cmds: Commands,
     mut grid: ResMut<Grid>,
-    mut removed: RemovedComponents<RtsObj>,
+    mut removed: RemovedComponents<Obstacle>,
 ) {
     let objs: Vec<Entity> = removed.read().collect();
 

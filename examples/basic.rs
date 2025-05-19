@@ -122,7 +122,7 @@ fn spawn_obstacles(
             Mesh3d(meshes.add(Cuboid::from_size(size))),
             MeshMaterial3d(materials.add(StandardMaterial::from_color(GRAY_400))),
             Transform::from_translation(pos),
-            RtsObj(size.xz()), // ADD THIS!
+            Obstacle(size.xz()), // ADD THIS!
             Name::new("Obstacle"),
         )
     };

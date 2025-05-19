@@ -14,11 +14,13 @@ pub struct GameCamera;
 #[derive(Component)]
 pub struct Destination;
 
-/// The mesh size of the component, only considering the x and y axis.
+/// Obstacle marker. Insert this into any entity that you want to be considered an obstacle by the flowfield(s).
+/// # Parameters
+/// - `Vec2`: The size of the obstacles mesh. Only the x and z values are used.
 #[derive(Component, Default)]
-pub struct RtsObj(pub Vec2);
+pub struct Obstacle(pub Vec2);
 
-/// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to control boid behavior and settings.
+/// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to use custom settings.
 #[derive(Component, Debug)]
 pub struct Boid {
     pub steering: Vec3,
