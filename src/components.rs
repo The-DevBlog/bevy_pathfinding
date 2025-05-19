@@ -14,7 +14,9 @@ pub struct GameCamera;
 #[derive(Component)]
 pub struct Destination;
 
-/// The mesh size of the component, only considering the x and y axis.
+/// Obstacle marker. Insert this into any entity that you want to be considered an obstacle by the flowfield(s).
+/// # Parameters
+/// - `Vec2`: The size of the obstacles mesh. Only the x and z values are used.
 #[derive(Component, Default)]
 pub struct Obstacle(pub Vec2);
 
