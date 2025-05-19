@@ -2,8 +2,11 @@
 
 use bevy::{color::palettes::tailwind::*, prelude::*, window::PrimaryWindow};
 use bevy_pathfinding::{
-    components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
-    BevyPathfindingPlugin,
+    components::*,
+    debug::resources::{BoidUpdater, DbgOptions},
+    events::InitializeFlowFieldEv,
+    grid::Grid,
+    utils, BevyPathfindingPlugin,
 };
 
 const CELL_SIZE: f32 = 10.0; // size of each cell in the grid
@@ -20,6 +23,7 @@ fn main() {
     let mut app = App::new();
 
     app.insert_resource(Grid::new(BUCKETS, MAP_GRID, CELL_SIZE)) // ADD THIS!
+        .insert_resource(BoidUpdater::new(115.0, 0.0, 0.0, 7.5))
         .add_plugins((
             DefaultPlugins,
             BevyPathfindingPlugin, // ADD THIS!
@@ -86,7 +90,8 @@ fn spawn_units(
             MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
             Transform::from_translation(pos),
             Speed(25.0),
-            Boid::default(), // ADD THIS! -  Can also be set with custom parameters `Boid::new(50.0, 0.0, 0.0, 5.0)`
+            // Boid::default(), // ADD THIS! -  Can also be set with custom parameters `Boid::new(50.0, 0.0, 0.0, 5.0)`
+            Boid::new(115.0, 0.0, 0.0, 7.5),
             Name::new("Unit"),
         )
     };

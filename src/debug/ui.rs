@@ -415,7 +415,7 @@ fn draw_ui_box(
     mut cmds: Commands,
     dbg: Res<DbgOptions>,
     dbg_icon: Res<DbgIcon>,
-    boids_updater: Res<BoidsUpdater>,
+    boid_updater: Res<BoidUpdater>,
 ) {
     let root_ctr = (
         RootCtr,
@@ -632,25 +632,25 @@ fn draw_ui_box(
     let labels = &[
         (
             "Separation",
-            boids_updater.separation_weight,
+            boid_updater.separation_weight,
             BoidsInfoOptions::Separation,
             None,
         ),
         (
             "Alignment",
-            boids_updater.alignment_weight,
+            boid_updater.alignment_weight,
             BoidsInfoOptions::Alignment,
             None,
         ),
         (
             "Cohesion",
-            boids_updater.cohesion_weight,
+            boid_updater.cohesion_weight,
             BoidsInfoOptions::Cohesion,
             None,
         ),
         (
             "Radius",
-            boids_updater.neighbor_radius,
+            boid_updater.neighbor_radius,
             BoidsInfoOptions::NeighborRadius,
             Some(BorderRadius::top(Val::Px(10.0))),
         ),
@@ -889,7 +889,7 @@ fn draw_ui_box(
 }
 
 fn handle_slider_arrow_interaction(
-    mut boids_udpater: ResMut<BoidsUpdater>,
+    mut boids_udpater: ResMut<BoidUpdater>,
     mut q_slider: Query<
         (
             &Interaction,
@@ -962,7 +962,7 @@ fn slider_drag_start_end(
         (&Interaction, &mut BackgroundColor, &BoidsInfoOptions),
         (With<BoidsSliderValue>, Changed<Interaction>),
     >,
-    boids_udpater: Res<BoidsUpdater>,
+    boids_udpater: Res<BoidUpdater>,
 ) {
     for (interaction, mut background_clr, boids_info) in q.iter_mut() {
         let Ok(window) = q_window.single() else {
@@ -1000,7 +1000,7 @@ fn slider_drag_start_end(
 fn slider_drag_update(
     drag: Res<DragState>,
     window_q: Query<&Window, With<PrimaryWindow>>,
-    mut boids_udpater: ResMut<BoidsUpdater>,
+    mut boids_udpater: ResMut<BoidUpdater>,
     mut q_txt: Query<(&mut Text, &BoidsInfoOptions), With<BoidsSliderValue>>,
 ) {
     let Ok(window) = window_q.single() else {

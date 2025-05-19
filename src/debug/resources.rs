@@ -11,12 +11,10 @@ impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DbgOptions>()
             .init_resource::<DbgIcon>()
-            .init_resource::<BoidsUpdater>()
             .register_type::<DbgOptions>()
-            .register_type::<BoidsUpdater>()
+            .add_systems(PreStartup, init_boid_updater)
             .add_systems(Startup, load_dbg_icon)
-            .add_systems(Update, update_boids)
-            .add_systems(PostUpdate, init_boids_updater.run_if(run_once));
+            .add_systems(Update, update_boids);
     }
 }
 
@@ -111,9 +109,9 @@ impl DrawMode {
     }
 }
 
-/// DO NOT USE. This component is updated whenever the boids info in the debug UI menu changes.
-#[derive(Resource, Reflect)]
-pub struct BoidsUpdater {
+/// This component is updated whenever the boids info in the debug UI menu changes.
+#[derive(Resource, Reflect, Debug)]
+pub struct BoidUpdater {
     pub separation_weight: f32,    // push apart
     pub alignment_weight: f32,     // match heading
     pub cohesion_weight: f32,      // pull toward center
@@ -121,7 +119,14 @@ pub struct BoidsUpdater {
     pub neighbor_exit_radius: f32, // new: slightly larger
 }
 
-impl Default for BoidsUpdater {
+/// Does not need to be explicity set unless custom values are desired.
+/// # Default Values
+/// - `separation_weight`: 50.0
+/// - `alignment_weight`: 0.0
+/// - `cohesion_weight`: 0.0
+/// - `neighbor_radius`: 5.0
+/// - `neighbor_exit_radius`: neighbor_radius (5) * 1.05
+impl Default for BoidUpdater {
     fn default() -> Self {
         let neighbor_radius = 5.0;
         Self {
@@ -134,17 +139,31 @@ impl Default for BoidsUpdater {
     }
 }
 
-fn init_boids_updater(q_boid: Query<&Boid>, mut boids_updater: ResMut<BoidsUpdater>) {
-    if let Some(boid) = q_boid.iter().next() {
-        boids_updater.separation_weight = boid.info.separation;
-        boids_updater.alignment_weight = boid.info.alignment;
-        boids_updater.cohesion_weight = boid.info.cohesion;
-        boids_updater.neighbor_radius = boid.info.neighbor_radius;
-        boids_updater.neighbor_exit_radius = boid.info.neighbor_exit_radius;
+impl BoidUpdater {
+    pub fn new(
+        separation_weight: f32,
+        alignment_weight: f32,
+        cohesion_weight: f32,
+        neighbor_radius: f32,
+    ) -> Self {
+        let neighbor_exit_radius = neighbor_radius * 1.05;
+        Self {
+            separation_weight,
+            alignment_weight,
+            cohesion_weight,
+            neighbor_radius,
+            neighbor_exit_radius,
+        }
     }
 }
 
-fn update_boids(mut q_boids: Query<&mut Boid>, boid_updater: Res<BoidsUpdater>) {
+fn init_boid_updater(mut cmds: Commands, boid_updater: Option<Res<BoidUpdater>>) {
+    if boid_updater.is_none() {
+        cmds.insert_resource(BoidUpdater::default());
+    }
+}
+
+fn update_boids(mut q_boids: Query<&mut Boid>, boid_updater: Res<BoidUpdater>) {
     for mut boid in q_boids.iter_mut() {
         boid.info.separation = boid_updater.separation_weight;
         boid.info.alignment = boid_updater.alignment_weight;
