@@ -24,8 +24,7 @@ fn main() {
             DefaultPlugins,
             BevyPathfindingPlugin, // ADD THIS!
         ))
-        .add_systems(Startup, (camera, setup, spawn_units))
-        .add_systems(PostStartup, spawn_obstacles)
+        .add_systems(Startup, (camera, setup, spawn_units, spawn_obstacles))
         .add_systems(Update, (set_unit_destination, move_unit))
         .run();
 }
@@ -122,7 +121,7 @@ fn spawn_obstacles(
             Mesh3d(meshes.add(Cuboid::from_size(size))),
             MeshMaterial3d(materials.add(StandardMaterial::from_color(GRAY_400))),
             Transform::from_translation(pos),
-            RtsObj(size.xz()), // ADD THIS!
+            Obstacle(size.xz()), // ADD THIS!
             Name::new("Obstacle"),
         )
     };

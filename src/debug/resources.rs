@@ -15,7 +15,8 @@ impl Plugin for ResourcesPlugin {
             .register_type::<DbgOptions>()
             .register_type::<BoidsUpdater>()
             .add_systems(Startup, load_dbg_icon)
-            .add_systems(Update, update_boids);
+            .add_systems(Update, update_boids)
+            .add_systems(PostUpdate, init_boids_updater.run_if(run_once));
     }
 }
 
@@ -130,6 +131,16 @@ impl Default for BoidsUpdater {
             neighbor_radius: neighbor_radius, // in world‐units (tweak to taste)
             neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
         }
+    }
+}
+
+fn init_boids_updater(q_boid: Query<&Boid>, mut boids_updater: ResMut<BoidsUpdater>) {
+    if let Some(boid) = q_boid.iter().next() {
+        boids_updater.separation_weight = boid.info.separation;
+        boids_updater.alignment_weight = boid.info.alignment;
+        boids_updater.cohesion_weight = boid.info.cohesion;
+        boids_updater.neighbor_radius = boid.info.neighbor_radius;
+        boids_updater.neighbor_exit_radius = boid.info.neighbor_exit_radius;
     }
 }
 

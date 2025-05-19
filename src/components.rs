@@ -16,7 +16,7 @@ pub struct Destination;
 
 /// The mesh size of the component, only considering the x and y axis.
 #[derive(Component, Default)]
-pub struct RtsObj(pub Vec2);
+pub struct Obstacle(pub Vec2);
 
 /// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to control boid behavior and settings.
 #[derive(Component, Debug)]
