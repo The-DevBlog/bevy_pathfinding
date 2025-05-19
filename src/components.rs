@@ -20,7 +20,7 @@ pub struct Destination;
 #[derive(Component, Default)]
 pub struct Obstacle(pub Vec2);
 
-/// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to control boid behavior and settings.
+/// Boid component with settings. Insert this into your entities that you want to control with the flowfields. Use the Boid::new() to use custom settings.
 #[derive(Component, Debug)]
 pub struct Boid {
     pub steering: Vec3,
