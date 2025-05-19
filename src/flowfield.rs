@@ -210,17 +210,27 @@ impl FlowField {
     }
 }
 
-fn flowfield_group_stop_system(
+pub fn flowfield_group_stop_system(
     mut cmds: Commands,
     mut q_ff: Query<(Entity, &mut FlowField)>,
     q_tf: Query<(&Transform, &Boid)>,
     q_dest: Query<&Destination>,
+    grid: Res<Grid>, // ← you already have this in your boids system
 ) {
+    // ——— copy your boids’ world-to-bucket math verbatim ———
+    let world_w = grid.size.x as f32 * grid.cell_diameter;
+    let world_d = grid.size.y as f32 * grid.cell_diameter;
+    let bucket_w = world_w / grid.buckets as f32;
+    let bucket_d = world_d / grid.buckets as f32;
+    let cols = grid.grid.len();
+    let rows = grid.grid[0].len();
+    let origin = grid.grid[cols / 2][rows / 2].world_pos;
+
     for (ff_ent, mut ff) in q_ff.iter_mut() {
-        // 1) Have we already marked one arrival?
+        // 1) Have we already marked an arrival?
         let mut any_arrived = ff.arrived;
 
-        // 2) Build a list of boids that have NO Destination (i.e. have arrived)
+        // 2) Build a list of “arrived” boids (no Destination)
         let mut arrived_list: Vec<Entity> = ff
             .units
             .iter()
@@ -228,51 +238,63 @@ fn flowfield_group_stop_system(
             .filter(|&u| q_dest.get(u).is_err())
             .collect();
 
-        // 3) If nobody’s arrived yet, look for the first winner
+        // 3) If none yet, pick the first within threshold → remove Destination
         if !any_arrived {
-            let threshold2 = 25.0; // TODO: Make this not a magic number
+            let threshold2 = 25.0;
             if let Some(&winner) = ff.units.iter().find(|&&u| {
-                if let Ok((tf, _)) = q_tf.get(u) {
-                    tf.translation
-                        .distance_squared(ff.destination_cell.world_pos)
-                        < threshold2
-                } else {
-                    false
-                }
+                q_tf.get(u)
+                    .map(|(tf, _)| {
+                        tf.translation
+                            .distance_squared(ff.destination_cell.world_pos)
+                            < threshold2
+                    })
+                    .unwrap_or(false)
             }) {
-                // remove *that* unit’s destination
                 cmds.entity(winner).remove::<Destination>();
                 arrived_list.push(winner);
                 any_arrived = true;
             }
         }
 
-        // 4) Now for every unit that still *has* a Destination, check contact
+        // ─── NEW: build your buckets from arrived_list ───
+        let mut buckets: HashMap<(i32, i32), Vec<Vec3>> =
+            HashMap::with_capacity(arrived_list.len());
+        for &a in &arrived_list {
+            if let Ok((tf_a, _)) = q_tf.get(a) {
+                let bx = ((tf_a.translation.x - origin.x) / bucket_w).floor() as i32;
+                let by = ((tf_a.translation.z - origin.y) / bucket_d).floor() as i32;
+                buckets.entry((bx, by)).or_default().push(tf_a.translation);
+            }
+        }
+
+        // 4) replace nested‐loops: for each unit still moving, only probe 3×3 buckets
         for &u in &ff.units {
-            // skip the ones that have already arrived
             if q_dest.get(u).is_err() {
                 continue;
-            }
-            // load its transform & boid info
+            } // skip already arrived
             if let Ok((tf_u, boid_u)) = q_tf.get(u) {
-                let nr2 = boid_u.info.neighbor_radius * 2.0;
+                let bx = ((tf_u.translation.x - origin.x) / bucket_w).floor() as i32;
+                let by = ((tf_u.translation.z - origin.y) / bucket_d).floor() as i32;
+                let stop_r2 = (boid_u.info.neighbor_radius * 2.0).powi(2);
 
-                // if it’s within radius of ANY arrived boid, drop its Dest too
-                for &a in &arrived_list {
-                    if let Ok((tf_a, _)) = q_tf.get(a) {
-                        if tf_u.translation.distance(tf_a.translation) <= nr2 {
-                            cmds.entity(u).remove::<Destination>();
-                            break;
+                'probe: for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        if let Some(cell) = buckets.get(&(bx + dx, by + dy)) {
+                            if cell
+                                .iter()
+                                .any(|&pos| tf_u.translation.distance_squared(pos) <= stop_r2)
+                            {
+                                cmds.entity(u).remove::<Destination>();
+                                break 'probe;
+                            }
                         }
                     }
                 }
             }
         }
 
-        // 5) record that “someone” has arrived, so we don’t re-run step 3
+        // 5) record and potentially despawn
         ff.arrived = any_arrived;
-
-        // 6) if *no* unit still has a Destination, despawn the flow‐field entity
         let any_left = ff.units.iter().any(|&u| q_dest.get(u).is_ok());
         if !any_left {
             cmds.entity(ff_ent).despawn();
