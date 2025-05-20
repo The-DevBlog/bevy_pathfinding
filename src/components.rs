@@ -68,6 +68,8 @@ impl Boid {
                 cohesion,
                 neighbor_radius: neighbor_radius,
                 neighbor_exit_radius: neighbor_radius * 1.05,
+                max_speed: 3.0,
+                max_force: 0.5,
             },
         }
     }
@@ -80,6 +82,10 @@ pub struct BoidsInfo {
     pub cohesion: f32,             // pull toward center
     pub neighbor_radius: f32,      // how far you “see” neighbors
     pub neighbor_exit_radius: f32, // new: slightly larger
+    /// How fast the boid is allowed to go (world-units per second)
+    pub max_speed: f32,
+    /// How strong each steering force pulse can be
+    pub max_force: f32,
 }
 
 impl Default for BoidsInfo {
@@ -91,6 +97,8 @@ impl Default for BoidsInfo {
             cohesion: 0.0,                                // medium urge to stay together
             neighbor_radius: neighbor_radius,             // in world‐units (tweak to taste)
             neighbor_exit_radius: neighbor_radius * 1.05, // new: slightly larger
+            max_speed: 3.0,                               // 3 world-units per second
+            max_force: 0.5,                               // max steering change per second
         }
     }
 }

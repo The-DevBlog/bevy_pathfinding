@@ -65,7 +65,7 @@ pub fn calculate_boid_steering(
                 let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
                 let iso = Isometry3d::new(pos, rot);
 
-                gizmos.circle(iso, boid.info.neighbor_radius, RED);
+                gizmos.circle(iso, boid.info.neighbor_radius / 2.0, RED);
             }
         }
     }
@@ -91,19 +91,23 @@ pub fn calculate_boid_steering(
                 let by = ((tf.translation.z - origin.y) / bucket_size_y).floor() as i32;
 
                 // gather neighbors with hysteresis
-                let enter_r2 = boid.info.neighbor_radius.powi(2) * 2.0;
+                let enter_r2 = boid.info.neighbor_radius.powi(2);
                 let exit_r2 = boid.info.neighbor_exit_radius.powi(2);
-                let mut current_neighbors = HashSet::new();
-                let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
 
+                let mut current_neighbors = HashSet::new();
+
+                let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
                 for dx in -1..=1 {
                     for dy in -1..=1 {
                         if let Some(bucket) = buckets.get(&(bx + dx, by + dy)) {
-                            for &(_e, pos, vel) in bucket {
+                            for &(other, pos, vel) in bucket {
+                                if other == unit {
+                                    continue; // ← don’t treat yourself as a neighbor!
+                                }
                                 let dist2 = tf.translation.distance_squared(pos);
-                                let was_neighbor = boid.prev_neighbors.contains(&_e);
+                                let was_neighbor = boid.prev_neighbors.contains(&other);
                                 if dist2 < enter_r2 || (was_neighbor && dist2 < exit_r2) {
-                                    current_neighbors.insert(_e);
+                                    current_neighbors.insert(other);
                                     neighbor_data.push((pos, vel));
                                 }
                             }
@@ -111,22 +115,28 @@ pub fn calculate_boid_steering(
                     }
                 }
 
-                // compute classic boid forces
                 let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
-
-                // sample your flow‐field
                 let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // smooth and integrate
-                let raw = sep + ali + coh + flow_force;
-                let smooth = boid.prev_steer.lerp(raw, 0.1);
-                boid.prev_steer = smooth;
-                boid.steering = smooth;
-                boid.velocity += smooth * dt;
+                // sum & clamp to max_force
+                let mut accel = sep + ali + coh + flow_force;
+                if accel.length_squared() > boid.info.max_force * boid.info.max_force {
+                    accel = accel.normalize_or_zero() * boid.info.max_force;
+                }
 
-                pending.push((unit, smooth));
-                boid.prev_neighbors = current_neighbors;
+                // integrate velocity & clamp speed
+                boid.velocity += accel * dt;
+                if boid.velocity.length_squared() > boid.info.max_speed * boid.info.max_speed {
+                    boid.velocity = boid.velocity.normalize_or_zero() * boid.info.max_speed;
+                }
+
+                // store for your flowfield map
+                boid.steering = accel;
+                boid.prev_steer = accel;
+
+                // write back to flowfield
+                pending.push((unit, accel));
             }
         }
 
@@ -137,34 +147,40 @@ pub fn calculate_boid_steering(
     }
 }
 
-// neighbors: slice of (position, velocity)
 fn compute_boids(neighbors: &[(Vec3, Vec3)], current_pos: Vec3, boid: &Boid) -> (Vec3, Vec3, Vec3) {
-    let mut separation = Vec3::ZERO;
-    let mut alignment = Vec3::ZERO;
-    let mut cohesion = Vec3::ZERO;
+    let mut sep_sum = Vec3::ZERO;
+    let mut ali_sum = Vec3::ZERO;
     let count = neighbors.len() as f32;
+
     if count > 0.0 {
-        // 1) Separation (same as before)
-        for (n_pos, _) in neighbors {
-            let offset = current_pos - *n_pos;
-            let dist = offset.length();
-            if dist > 0.0 {
-                separation += offset.normalize() / dist;
+        // -- Separation: distance-weighted—
+        for &(n_pos, _) in neighbors {
+            let offset = current_pos - n_pos;
+            let dist = offset.length().max(0.01);
+            // only repel inside neighbor_radius:
+            if dist < boid.info.neighbor_radius {
+                let strength = (boid.info.neighbor_radius - dist) / dist;
+                sep_sum += offset.normalize() * strength;
             }
         }
-        separation = (separation / count) * boid.info.separation;
+        let desired_sep = sep_sum.normalize_or_zero() * boid.info.max_speed;
+        let mut sep_steer = (desired_sep - boid.velocity).clamp_length_max(boid.info.max_force);
+        // **weight once here**:
+        let separation = sep_steer * boid.info.separation;
 
-        // 2) Alignment: average neighbor velocity
-        for (_, n_vel) in neighbors {
-            alignment += *n_vel;
+        // -- Alignment: average neighbor velocity
+        for &(_, n_vel) in neighbors {
+            ali_sum += n_vel;
         }
-        // normalize & weight
-        alignment = (alignment / count).normalize_or_zero() * boid.info.alignment;
+        let alignment = (ali_sum / count).normalize_or_zero() * boid.info.alignment;
 
-        // 3) Cohesion: same as before
-        let center = neighbors.iter().map(|(n_pos, _)| *n_pos).sum::<Vec3>() / count;
+        // -- Cohesion: steer toward average position
+        let center = neighbors.iter().map(|(p, _)| *p).sum::<Vec3>() / count;
         let to_center = center - current_pos;
-        cohesion = to_center.normalize_or_zero() * boid.info.cohesion;
+        let cohesion = to_center.normalize_or_zero() * boid.info.cohesion;
+
+        return (separation, alignment, cohesion);
     }
-    (separation, alignment, cohesion)
+
+    (Vec3::ZERO, Vec3::ZERO, Vec3::ZERO)
 }

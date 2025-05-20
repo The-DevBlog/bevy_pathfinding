@@ -275,7 +275,7 @@ pub fn flowfield_group_stop_system(
             if let Ok((tf_u, boid_u)) = q_tf.get(u) {
                 let bx = ((tf_u.translation.x - origin.x) / bucket_w).floor() as i32;
                 let by = ((tf_u.translation.z - origin.y) / bucket_d).floor() as i32;
-                let stop_r2 = (boid_u.info.neighbor_radius * 2.0).powi(2);
+                let stop_r2 = (boid_u.info.neighbor_radius).powi(2);
 
                 'probe: for dx in -1..=1 {
                     for dy in -1..=1 {
