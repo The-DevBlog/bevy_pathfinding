@@ -82,7 +82,7 @@ pub struct BoidsInfo {
     pub cohesion: f32,             // pull toward center
     pub neighbor_radius: f32,      // how far you “see” neighbors
     pub neighbor_exit_radius: f32, // new: slightly larger
-    /// How fast the boid is allowed to go (world-units per second)
+    /// How fast the boid is allowed to go (world-units per second) TODO: Since the user sets the speed, should I use this?
     pub max_speed: f32,
     /// How strong each steering force pulse can be
     pub max_force: f32,
