@@ -30,6 +30,7 @@ bytemuck = "1.21.0"
 image = "0.25.5"
 
 [dev-dependencies]
+bevy_rts_camera = "0.10.0"
 bevy = "0.16.0"
 
 [features]
