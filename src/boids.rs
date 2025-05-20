@@ -119,21 +119,27 @@ pub fn calculate_boid_steering(
                 let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
 
-                // sum & clamp to max_force
-                let mut accel = sep + ali + coh + flow_force;
-                if accel.length_squared() > boid.info.max_force * boid.info.max_force {
-                    accel = accel.normalize_or_zero() * boid.info.max_force;
-                }
+                // 1) build raw, then lerp into the old steering
+                let raw = sep + ali + coh + flow_force;
+                // let smooth = boid.prev_steer.lerp(raw, boid.info.steer_smoothing);
+                let smooth = boid.prev_steer.lerp(raw, 0.1);
 
-                // integrate velocity & clamp speed
+                // 2) now clamp that blended steering to max_force
+                let accel = if smooth.length_squared() > boid.info.max_force * boid.info.max_force {
+                    smooth.normalize_or_zero() * boid.info.max_force
+                } else {
+                    smooth
+                };
+
+                // 3) integrate & clamp speed
                 boid.velocity += accel * dt;
                 if boid.velocity.length_squared() > boid.info.max_speed * boid.info.max_speed {
                     boid.velocity = boid.velocity.normalize_or_zero() * boid.info.max_speed;
                 }
 
-                // store for your flowfield map
-                boid.steering = accel;
+                // 4) write out for next frame
                 boid.prev_steer = accel;
+                boid.steering = accel;
 
                 // write back to flowfield
                 pending.push((unit, accel));
