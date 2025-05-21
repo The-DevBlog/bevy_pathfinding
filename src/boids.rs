@@ -18,7 +18,6 @@ impl Plugin for BoidsPlugin {
     }
 }
 
-// New code. Bucketing for performance (big gains), but jittery
 pub fn calculate_boid_steering(
     time: Res<Time>,
     mut q_boids: Query<(Entity, &Transform, &mut Boid)>,
@@ -29,7 +28,7 @@ pub fn calculate_boid_steering(
 ) {
     let dt = time.delta_secs();
 
-    // → WORLD dimensions (in world‐units), given cell_diameter and grid.size
+    // → WORLD dimensions (in world‐units)
     let world_width = grid.size.x as f32 * grid.cell_diameter;
     let world_depth = grid.size.y as f32 * grid.cell_diameter;
 
@@ -37,7 +36,7 @@ pub fn calculate_boid_steering(
     let bucket_size_x = world_width / grid.buckets;
     let bucket_size_y = world_depth / grid.buckets;
 
-    // → Find the “center” origin same as your bucket math
+    // → Find the “center” origin for bucket math
     let cols = grid.grid.len();
     let rows = grid.grid[0].len();
     let origin = grid.grid[cols / 2][rows / 2].world_pos;
@@ -48,7 +47,7 @@ pub fn calculate_boid_steering(
         .map(|(e, tf, b)| (e, tf.translation, b.velocity))
         .collect();
 
-    // 2) Draw the grid(s) (optional)
+    // 2) Optional debug drawing
     if let Some(dbg) = dbg_options {
         if dbg.draw_spatial_grid {
             gizmos.grid(
@@ -58,19 +57,15 @@ pub fn calculate_boid_steering(
                 YELLOW,
             );
         }
-
         if dbg.draw_radius {
             for (_, tf, boid) in q_boids.iter() {
-                let pos: Vec3 = tf.translation;
-                let rot = Quat::from_rotation_x(std::f32::consts::PI / 2.0);
-                let iso = Isometry3d::new(pos, rot);
-
+                let iso = Isometry3d::new(tf.translation, Quat::from_rotation_x(PI / 2.0));
                 gizmos.circle(iso, boid.info.neighbor_radius / 2.0, RED);
             }
         }
     }
 
-    // 3) Build bucket map: (bx,by) → list of boids in that cell
+    // 3) Build bucket map
     let mut buckets: HashMap<(i32, i32), Vec<(Entity, Vec3, Vec3)>> =
         HashMap::with_capacity(snapshot.len());
 
@@ -80,29 +75,29 @@ pub fn calculate_boid_steering(
         buckets.entry((bx, by)).or_default().push((ent, pos, vel));
     }
 
-    // 4) For each FlowField, compute steering only against 3×3 neighbor buckets
+    // 4) Compute steering per FlowField
     for mut ff in q_ff.iter_mut() {
         let mut pending: Vec<(Entity, Vec3)> = Vec::with_capacity(ff.units.len());
 
         for &unit in &ff.units {
             if let Ok((_, tf, mut boid)) = q_boids.get_mut(unit) {
-                // determine which bucket this boid is in
+                // bucket coords
                 let bx = ((tf.translation.x - origin.x) / bucket_size_x).floor() as i32;
                 let by = ((tf.translation.z - origin.y) / bucket_size_y).floor() as i32;
 
-                // gather neighbors with hysteresis
+                // hysteresis radii
                 let enter_r2 = boid.info.neighbor_radius.powi(2);
                 let exit_r2 = boid.info.neighbor_exit_radius.powi(2);
-
+                let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
                 let mut current_neighbors = HashSet::new();
 
-                let mut neighbor_data: Vec<(Vec3, Vec3)> = Vec::new();
+                // gather neighbors
                 for dx in -1..=1 {
                     for dy in -1..=1 {
                         if let Some(bucket) = buckets.get(&(bx + dx, by + dy)) {
                             for &(other, pos, vel) in bucket {
                                 if other == unit {
-                                    continue; // ← don’t treat yourself as a neighbor!
+                                    continue;
                                 }
                                 let dist2 = tf.translation.distance_squared(pos);
                                 let was_neighbor = boid.prev_neighbors.contains(&other);
@@ -115,38 +110,57 @@ pub fn calculate_boid_steering(
                     }
                 }
 
+                // standard boid forces
                 let (sep, ali, coh) = compute_boids(&neighbor_data, tf.translation, &boid);
                 let dir2d = ff.sample_direction(tf.translation, &grid);
                 let flow_force = Vec3::new(dir2d.x, 0.0, dir2d.y);
-
-                // 1) build raw, then lerp into the old steering
                 let raw = sep + ali + coh + flow_force;
-                // let smooth = boid.prev_steer.lerp(raw, boid.info.steer_smoothing);
                 let smooth = boid.prev_steer.lerp(raw, 0.1);
 
-                // 2) now clamp that blended steering to max_force
-                let accel = if smooth.length_squared() > boid.info.max_force * boid.info.max_force {
+                // 1) acceleration
+                let accel = if smooth.length_squared() > boid.info.max_force.powi(2) {
                     smooth.normalize_or_zero() * boid.info.max_force
                 } else {
                     smooth
                 };
 
-                // 3) integrate & clamp speed
+                // 2) integrate & clamp speed
                 boid.velocity += accel * dt;
-                if boid.velocity.length_squared() > boid.info.max_speed * boid.info.max_speed {
+                if boid.velocity.length_squared() > boid.info.max_speed.powi(2) {
                     boid.velocity = boid.velocity.normalize_or_zero() * boid.info.max_speed;
                 }
 
-                // 4) write out for next frame
+                // ◀︎ friction‑y collision resolution
+                let collision_radius = boid.info.neighbor_radius;
+                'collision_check: for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        if let Some(bucket) = buckets.get(&(bx + dx, by + dy)) {
+                            for &(other, other_pos, _) in bucket {
+                                if other == unit {
+                                    continue;
+                                }
+                                let offset = tf.translation - other_pos;
+                                let dist = offset.length();
+                                if dist < collision_radius && dist > 0.0 {
+                                    let normal = offset / dist;
+                                    let v_norm = boid.velocity.dot(normal) * normal;
+                                    boid.velocity -= v_norm;
+                                    break 'collision_check;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3) finalize
+                boid.prev_neighbors = current_neighbors;
                 boid.prev_steer = accel;
                 boid.steering = accel;
-
-                // write back to flowfield
                 pending.push((unit, accel));
             }
         }
 
-        // 5) write back into the FlowField if you still need it
+        // 5) write back steering map
         for (unit, steer) in pending {
             ff.steering_map.insert(unit, steer);
         }
