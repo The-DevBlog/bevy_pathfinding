@@ -199,6 +199,7 @@ fn move_unit(
     let delta_secs = time.delta_secs();
 
     for (mut tf, boid, speed) in q_units.iter_mut() {
-        tf.translation += boid.steering.normalize_or_zero() * delta_secs * speed.0;
+        // tf.translation += boid.steering.normalize_or_zero() * delta_secs * speed.0;
+        tf.translation += boid.velocity.normalize_or_zero() * delta_secs * speed.0;
     }
 }
