@@ -170,7 +170,7 @@ fn compute_boids(neighbors: &[(Vec3, Vec3)], current_pos: Vec3, boid: &Boid) -> 
             }
         }
         let desired_sep = sep_sum.normalize_or_zero() * boid.info.max_speed;
-        let mut sep_steer = (desired_sep - boid.velocity).clamp_length_max(boid.info.max_force);
+        let sep_steer = (desired_sep - boid.velocity).clamp_length_max(boid.info.max_force);
         // **weight once here**:
         let separation = sep_steer * boid.info.separation;
 
