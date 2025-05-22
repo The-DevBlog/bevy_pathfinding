@@ -27,6 +27,8 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "bevy_winit"
 ] }
 bytemuck = "1.21.0"
+dodgy_3d = "0.5.2"
+glam = "0.29.1"
 image = "0.25.5"
 
 [dev-dependencies]

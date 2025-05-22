@@ -13,19 +13,22 @@ pub mod flowfield;
 pub mod grid;
 pub mod grid_direction;
 pub mod resources;
+pub mod rvo;
 pub mod utils;
 
 use boids::BoidsPlugin;
 use flowfield::FlowfieldPlugin;
 use grid::GridPlugin;
 use resources::ResourcesPlugin;
+use rvo::RVOPlugin;
 
 pub struct BevyPathfindingPlugin;
 
 impl Plugin for BevyPathfindingPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            BoidsPlugin,
+            // BoidsPlugin,
+            RVOPlugin,
             FlowfieldPlugin,
             ResourcesPlugin,
             GridPlugin,

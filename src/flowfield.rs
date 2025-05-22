@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use crate::components::*;
 use crate::events::*;
+use crate::rvo::RVOAgent;
 use crate::{cell::*, grid::Grid, grid_direction::GridDirection, utils};
 
 pub struct FlowfieldPlugin;
@@ -23,7 +24,6 @@ pub struct DestinationRadius(pub u32);
 #[derive(Component, Clone, Default, PartialEq)]
 pub struct FlowField {
     pub arrived: bool,
-    pub destination_grid_size: IVec2,
     pub destination_cell: Cell,
     pub destination_radius: f32,
     pub grid: Vec<Vec<Cell>>,
@@ -213,7 +213,8 @@ impl FlowField {
 pub fn flowfield_group_stop_system(
     mut cmds: Commands,
     mut q_ff: Query<(Entity, &mut FlowField)>,
-    q_tf: Query<(&Transform, &Boid)>,
+    // q_tf: Query<(&Transform, &Boid)>,
+    q_tf: Query<(&Transform, &RVOAgent)>,
     q_dest: Query<&Destination>,
     grid: Res<Grid>, // ← you already have this in your boids system
 ) {
@@ -272,10 +273,11 @@ pub fn flowfield_group_stop_system(
             if q_dest.get(u).is_err() {
                 continue;
             } // skip already arrived
-            if let Ok((tf_u, boid_u)) = q_tf.get(u) {
+            if let Ok((tf_u, rvo_agent)) = q_tf.get(u) {
                 let bx = ((tf_u.translation.x - origin.x) / bucket_w).floor() as i32;
                 let by = ((tf_u.translation.z - origin.y) / bucket_d).floor() as i32;
-                let stop_r2 = (boid_u.info.neighbor_radius * 2.0).powi(2);
+                // let stop_r2 = (boid_u.info.neighbor_radius * 2.0).powi(2);
+                let stop_r2 = (rvo_agent.radius * 2.0).powi(2);
 
                 'probe: for dx in -1..=1 {
                     for dy in -1..=1 {

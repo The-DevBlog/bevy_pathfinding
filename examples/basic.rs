@@ -2,8 +2,12 @@
 
 use bevy::{color::palettes::tailwind::*, prelude::*, window::PrimaryWindow};
 use bevy_pathfinding::{
-    components::*, debug::resources::DbgOptions, events::InitializeFlowFieldEv, grid::Grid, utils,
-    BevyPathfindingPlugin,
+    components::*,
+    debug::resources::DbgOptions,
+    events::InitializeFlowFieldEv,
+    grid::Grid,
+    rvo::{RVOAgent, RVOVelocity},
+    utils, BevyPathfindingPlugin,
 };
 
 const CELL_SIZE: f32 = 10.0; // size of each cell in the grid
@@ -26,7 +30,7 @@ fn main() {
         ))
         .add_systems(Startup, (camera, setup, spawn_units))
         .add_systems(PostStartup, spawn_obstacles)
-        .add_systems(Update, (set_unit_destination, move_unit))
+        .add_systems(Update, (set_unit_destination))
         .run();
 }
 
@@ -87,7 +91,11 @@ fn spawn_units(
             MeshMaterial3d(materials.add(StandardMaterial::from_color(BLUE_500))),
             Transform::from_translation(pos),
             Speed(25.0),
-            Boid::default(), // ADD THIS! -  Can also be set with custom parameters `Boid::new(50.0, 0.0, 0.0, 5.0)`
+            RVOAgent {
+                radius: 5.0,
+                max_speed: 25.0,
+            },
+            RVOVelocity(Vec3::ZERO),
             Name::new("Unit"),
         )
     };
@@ -137,7 +145,7 @@ fn spawn_obstacles(
 fn set_unit_destination(
     mut cmds: Commands,
     input: Res<ButtonInput<MouseButton>>,
-    mut q_units: Query<Entity, With<Boid>>,
+    mut q_units: Query<Entity, With<RVOAgent>>,
     q_map: Query<&GlobalTransform, With<MapBase>>,
     q_cam: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     q_window: Query<&Window, With<PrimaryWindow>>,
@@ -186,19 +194,5 @@ fn set_unit_destination(
             entities: units,
             destination_pos,
         });
-    }
-}
-
-// ADD THIS!
-// moves all units (boids) that have a destination, towards it
-// if you are using a physics engine, you would want to swap out the 'Transform' here
-fn move_unit(
-    mut q_units: Query<(&mut Transform, &mut Boid, &Speed), With<Destination>>,
-    time: Res<Time>,
-) {
-    let delta_secs = time.delta_secs();
-
-    for (mut tf, boid, speed) in q_units.iter_mut() {
-        tf.translation += boid.steering.normalize_or_zero() * delta_secs * speed.0;
     }
 }
