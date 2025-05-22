@@ -81,7 +81,8 @@ fn rvo_system(
 
     // 2) Solve ORCA with a longer look‐ahead and cull far neighbours
     let opts = AvoidanceOptions { time_horizon: 3.0 };
-    let neighbour_radius2 = 15.0 * 15.0;
+    // let neighbour_radius2 = 15.0 * 15.0;
+    let neighbour_radius2 = 10.0 * 10.0;
     let mut new_vels = Vec::with_capacity(agents.len());
 
     for i in 0..agents.len() {
@@ -119,6 +120,7 @@ fn rvo_system(
 fn apply_velocity_system(time: Res<Time>, mut q: Query<(&mut Transform, &RVOVelocity)>) {
     let dt = time.delta_secs();
     for (mut tf, vel) in &mut q {
-        tf.translation += **vel * dt;
+        tf.translation.x += vel.x * dt;
+        tf.translation.z += vel.z * dt;
     }
 }
