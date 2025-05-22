@@ -9,7 +9,7 @@ use bevy_pathfinding::{
     debug::resources::{BoidUpdater, DbgOptions},
     events::InitializeFlowFieldEv,
     grid::Grid,
-    rvo::RVOAgent,
+    rvo::{RVOAgent, RVOVelocity},
     utils, BevyPathfindingPlugin,
 };
 use bevy_rts_camera::{Ground, RtsCamera, RtsCameraControls, RtsCameraPlugin};
@@ -35,7 +35,7 @@ fn main() {
             RtsCameraPlugin,
         ))
         .add_systems(Startup, (camera, setup, spawn_units))
-        // .add_systems(Update, (set_unit_destination, move_unit))
+        .add_systems(Update, (set_unit_destination))
         .run();
 }
 
@@ -119,6 +119,7 @@ fn spawn_units(
                 radius: 5.0,
                 max_speed: 25.0,
             },
+            RVOVelocity(Vec3::ZERO),
             // Boid::new(115.0, 0.0, 0.0, 7.5),
             Name::new("Unit"),
         )

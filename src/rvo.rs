@@ -58,11 +58,10 @@ fn rvo_system(
         return;
     }
 
-    // 1) Build your ORCA agents, remember the entity order, and sample prefs
+    // 1) Build ORCA agents & prefs
     let mut agents = Vec::new();
     let mut entities = Vec::new();
     let mut prefs = Vec::new();
-
     for (ent, tf, rvo) in q_agents.iter_mut() {
         agents.push(Agent {
             position: tf.translation.into(),
@@ -79,37 +78,63 @@ fn rvo_system(
         prefs.push(Vec3::new(dir2.x, 0.0, dir2.y) * rvo.max_speed);
     }
 
-    // 2) Solve ORCA with a longer look‐ahead and cull far neighbours
-    let opts = AvoidanceOptions { time_horizon: 3.0 };
-    // let neighbour_radius2 = 15.0 * 15.0;
-    let neighbour_radius2 = 10.0 * 10.0;
-    let mut new_vels = Vec::with_capacity(agents.len());
+    // 2) Partition into buckets
+    let buckets_count = grid.buckets as usize;
+    let world_w = grid.size.x as f32 * grid.cell_diameter;
+    let world_d = grid.size.y as f32 * grid.cell_diameter;
+    let mut buckets: Vec<Vec<usize>> = vec![Vec::new(); buckets_count * buckets_count];
+    let mut agent_bucket = Vec::with_capacity(agents.len());
 
+    for (i, ag) in agents.iter().enumerate() {
+        // map X from [-world_w/2..+world_w/2] to [0..buckets_count)
+        let bx = (((ag.position.x + world_w * 0.5) / world_w) * buckets_count as f32)
+            .clamp(0.0, buckets_count as f32 - 1.0)
+            .floor() as usize;
+        // same for Z
+        let bz = (((ag.position.z + world_d * 0.5) / world_d) * buckets_count as f32)
+            .clamp(0.0, buckets_count as f32 - 1.0)
+            .floor() as usize;
+
+        buckets[bx + bz * buckets_count].push(i);
+        agent_bucket.push((bx, bz));
+    }
+
+    // 3) ORCA solve, only probing local buckets
+    let opts = AvoidanceOptions { time_horizon: 8.0 };
+    let mut new_vels = Vec::with_capacity(agents.len());
     for i in 0..agents.len() {
-        let neighbours = agents
-            .iter()
-            .enumerate()
-            .filter_map(|(j, other)| {
-                let delta2 = (agents[i].position - other.position).length_squared();
-                if j != i && delta2 < neighbour_radius2 {
-                    Some(Cow::Borrowed(other))
-                } else {
-                    None
+        let (bx, bz) = agent_bucket[i];
+        let mut neighbours = Vec::new();
+
+        // probe 3x3 surrounding buckets
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                let nbx = bx as isize + dx;
+                let nbz = bz as isize + dz;
+                if (0..buckets_count as isize).contains(&nbx)
+                    && (0..buckets_count as isize).contains(&nbz)
+                {
+                    let idx = nbx as usize + nbz as usize * buckets_count;
+                    for &j in &buckets[idx] {
+                        if j != i {
+                            neighbours.push(Cow::Borrowed(&agents[j]));
+                        }
+                    }
                 }
-            })
-            .collect::<Vec<_>>();
+            }
+        }
 
         let v = agents[i].compute_avoiding_velocity(
             &neighbours,
             prefs[i],
-            prefs[i].length(), // your max_speed
+            prefs[i].length(),
             dt,
             &opts,
         );
         new_vels.push(v);
     }
 
-    // 3) Write back into RVOVelocity
+    // 4) Write back
     for (ent, v) in entities.into_iter().zip(new_vels) {
         if let Ok(mut vel) = q_vel.get_mut(ent) {
             **vel = v;
