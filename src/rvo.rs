@@ -3,6 +3,7 @@
 use bevy::color::palettes::css::RED;
 use bevy::prelude::*;
 use dodgy_3d::{Agent, AvoidanceOptions, Vec3};
+use rand::rng;
 use std::borrow::Cow;
 
 use crate::debug::resources::DbgOptions;
