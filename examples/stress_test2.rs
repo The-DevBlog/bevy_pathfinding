@@ -22,7 +22,7 @@ const MAP_GRID: IVec2 = IVec2::new(300, 300); // number of cell rows and columns
 const MAP_WIDTH: f32 = MAP_GRID.x as f32 * CELL_SIZE;
 const MAP_DEPTH: f32 = MAP_GRID.y as f32 * CELL_SIZE;
 
-const UNIT_COUNT: usize = 100;
+const UNIT_COUNT: usize = 10000;
 
 fn main() {
     let mut app = App::new();
