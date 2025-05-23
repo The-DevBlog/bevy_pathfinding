@@ -27,9 +27,9 @@ impl Plugin for RVOPlugin {
         app
             // make sure your flowfields have already been computed
             // .add_systems(Update, rvo_system.after(crate::flowfield::FlowfieldPlugin))
-            .add_systems(Update, rvo_system)
+            .add_systems(Update, rvo)
             // then have some movement/apply system that reads Velocity
-            .add_systems(Update, apply_velocity_system)
+            .add_systems(Update, apply_velocity)
             .add_systems(Update, draw_radius);
     }
 }
@@ -46,7 +46,7 @@ fn draw_radius(q_agents: Query<(&RVOAgent, &Transform)>, mut gizmos: Gizmos, dbg
     }
 }
 
-fn rvo_system(
+fn rvo(
     grid: Res<Grid>,
     time: Res<Time>,
     q_ff: Query<&FlowField>,
@@ -142,7 +142,7 @@ fn rvo_system(
     }
 }
 
-fn apply_velocity_system(time: Res<Time>, mut q: Query<(&mut Transform, &RVOVelocity)>) {
+fn apply_velocity(time: Res<Time>, mut q: Query<(&mut Transform, &RVOVelocity)>) {
     let dt = time.delta_secs();
     for (mut tf, vel) in &mut q {
         tf.translation.x += vel.x * dt;
