@@ -7,6 +7,13 @@ use crate::flowfield::FlowField;
 /// # Example
 ///
 /// ```
+/// use bevy::prelude::*;
+/// use bevy::window::PrimaryWindow;
+/// use bevy_pathfinding::components::{GameCamera, MapBase};
+/// use bevy_pathfinding::debug::resources::DbgOptions;
+/// use bevy_pathfinding::events::InitializeFlowFieldEv;
+/// use bevy_pathfinding::utils;
+///
 /// #[derive(Component)]
 /// struct Unit;
 ///

@@ -41,6 +41,9 @@ impl Grid {
     /// # Example
     ///
     /// ```
+    /// use bevy::prelude::IVec2;
+    /// use bevy_pathfinding::grid::Grid;
+    ///
     /// let grid = Grid::new(10.0, IVec2::new(25, 25), 10.0);
     /// ```
     ///
@@ -154,7 +157,7 @@ impl Grid {
     // something different like rough terrain?
     pub fn reset_cell_costs(&mut self, entities: Vec<Entity>) {
         for ent in entities.iter() {
-            if let Some(occupied_cells) = self.occupied_cells.remove(&ent.index()) {
+            if let Some(occupied_cells) = self.occupied_cells.remove(&ent.index_u32()) {
                 for cell in occupied_cells.iter() {
                     self.grid[cell.y as usize][cell.x as usize].cost = 1;
                 }
@@ -175,7 +178,7 @@ fn update_costfield_on_add(
     }
 
     for (ent, transform, size) in objects.iter() {
-        grid.update_cell_costs(ent.index(), transform, size);
+        grid.update_cell_costs(ent.index_u32(), transform, size);
     }
 
     cmds.trigger(UpdateCostEv);
