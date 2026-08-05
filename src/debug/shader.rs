@@ -1,4 +1,5 @@
 use allocator::MeshAllocator;
+use bevy::core_pipeline::core_3d::TransparentSortingInfo3d;
 use bevy::{
     asset::embedded_asset,
     core_pipeline::core_3d::Transparent3d,
@@ -11,7 +12,8 @@ use bevy::{
     prelude::*,
     render::{
         extract_component::*, mesh::*, render_asset::RenderAssets, render_phase::*,
-        render_resource::*, renderer::RenderDevice, view::ExtractedView, *,
+        render_resource::*, renderer::RenderDevice, sync_component::SyncComponent,
+        view::ExtractedView, *,
     },
 };
 use bytemuck::{Pod, Zeroable};
@@ -69,12 +71,16 @@ pub struct InstanceData {
 #[derive(Component, Deref)]
 pub struct InstanceMaterialData(pub HashMap<i32, Vec<InstanceData>>);
 
+impl SyncComponent for InstanceMaterialData {
+    type Target = Self;
+}
+
 impl ExtractComponent for InstanceMaterialData {
     type QueryData = &'static InstanceMaterialData;
     type QueryFilter = ();
     type Out = Self;
 
-    fn extract_component(item: QueryItem<'_, Self::QueryData>) -> Option<Self> {
+    fn extract_component(item: QueryItem<'_, '_, Self::QueryData>) -> Option<Self> {
         Some(InstanceMaterialData(item.0.clone()))
     }
 }
@@ -93,18 +99,18 @@ impl Plugin for CustomShaderPlugin {
             .init_resource::<Assets<Shader>>()
             .add_systems(ExtractSchedule, sync_data_from_main_app.run_if(run_once))
             .add_systems(
+                RenderStartup,
+                init_custom_pipeline.after(MeshPipelineSystems),
+            )
+            .add_systems(
                 Render,
                 (
-                    queue_custom.in_set(RenderSet::QueueMeshes),
-                    prepare_instance_buffers.in_set(RenderSet::PrepareResources),
+                    queue_custom.in_set(RenderSystems::QueueMeshes),
+                    prepare_instance_buffers.in_set(RenderSystems::PrepareResources),
                 ),
             );
 
         embedded_asset!(app, "../../assets/shaders/instancing.wgsl");
-    }
-
-    fn finish(&self, app: &mut App) {
-        app.sub_app_mut(RenderApp).init_resource::<CustomPipeline>();
     }
 }
 
@@ -138,6 +144,7 @@ fn load_textures(
 
     let digit_atlas = Image {
         data: Some(rgba_image.into_raw()),
+        data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             label: Some("digit_atlas"),
             size: Extent3d {
@@ -155,6 +162,7 @@ fn load_textures(
         sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
         texture_view_descriptor: None,
         asset_usage: Default::default(),
+        copy_on_resize: false,
     };
 
     // ARROW IMG
@@ -165,6 +173,7 @@ fn load_textures(
 
     let arrow_img = Image {
         data: Some(rgba_image.into_raw()),
+        data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             label: Some("arrow_img"),
             size: Extent3d {
@@ -182,6 +191,7 @@ fn load_textures(
         sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
         texture_view_descriptor: None,
         asset_usage: Default::default(),
+        copy_on_resize: false,
     };
 
     // 'X' IMG
@@ -192,6 +202,7 @@ fn load_textures(
 
     let x_img = Image {
         data: Some(rgba_image.into_raw()),
+        data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             label: Some("x_img"),
             size: Extent3d {
@@ -209,6 +220,7 @@ fn load_textures(
         sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
         texture_view_descriptor: None,
         asset_usage: Default::default(),
+        copy_on_resize: false,
     };
 
     // DESTINATION IMG
@@ -219,6 +231,7 @@ fn load_textures(
 
     let destination_img = Image {
         data: Some(rgba_image.into_raw()),
+        data_order: TextureDataOrder::default(),
         texture_descriptor: TextureDescriptor {
             label: Some("destination_img"),
             size: Extent3d {
@@ -236,6 +249,7 @@ fn load_textures(
         sampler: ImageSampler::Descriptor(ImageSamplerDescriptor::default()),
         texture_view_descriptor: None,
         asset_usage: Default::default(),
+        copy_on_resize: false,
     };
 
     // Store the atlas in the first slot of the Digits array
@@ -260,40 +274,48 @@ fn queue_custom(
     render_mesh_instances: Res<RenderMeshInstances>,
     material_meshes: Query<(Entity, &MainEntity), With<InstanceMaterialData>>,
     mut transparent_render_phases: ResMut<ViewSortedRenderPhases<Transparent3d>>,
-    mut views: Query<(&ExtractedView, &Msaa)>,
+    views: Query<&ExtractedView>,
+    view_key_cache: Res<ViewKeyCache>,
     q_entities: Query<Entity, (With<InstanceMaterialData>, Without<DigitBindGroup>)>,
     render_device: Res<RenderDevice>,
 ) {
     let draw_custom = transparent_3d_draw_functions.read().id::<DrawCustom>();
 
-    for (view, msaa) in &mut views {
-        let msaa_key = MeshPipelineKey::from_msaa_samples(msaa.samples());
-
+    for view in &views {
         let Some(transparent_phase) = transparent_render_phases.get_mut(&view.retained_view_entity)
         else {
             continue;
         };
 
-        let view_key = msaa_key | MeshPipelineKey::from_hdr(view.hdr);
-        let rangefinder = view.rangefinder3d();
+        let Some(&view_key) = view_key_cache.get(&view.retained_view_entity) else {
+            continue;
+        };
+
         for (entity, main_entity) in &material_meshes {
             let Some(mesh_instance) = render_mesh_instances.render_mesh_queue_data(*main_entity)
             else {
                 continue;
             };
-            let Some(mesh) = meshes.get(mesh_instance.mesh_asset_id) else {
+            let Some(mesh) = meshes.get(mesh_instance.mesh_asset_id()) else {
                 continue;
             };
-            let key =
-                view_key | MeshPipelineKey::from_primitive_topology(mesh.primitive_topology());
+            let key = view_key
+                | MeshPipelineKey::from_primitive_topology_and_strip_index(
+                    mesh.primitive_topology(),
+                    mesh.index_format(),
+                );
             let pipeline = pipelines
                 .specialize(&pipeline_cache, &custom_pipeline, key, &mesh.layout)
                 .unwrap();
-            transparent_phase.add(Transparent3d {
+            transparent_phase.add_retained(Transparent3d {
+                sorting_info: TransparentSortingInfo3d::Sorted {
+                    mesh_center: Vec3::ZERO,
+                    depth_bias: 0.0,
+                },
                 entity: (entity, *main_entity),
                 pipeline,
                 draw_function: draw_custom,
-                distance: rangefinder.distance_translation(&mesh_instance.translation),
+                distance: 0.0,
                 batch_range: 0..1,
                 extra_index: PhaseItemExtraIndex::None,
                 indexed: false,
@@ -307,9 +329,11 @@ fn queue_custom(
         gpu_images.get(&assets.x_img),
         gpu_images.get(&assets.destination_img),
     ) {
+        let bind_group_layout =
+            pipeline_cache.get_bind_group_layout(&custom_pipeline.texture_layout);
         let bind_group = render_device.create_bind_group(
             Some("digit+arrow bind group"),
-            &custom_pipeline.texture_layout,
+            &bind_group_layout,
             &[
                 // digit atlas texture
                 BindGroupEntry {
@@ -395,104 +419,102 @@ fn prepare_instance_buffers(
 struct CustomPipeline {
     shader: Handle<Shader>,
     mesh_pipeline: MeshPipeline,
-    texture_layout: BindGroupLayout,
+    texture_layout: BindGroupLayoutDescriptor,
 }
 
-impl FromWorld for CustomPipeline {
-    fn from_world(world: &mut World) -> Self {
-        let mesh_pipeline = { world.resource::<MeshPipeline>().clone() };
+fn init_custom_pipeline(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mesh_pipeline: Res<MeshPipeline>,
+) {
+    // Load the embedded shader by its virtual path
+    let shader: Handle<Shader> = asset_server
+        .load("embedded://bevy_pathfinding/debug/../../assets/shaders/instancing.wgsl");
 
-        // Load the embedded shader by its virtual path
-        let asset_server = world.resource::<AssetServer>();
-        let shader: Handle<Shader> = asset_server
-            .load("embedded://bevy_pathfinding/debug/../../assets/shaders/instancing.wgsl");
+    // Create a bind group layout descriptor for { texture, sampler }.
+    let texture_layout = BindGroupLayoutDescriptor::new(
+        "digit_texture_layout",
+        &[
+            // digit atlas texture
+            BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    multisampled: false,
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            // digit atlas sampler
+            BindGroupLayoutEntry {
+                binding: 1,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+            // arrow img texture
+            BindGroupLayoutEntry {
+                binding: 2,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    multisampled: false,
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            // arrow img sampler
+            BindGroupLayoutEntry {
+                binding: 3,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+            // 'x' img texture
+            BindGroupLayoutEntry {
+                binding: 4,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    multisampled: false,
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            // 'x' img sampler
+            BindGroupLayoutEntry {
+                binding: 5,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+            // destination img texture
+            BindGroupLayoutEntry {
+                binding: 6,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Texture {
+                    multisampled: false,
+                    sample_type: TextureSampleType::Float { filterable: true },
+                    view_dimension: TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            // destination img sampler
+            BindGroupLayoutEntry {
+                binding: 7,
+                visibility: ShaderStages::FRAGMENT,
+                ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    );
 
-        // Create a bind group layout for { texture, sampler }.
-        let render_device = world.resource::<RenderDevice>();
-        let texture_layout = render_device.create_bind_group_layout(
-            Some("digit_texture_layout"),
-            &[
-                // digit atlas texture
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // digit atlas sampler
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // arrow img texture
-                BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // arrow img sampler
-                BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // 'x' img texture
-                BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // 'x' img sampler
-                BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // destination img texture
-                BindGroupLayoutEntry {
-                    binding: 6,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        multisampled: false,
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                // destination img sampler
-                BindGroupLayoutEntry {
-                    binding: 7,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        );
-
-        CustomPipeline {
-            shader,
-            mesh_pipeline,
-            texture_layout,
-        }
-    }
+    commands.insert_resource(CustomPipeline {
+        shader,
+        mesh_pipeline: mesh_pipeline.clone(),
+        texture_layout,
+    });
 }
 
 impl SpecializedMeshPipeline for CustomPipeline {
@@ -547,8 +569,9 @@ impl SpecializedMeshPipeline for CustomPipeline {
 type DrawCustom = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
-    SetMeshBindGroup<1>,
-    SetDigitTextureBindGroup<2>,
+    SetMeshViewBindingArrayBindGroup<1>,
+    SetMeshBindGroup<2>,
+    SetDigitTextureBindGroup<3>,
     DrawMeshInstanced,
 );
 
@@ -601,14 +624,14 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
         else {
             return RenderCommandResult::Skip;
         };
-        let Some(gpu_mesh) = meshes.into_inner().get(mesh_instance.mesh_asset_id) else {
+        let Some(gpu_mesh) = meshes.into_inner().get(mesh_instance.mesh_asset_id()) else {
             return RenderCommandResult::Skip;
         };
         let Some(instance_buffer) = instance_buffer else {
             return RenderCommandResult::Skip;
         };
         let Some(vertex_buffer_slice) =
-            mesh_allocator.mesh_vertex_slice(&mesh_instance.mesh_asset_id)
+            mesh_allocator.mesh_vertex_slice(&mesh_instance.mesh_asset_id())
         else {
             return RenderCommandResult::Skip;
         };
@@ -622,12 +645,12 @@ impl<P: PhaseItem> RenderCommand<P> for DrawMeshInstanced {
                 count,
             } => {
                 let Some(index_buffer_slice) =
-                    mesh_allocator.mesh_index_slice(&mesh_instance.mesh_asset_id)
+                    mesh_allocator.mesh_index_slice(&mesh_instance.mesh_asset_id())
                 else {
                     return RenderCommandResult::Skip;
                 };
 
-                pass.set_index_buffer(index_buffer_slice.buffer.slice(..), 0, *index_format);
+                pass.set_index_buffer(index_buffer_slice.buffer.slice(..), *index_format);
                 pass.draw_indexed(
                     index_buffer_slice.range.start..(index_buffer_slice.range.start + count),
                     vertex_buffer_slice.range.start as i32,

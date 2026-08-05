@@ -47,6 +47,8 @@ impl Boid {
     ///
     /// # Example
     /// ```
+    /// use bevy_pathfinding::components::Boid;
+    ///
     /// Boid::new(50.0, 1.0, 1.0, 5.0);
     /// ```
     ///

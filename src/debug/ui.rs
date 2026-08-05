@@ -5,8 +5,7 @@ use super::resources;
 use super::resources::*;
 
 use bevy::color::palettes::css::WHITE;
-use bevy::window::SystemCursorIcon;
-use bevy::winit::cursor::CursorIcon;
+use bevy::window::{CursorIcon, SystemCursorIcon};
 use bevy::{prelude::*, window::PrimaryWindow};
 
 const CLR_TXT: Color = Color::srgb(0.8, 0.8, 0.8);
@@ -100,7 +99,6 @@ struct OptionBoxCtr {
 struct DropdownOptionsCtr {
     visible_node: VisibleNode,
     background_clr: BackgroundColor,
-    border_radius: BorderRadius,
     node: Node,
     name: Name,
 }
@@ -235,10 +233,10 @@ fn handle_hide_dbg_interaction(
 }
 
 fn toggle_dbg_visibility(
-    trigger: Trigger<ToggleDbgVisibilityEv>,
-    mut q_node: Query<&mut Node, With<VisibleNode>>,
-    mut q_border: Query<&mut BorderRadius, With<BoidsInfoCtr>>,
-    mut q_border_root: Query<&mut Node, (With<RootCtr>, Without<VisibleNode>)>,
+    trigger: On<ToggleDbgVisibilityEv>,
+    mut q_node: Query<&mut Node, (With<VisibleNode>, Without<BoidsInfoCtr>, Without<RootCtr>)>,
+    mut q_border: Query<&mut Node, (With<BoidsInfoCtr>, Without<RootCtr>)>,
+    mut q_border_root: Query<&mut Node, With<RootCtr>>,
     mut cmds: Commands,
 ) {
     let visible = trigger.event().0;
@@ -253,12 +251,12 @@ fn toggle_dbg_visibility(
 
     for mut node in q_node.iter_mut() {
         if visible {
-            *border = BorderRadius::bottom(Val::Px(10.0));
+            border.border_radius = BorderRadius::bottom(Val::Px(10.0));
             border_root.border.bottom = Val::Px(1.0);
             node.display = Display::Flex;
             cmds.trigger(HideOptionsEv);
         } else {
-            *border = BorderRadius::all(Val::Px(10.0));
+            border.border_radius = BorderRadius::all(Val::Px(10.0));
             border_root.border.bottom = Val::Px(5.0);
             node.display = Display::None;
         }
@@ -266,7 +264,7 @@ fn toggle_dbg_visibility(
 }
 
 fn hide_options(
-    _trigger: Trigger<HideOptionsEv>,
+    _trigger: On<HideOptionsEv>,
     mut q_node: Query<&mut Node, Or<(With<DropdownOptions>, With<BoidsDropdownOptionsCtr>)>>,
 ) {
     for mut node in q_node.iter_mut() {
@@ -275,7 +273,7 @@ fn hide_options(
 }
 
 fn update_active_dropdown_option(
-    _trigger: Trigger<UpdateDropdownOptionEv>,
+    _trigger: On<UpdateDropdownOptionEv>,
     dbg: Res<DbgOptions>,
     mut q_txt: Query<(&mut Text, &OptionBox)>,
 ) {
@@ -319,9 +317,9 @@ fn handle_boids_dropdown_interaction(
 }
 
 fn toggle_boids_dropdown_visibility(
-    _trigger: Trigger<ToggleBoidsDropdown>,
+    _trigger: On<ToggleBoidsDropdown>,
     mut q_node: Query<&mut Node, With<BoidsDropdownOptionsCtr>>,
-    mut q_border: Query<&mut BorderRadius, (With<BoidsInfoCtr>, Without<BoidsDropdownOptionsCtr>)>,
+    mut q_border: Query<&mut Node, (With<BoidsInfoCtr>, Without<BoidsDropdownOptionsCtr>)>,
 ) {
     let Ok(mut border) = q_border.single_mut() else {
         return;
@@ -330,9 +328,9 @@ fn toggle_boids_dropdown_visibility(
     for mut dropdown in q_node.iter_mut() {
         if dropdown.display == Display::Flex {
             dropdown.display = Display::None;
-            *border = BorderRadius::bottom(Val::Px(10.0));
+            border.border_radius = BorderRadius::bottom(Val::Px(10.0));
         } else if dropdown.display == Display::None {
-            *border = BorderRadius::bottom(Val::Px(0.0));
+            border.border_radius = BorderRadius::bottom(Val::Px(0.0));
             dropdown.display = Display::Flex
         }
     }
@@ -389,7 +387,7 @@ fn handle_drag(
 }
 
 fn toggle_dropdown_visibility(
-    trigger: Trigger<ToggleModeEv>,
+    trigger: On<ToggleModeEv>,
     mut q_dropdown: Query<(&mut Node, &DropdownOptions)>,
 ) {
     let option = trigger.event().0;
@@ -422,11 +420,11 @@ fn draw_ui_box(
         Node {
             flex_direction: FlexDirection::Column,
             border: UiRect::all(Val::Px(1.0)),
+            border_radius: BorderRadius::all(Val::Px(10.0)),
             ..default()
         },
         Button::default(),
         BorderColor::from(CLR_BORDER),
-        BorderRadius::all(Val::Px(10.0)),
         BackgroundColor::from(CLR_BACKGROUND_1),
         DebugUI,
         Name::new("Debug Container"),
@@ -446,10 +444,10 @@ fn draw_ui_box(
     let hide_dbg_btn = (
         HideDbgBtn,
         ImageNode::new(dbg_icon.0.clone()),
-        BorderRadius::all(Val::Px(10.0)),
         Node {
             width: Val::Px(25.0),
             height: Val::Px(25.0),
+            border_radius: BorderRadius::all(Val::Px(10.0)),
             ..default()
         },
         Name::new("Debug Icon"),
@@ -551,7 +549,6 @@ fn draw_ui_box(
         |border_radius: BorderRadius, padding: Option<f32>| DropdownOptionsCtr {
             visible_node: VisibleNode,
             background_clr: BackgroundColor::from(CLR_BACKGROUND_2),
-            border_radius,
             node: Node {
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::bottom(match padding {
@@ -559,6 +556,7 @@ fn draw_ui_box(
                     None => Val::Px(0.0),
                 }),
                 display: Display::None,
+                border_radius,
                 ..default()
             },
             name: Name::new("Options Container"),
@@ -572,10 +570,10 @@ fn draw_ui_box(
 
         (
             SetActiveOption { set, txt },
-            radius,
             Node {
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
                 margin: UiRect::left(Val::Px(5.0)),
+                border_radius: radius,
                 ..default()
             },
         )
@@ -593,11 +591,11 @@ fn draw_ui_box(
         BoidsInfoCtr,
         Button::default(),
         BackgroundColor::from(CLR_BACKGROUND_2),
-        BorderRadius::bottom(Val::Px(10.0)),
         BorderColor::from(CLR_BORDER),
         Node {
             padding: UiRect::all(Val::Px(5.0)),
             border: UiRect::top(Val::Px(1.0)),
+            border_radius: BorderRadius::bottom(Val::Px(10.0)),
             ..default()
         },
         Name::new("Boids Info Dropdown Button"),
@@ -618,11 +616,11 @@ fn draw_ui_box(
 
         (
             Button::default(),
-            radius,
             Node {
                 margin: UiRect::horizontal(Val::Px(5.0)),
                 padding: UiRect::new(Val::Px(5.0), Val::Px(5.0), Val::Px(2.5), Val::Px(2.5)),
                 justify_content: JustifyContent::SpaceBetween,
+                border_radius: radius,
                 ..default()
             },
             Name::new(format!("Boids Option Btn {}", txt)),
@@ -671,12 +669,12 @@ fn draw_ui_box(
         (
             BackgroundColor::from(CLR_BACKGROUND_1),
             BorderColor::from(CLR_BORDER),
-            BorderRadius::all(Val::Px(10.0)),
             boid,
             arrow,
             Node {
                 border: UiRect::all(Val::Px(1.0)),
                 padding: UiRect::horizontal(Val::Px(5.0)),
+                border_radius: BorderRadius::all(Val::Px(10.0)),
                 ..default()
             },
             Button::default(),
@@ -940,15 +938,15 @@ fn handle_slider_arrow_interaction(
                 }
 
                 background_clr.0 = CLR_BTN_HOVER.into();
-                border_clr.0 = WHITE.into();
+                border_clr.set_all(WHITE);
             }
             Interaction::Hovered => {
                 background_clr.0 = CLR_BTN_HOVER.into();
-                border_clr.0 = WHITE.into();
+                border_clr.set_all(WHITE);
             }
             Interaction::None => {
                 background_clr.0 = CLR_BACKGROUND_1.into();
-                border_clr.0 = CLR_BORDER.into();
+                border_clr.set_all(CLR_BORDER);
             }
         }
     }

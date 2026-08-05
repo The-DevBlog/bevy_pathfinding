@@ -30,7 +30,7 @@ fn draw_on_startup(mut cmds: Commands) {
 }
 
 fn set_active_dbg_flowfield(
-    trigger: Trigger<SetActiveFlowfieldEv>,
+    trigger: On<SetActiveFlowfieldEv>,
     mut cmds: Commands,
     mut active_dbg_flowfield: ResMut<ActiveDbgFlowfield>,
 ) {
@@ -47,7 +47,7 @@ fn set_active_dbg_flowfield(
     }
 }
 
-fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<DbgOptions>) {
+fn trigger_events(_trigger: On<DrawAllEv>, mut cmds: Commands, dbg: Res<DbgOptions>) {
     dbg.print("\ntrigger_events() start");
 
     cmds.trigger(DrawGridEv);
@@ -59,7 +59,7 @@ fn trigger_events(_trigger: Trigger<DrawAllEv>, mut cmds: Commands, dbg: Res<Dbg
 }
 
 fn draw_grid(
-    _trigger: Trigger<DrawGridEv>,
+    _trigger: On<DrawGridEv>,
     mut cmds: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     q_grid_lines: Query<Entity, With<GridLine>>,
@@ -140,7 +140,7 @@ fn draw_grid(
 }
 
 pub fn draw_flowfield(
-    _trigger: Trigger<DrawFlowFieldEv>,
+    _trigger: On<DrawFlowFieldEv>,
     dbg: Res<DbgOptions>,
     grid: Res<Grid>,
     active_dbg_flowfield: Res<ActiveDbgFlowfield>,
@@ -233,7 +233,7 @@ pub fn draw_flowfield(
 }
 
 fn draw_costfield(
-    _trigger: Trigger<DrawCostFieldEv>,
+    _trigger: On<DrawCostFieldEv>,
     dbg: Res<DbgOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,
@@ -310,7 +310,7 @@ fn draw_costfield(
 }
 
 fn draw_integration_field(
-    _trigger: Trigger<DrawIntegrationFieldEv>,
+    _trigger: On<DrawIntegrationFieldEv>,
     dbg: Res<DbgOptions>,
     active_dbg_flowfield: Res<ActiveDbgFlowfield>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -392,7 +392,7 @@ fn draw_integration_field(
 }
 
 fn draw_index(
-    _trigger: Trigger<DrawAllEv>,
+    _trigger: On<DrawAllEv>,
     dbg: Res<DbgOptions>,
     mut meshes: ResMut<Assets<Mesh>>,
     grid: Res<Grid>,

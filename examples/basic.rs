@@ -59,7 +59,7 @@ fn setup(
     let light = (
         DirectionalLight {
             illuminance: 5000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             shadow_depth_bias: 1.5,
             shadow_normal_bias: 1.0,
             ..default()

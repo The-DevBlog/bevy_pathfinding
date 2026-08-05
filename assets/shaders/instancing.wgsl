@@ -88,27 +88,27 @@ fn vertex(in: VertexInput) -> VertexOutput {
 ////////////////////////////////////////////////////////////////////////////////
 
 // DIGIT ATLAS
-@group(2) @binding(0)
+@group(3) @binding(0)
 var digit_atlas_texture: texture_2d<f32>;
-@group(2) @binding(1)
+@group(3) @binding(1)
 var digit_atlas_sampler: sampler;
 
 // ARROW IMG
-@group(2) @binding(2)
+@group(3) @binding(2)
 var arrow_texture: texture_2d<f32>;
-@group(2) @binding(3)
+@group(3) @binding(3)
 var arrow_sampler: sampler;
 
 // 'X' IMG
-@group(2) @binding(4)
+@group(3) @binding(4)
 var x_texture: texture_2d<f32>;
-@group(2) @binding(5)
+@group(3) @binding(5)
 var x_sampler: sampler;
 
 // 'X' IMG
-@group(2) @binding(6)
+@group(3) @binding(6)
 var destination_texture: texture_2d<f32>;
-@group(2) @binding(7)
+@group(3) @binding(7)
 var destination_sampler: sampler;
 
 ////////////////////////////////////////////////////////////////////////////////
